@@ -4,7 +4,7 @@ import withNuxt from './.nuxt/eslint.config.mjs';
 
 export default withNuxt(
 	antfu({
-		// Throwaway spike for issue #4; not app code.
+		// Throwaway spikes (issues #4, #13, #18, #19); not app code.
 		ignores: ['spike/**'],
 		antislop: true,
 		typescript: true,
@@ -19,4 +19,13 @@ export default withNuxt(
 			indent: 'tab',
 		},
 	}),
+	{
+		// The glossary is written as `**Term** (em dash) definition`, so the
+		// antislop em-dash rule fights its own house style. This is why
+		// `pnpm lint` failed on main.
+		files: ['**/*.md', '**/*.md/**'],
+		rules: {
+			'slop/no-em-dash': 'off',
+		},
+	},
 );

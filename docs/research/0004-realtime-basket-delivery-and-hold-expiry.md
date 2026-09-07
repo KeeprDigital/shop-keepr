@@ -17,14 +17,14 @@ expiry sweeper — but lazy expiry on read is the correctness invariant, not the
 
 Concretely:
 
-| Requirement | Mechanism |
-| --- | --- |
-| Push Basket to staff | Hibernatable WebSockets on a per-store DO (`store:<storeId>`), fan-out via crossws pub/sub |
-| Hold expiry | `expiresAt` timestamp is authoritative; every read filters `expiresAt > now`. One DO alarm set to the earliest `expiresAt` fires the release *event* (broadcast + row GC) |
-| Hold state lives | **Inside the DO's SQLite storage**, not the primary store. The primary store owns Movements and Inventory Items; the DO owns reservations |
+| Requirement          | Mechanism                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Push Basket to staff | Hibernatable WebSockets on a per-store DO (`store:<storeId>`), fan-out via crossws pub/sub                                                                                |
+| Hold expiry          | `expiresAt` timestamp is authoritative; every read filters `expiresAt > now`. One DO alarm set to the earliest `expiresAt` fires the release _event_ (broadcast + row GC) |
+| Hold state lives     | **Inside the DO's SQLite storage**, not the primary store. The primary store owns Movements and Inventory Items; the DO owns reservations                                 |
 
 Rejected: Ably (solves only transport, leaves expiry needing a DO or cron anyway, adds a
-vendor and a token-minting endpoint). Rejected as the *only* mechanism: polling (it is
+vendor and a token-minting endpoint). Rejected as the _only_ mechanism: polling (it is
 genuinely sufficient for correctness, and costs more requests than hibernated WebSockets at
 this scale — see [§7](#7-the-honest-lower-bound-polling--lazy-expiry)).
 
@@ -32,7 +32,7 @@ this scale — see [§7](#7-the-honest-lower-bound-polling--lazy-expiry)).
 
 Cloudflare publishes **no delivery-latency guarantee** for alarms — only at-least-once
 execution with exponential-backoff retry ([§1](#1-do-alarms)). So an alarm must never be the
-thing that *makes* a Hold expired; otherwise a late alarm sells a card twice. Making
+thing that _makes_ a Hold expired; otherwise a late alarm sells a card twice. Making
 `expiresAt` authoritative and computing available-to-promise as
 `on-hand − Σ(holds where expiresAt > now)` means:
 
@@ -41,7 +41,7 @@ thing that *makes* a Hold expired; otherwise a late alarm sells a card twice. Ma
   deleting dead rows;
 - the design degrades to plain polling if the socket drops, with no correctness change.
 
-This is the cheap-to-extend answer the map asks for: the expiry *rule* is a pure function of
+This is the cheap-to-extend answer the map asks for: the expiry _rule_ is a pure function of
 `(now, holds)` that is testable without any Cloudflare runtime at all.
 
 ---
@@ -53,11 +53,11 @@ primary store. **This recommendation does not depend on that outcome**, because 
 primary-store data: it is short-lived, TTL-scoped, never audited, and must be serialised
 against concurrent kiosks. Movements are the opposite on every axis.
 
-| #2 outcome | Where Holds live | What changes |
-| --- | --- | --- |
-| **D1** | DO SQLite (recommended shape) | Strongest case for the DO. D1 has **no interactive transactions** — `BEGIN TRANSACTION` errors, and `.batch()` cannot interleave JS between statements ([§8](#8-d1-and-serialisation)). Since available-to-promise is a ledger sum minus holds, a safe "reserve the last copy" is a read-modify-write that D1 cannot do atomically. The DO's global-uniqueness guarantee supplies exactly that serialisation point. |
-| **Postgres via Hyperdrive** | DO SQLite still, or Postgres | Postgres *can* do the read-modify-write in one transaction (`SELECT … FOR UPDATE`), so Holds-in-Postgres becomes viable. Keep them in the DO anyway unless the team wants one fewer moving part: Holds in Postgres means the alarm still lives in a DO (or a cron), and a Hold write becomes a Hyperdrive round-trip on every kiosk tap. Caution: an outbound connection from a DO **prevents hibernation and incurs duration charges for up to 15 minutes per connection** ([§2](#2-websocket-hibernation-cost-model)) — so do not hold a Postgres connection open inside the socket DO. |
-| **DO SQLite as primary store** | Same DO, separate tables | Holds and Movements land in the same SQLite database. Simplest of the three; the whole store is one DO. Watch the 10 GB per-object storage ceiling ([§3](#3-partitioning-per-store-vs-per-sku)) and note that a single DO caps at a **soft 1,000 req/s** — irrelevant at one store. |
+| #2 outcome                     | Where Holds live              | What changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1**                         | DO SQLite (recommended shape) | Strongest case for the DO. D1 has **no interactive transactions** — `BEGIN TRANSACTION` errors, and `.batch()` cannot interleave JS between statements ([§8](#8-d1-and-serialisation)). Since available-to-promise is a ledger sum minus holds, a safe "reserve the last copy" is a read-modify-write that D1 cannot do atomically. The DO's global-uniqueness guarantee supplies exactly that serialisation point.                                                                                                                                                                       |
+| **Postgres via Hyperdrive**    | DO SQLite still, or Postgres  | Postgres _can_ do the read-modify-write in one transaction (`SELECT … FOR UPDATE`), so Holds-in-Postgres becomes viable. Keep them in the DO anyway unless the team wants one fewer moving part: Holds in Postgres means the alarm still lives in a DO (or a cron), and a Hold write becomes a Hyperdrive round-trip on every kiosk tap. Caution: an outbound connection from a DO **prevents hibernation and incurs duration charges for up to 15 minutes per connection** ([§2](#2-websocket-hibernation-cost-model)) — so do not hold a Postgres connection open inside the socket DO. |
+| **DO SQLite as primary store** | Same DO, separate tables      | Holds and Movements land in the same SQLite database. Simplest of the three; the whole store is one DO. Watch the 10 GB per-object storage ceiling ([§3](#3-partitioning-per-store-vs-per-sku)) and note that a single DO caps at a **soft 1,000 req/s** — irrelevant at one store.                                                                                                                                                                                                                                                                                                       |
 
 In every case: on Basket confirmation, the DO writes the sale-out **Movement** to the primary
 store and then deletes the Hold. That write is the transactional boundary; the Hold is not.
@@ -76,7 +76,7 @@ Source: [Alarms API](https://developers.cloudflare.com/durable-objects/api/alarm
   alarm." → Many Holds must be multiplexed onto one alarm.
 - **Cloudflare documents the exact multiplexing pattern** we need: store the schedule in
   storage, have `alarm()` process due events and reschedule itself for the next one
-  ("Scheduling multiple events with a single alarm"). Our Hold table *is* that schedule.
+  ("Scheduling multiple events with a single alarm"). Our Hold table _is_ that schedule.
 - **Reliability.** "Alarms have guaranteed at-least-once execution and are retried
   automatically when the `alarm()` handler throws." "Retries are performed using exponential
   backoff starting at a 2 second delay from the first failure with up to 6 retries allowed."
@@ -86,7 +86,7 @@ Source: [Alarms API](https://developers.cloudflare.com/durable-objects/api/alarm
 - **Granularity.** Scheduling is millisecond-precision (`setAlarm(scheduledTimeMs)`), but
   there is **no published upper bound on firing latency**. The announcement post only says
   "Single failures should resolve in under 30 seconds, while multiple failures may take
-  slightly longer" — that is about *retry* latency, not steady-state delivery. Treat alarm
+  slightly longer" — that is about _retry_ latency, not steady-state delivery. Treat alarm
   timing as best-effort; hence lazy expiry.
 - **Alarms are durable.** "Alarms are modified using the Storage API, and alarm operations
   follow the same rules as other storage operations." Storage survives eviction and restart
@@ -112,7 +112,7 @@ field, "At every minute"), the account is capped at 5 (Free) / 250 (Paid) trigge
 ([Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)).
 Cloudflare's own framing: "Alarms are more fine grained than Cron Triggers … it can have an
 unlimited amount of Durable Objects, each of which can have an alarm set." A one-minute
-sweeper is *acceptable* for a TTL measured in minutes, but it is a worse fit and it still
+sweeper is _acceptable_ for a TTL measured in minutes, but it is a worse fit and it still
 needs somewhere to push from.
 
 ### 2. WebSocket hibernation cost model
@@ -145,7 +145,7 @@ Sources: [Use WebSockets](https://developers.cloudflare.com/durable-objects/best
   Object in memory and causes it to incur duration charges for up to 15 minutes per
   connection, even with no incoming requests."
 - **SSE is the worse cousin.** A held-open SSE response is "a request/event still being
-  processed", so the object stays in the *idle, in-memory, non-hibernateable* state and
+  processed", so the object stays in the _idle, in-memory, non-hibernateable_ state and
   "continues to incur duration charges". SSE is simpler to write and strictly more expensive
   to run. Prefer WebSocket + hibernation.
 - **Request billing.** "Includes HTTP requests, RPC sessions, WebSocket messages, and alarm
@@ -180,7 +180,7 @@ argument against Durable Objects does not exist at this scale.
   four screens is four orders of magnitude below that. There is no throughput reason to shard.
 - **A Basket spans SKUs.** Adding three cards to a Basket must reserve three Inventory Items.
   With per-SKU DOs that is a three-way distributed transaction with no rollback primitive —
-  Cloudflare gives you atomicity *within* an object, not across objects. Per-store makes it one
+  Cloudflare gives you atomicity _within_ an object, not across objects. Per-store makes it one
   local SQLite transaction.
 - **One alarm, not N.** Per-SKU means one alarm per SKU (fine — "unlimited amount of Durable
   Objects, each of which can have an alarm set") but also N objects to wake, N `setAlarm()`
@@ -192,7 +192,7 @@ argument against Durable Objects does not exist at this scale.
   instance "every connection across your app already lands on that same Durable Object, so
   `peer.publish()` is cluster-global out of the box. **No backplane needed.**" Sharding would
   force a sync backplane, and crossws documents that relayed inbound delivery is then
-  best-effort: "A message relayed *into* a hibernated Durable Object may miss some sockets."
+  best-effort: "A message relayed _into_ a hibernated Durable Object may miss some sockets."
   Per-store sidesteps this entirely.
 - **Multi-store later is free.** The map mandates `storeId` on every table. `getByName(\`store:${storeId}\`)`
   scales to N stores by construction — the partition key is already the tenancy key. This is
@@ -213,12 +213,12 @@ Source: [Lifecycle → Shutdown behavior](https://developers.cloudflare.com/dura
 [Access DO Storage](https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/),
 [Migrations](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/).
 
-| Thing | Survives hibernation | Survives eviction / restart / deploy |
-| --- | --- | --- |
-| SQLite / KV storage (Holds) | Yes | **Yes** |
-| Alarm | Yes | **Yes** (it is storage) |
-| In-memory instance fields | **No** | No |
-| WebSocket connections | **Yes** | **No** — terminated |
+| Thing                       | Survives hibernation | Survives eviction / restart / deploy |
+| --------------------------- | -------------------- | ------------------------------------ |
+| SQLite / KV storage (Holds) | Yes                  | **Yes**                              |
+| Alarm                       | Yes                  | **Yes** (it is storage)              |
+| In-memory instance fields   | **No**               | No                                   |
+| WebSocket connections       | **Yes**              | **No** — terminated                  |
 
 - Objects restart routinely: "New Worker deployments with code updates", inactivity, "Cloudflare
   updates to the Workers runtime system", "Workers runtime decisions on where to host objects".
@@ -245,7 +245,7 @@ Source: [Lifecycle → Shutdown behavior](https://developers.cloudflare.com/dura
   its stored data permanently**"; "There is no Trash for Durable Object namespaces deleted
   through `exports`." Also "Storage type is immutable once a namespace exists." If Holds are
   the only thing in the DO, a botched migration costs at most one TTL window of reservations —
-  a real argument for *not* putting Movements in the same DO unless #2 chooses DO SQLite
+  a real argument for _not_ putting Movements in the same DO unless #2 chooses DO SQLite
   deliberately.
 - **PITR as a safety net.** SQLite-backed DOs "offer Point In Time Recovery API which can
   restore a Durable Object's embedded SQLite database contents … to any point in the past 30
@@ -266,7 +266,7 @@ Read from source
   `undefined` for non-upgrade requests, and `createHandler` then falls through to the normal
   Worker `fetchHandler` (verified in `_module-handler.ts`). A `ctxExt.durableFetch()` escape
   hatch is exposed if a route wants to forward into the DO deliberately. This corrects the
-  wording on the current Nitro docs site, which describes the preset as routing *requests*
+  wording on the current Nitro docs site, which describes the preset as routing _requests_
   through a DO.
 - Two Nitro hooks are wired for us: **`cloudflare:durable:init`** (called from the DO
   constructor) and **`cloudflare:durable:alarm`** (the DO's `alarm()` handler calls
@@ -287,10 +287,10 @@ Read from source
 ```jsonc
 // wrangler.jsonc — required, not generated
 {
-  "durable_objects": {
-    "bindings": [{ "name": "$DurableObject", "class_name": "$DurableObject" }]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["$DurableObject"] }]
+	"durable_objects": {
+		"bindings": [{ "name": "$DurableObject", "class_name": "$DurableObject" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["$DurableObject"] }]
 }
 ```
 
@@ -332,7 +332,7 @@ Hold state stays in the DO.
 every 3 s from four screens is not a load problem. The ticket asks whether this is enough — and
 on correctness, it is.
 
-Three things argue against shipping polling *alone*:
+Three things argue against shipping polling _alone_:
 
 1. **It costs more, not less.** 4 clients × 1 request/3 s × 12 h/day ≈ 57,600 requests/day ≈
    **1.7M Worker requests/month**, each doing a ledger-sum query against the primary store. The
@@ -387,10 +387,10 @@ baskets(id, number, customer_name, status, created_at)
   insert Hold, insert/update Basket line → `setAlarm(min(expires_at))` if earlier than current
   → `publish("store:<id>:queue", snapshot)`.
 - **ATP source** depends on #2. If the ledger is in D1/Postgres, the DO caches on-hand per SKU
-  and refreshes it on write; the DO remains authoritative for *holds*, which is what needs
+  and refreshes it on write; the DO remains authoritative for _holds_, which is what needs
   serialising. If the ledger is in the same DO, it is a local `SUM`.
 - **`alarm()`** (via the `cloudflare:durable:alarm` Nitro hook) → `DELETE FROM holds WHERE
-  expires_at <= now` → broadcast → `setAlarm(next min(expires_at))`, all inside `try/catch`
+expires_at <= now` → broadcast → `setAlarm(next min(expires_at))`, all inside `try/catch`
   that reschedules on failure.
 - **Every read** filters `expires_at > now`. The alarm is never trusted for correctness.
 - **Clients** subscribe on connect, receive a full snapshot, and fall back to 5 s polling
