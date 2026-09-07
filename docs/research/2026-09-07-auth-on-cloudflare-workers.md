@@ -522,11 +522,19 @@ per-key usage caps — the right granularity, and revocation is still one DB del
 
 ---
 
-## 6. Compatibility with the open data-layer decision (#2)
+## 6. Compatibility with the data-layer decision (#2)
 
-Issue #2 is unresolved between D1, Postgres via Hyperdrive, and Durable Object SQLite. **The
-recommendation survives all three**, which is the point of choosing a library over a hosted vendor.
-Costs differ:
+> **Resolved after this research was written: [#2](https://github.com/KeeprDigital/shop-keepr/issues/2)
+> picked D1.** That is the ✅ row below — the best-supported path, and the one that needs no spike.
+> **Auth tables go in the same D1 database as the app schema.** No Hyperdrive spike, no separate auth
+> database. Findings: `docs/research/2026-09-07-cloudflare-data-layer.md` on branch
+> `research/cloudflare-data-layer`.
+>
+> The matrix below is kept as written, because the reasoning is what makes the decision reversible.
+> If the data layer is ever revisited, this says what auth would cost under each alternative.
+
+The analysis was done against all three candidates while #2 was open. **The recommendation survives
+all three**, which is the point of choosing a library over a hosted vendor. Costs differ:
 
 | Data layer | Better Auth verdict | Evidence and cost |
 |---|---|---|
@@ -543,17 +551,35 @@ Sources: <https://developers.cloudflare.com/durable-objects/api/storage-api/>,
 
 **Recommended composition, stated plainly:**
 
-- **#2 picks D1** → auth tables in the same D1 database. Cleanest outcome; nothing more to decide.
-- **#2 picks Hyperdrive/Postgres** → auth tables in the same Postgres, standard CLI migrations. The
-  most boring option and the only one where a stock Postgres adapter drops in unmodified — but spike
+- ✅ **D1 (the decision taken)** → auth tables in the same D1 database. Cleanest outcome; nothing
+  more to decide, and item 6 in [§7](#7-what-this-leaves-open) is discharged.
+- **Hyperdrive/Postgres** → auth tables in the same Postgres, standard CLI migrations. The most
+  boring option and the only one where a stock Postgres adapter drops in unmodified — but spike
   Better Auth + Hyperdrive specifically, because no one has published it working.
-- **#2 picks DO SQLite** → **add a small D1 for auth only.** This does **not** block the
+- **DO SQLite** → **add a small D1 for auth only.** This would **not** have blocked the
   recommendation. Auth data and inventory data have nothing to join on except an opaque
   `actorUserId`, so the split is free; it is one extra binding.
 
-Please carry that last line into the #2 thread: DO SQLite should not be discarded on the false
-belief that it forces an auth rewrite, and equally it should not be chosen on the belief that it can
-host the auth tables. It can do neither.
+The point that was carried into the #2 thread while it was open, preserved because it is the kind of
+thing that gets re-litigated: DO SQLite should not be discarded on the false belief that it forces an
+auth rewrite, and equally should not be chosen on the belief that it can host the auth tables. It can
+do neither.
+
+### Two conventions #2 landed that touch the auth tables
+
+1. **"Never hand D1 a `Date`; store timestamps as epoch-ms integers."** This is #2's app-schema
+   convention, prompted partly by [#10816](https://github.com/better-auth/better-auth/issues/10816).
+   **It does not need extending to the auth tables** — Better Auth's Kysely/D1 path already sets
+   `supportsDates: false` for SQLite and serialises internally. The convention and the bug are the
+   same underlying D1 constraint seen from two sides; the built-in adapter is precisely the component
+   that already handles it, which is a second reason to prefer it over Drizzle here.
+2. **`db.withSession()` from day one, with read replication off.** #2 recommends adopting the call
+   pattern pre-emptively so enabling replication later cannot introduce a read-your-writes bug. That
+   is the right instinct and it strengthens the caution in [§1](#workers-kv-is-disqualified-for-sessions):
+   the auth library will never route its own queries through a session handle, so if replication is
+   ever switched on, **the auth tables must stay off it**. #2 also flags that D1 read replication's
+   status is ambiguous — the docs page carries no beta label, but the only changelog status statement
+   remains "public beta" (2025-04-10) with no GA entry through 2026-09-01. Not for MVP.
 
 **Contrast: the hosted vendors are data-layer-agnostic** because they hold the users themselves.
 That is their only genuine advantage in this matrix, and it is the same fact as the lock-in.
@@ -576,8 +602,9 @@ Ordered by how much it would hurt to discover late.
 4. **Workers Paid plan** — now a hard requirement, not a preference. Needs to be an accepted cost.
 5. **`compatibility_date` ≥ `2026-08-04`**, and be aware Nitro 2 writes `no_nodejs_compat_v2` into
    the generated Wrangler config regardless. Belongs with the deployment/environments ticket.
-6. **If #2 picks Hyperdrive**, spike Better Auth + Hyperdrive specifically. Nobody has published it
-   working; the reasoning that it should work is sound but unproven.
+6. ~~**If #2 picks Hyperdrive**, spike Better Auth + Hyperdrive specifically.~~ **Discharged** —
+   #2 chose D1, which is the first-party documented path. Only reopens if the data layer is
+   revisited.
 7. **`BETTER_AUTH_SECRET`** via `wrangler secret put`, never in `wrangler.jsonc`.
 8. **`actorUserId` on Movement** — decide now. Cheap now, expensive later. Feeds the map's open
    "migration path from shared login to per-staff users" item.
@@ -655,7 +682,8 @@ Nitro:
 Stated here so nobody later mistakes them for established fact:
 
 - **Better Auth + Hyperdrive** has no primary source showing it working. The reasoning is sound; the
-  demonstration does not exist.
+  demonstration does not exist. Moot now that #2 chose D1, but it would need proving before any
+  future move to Postgres.
 - **CPU cost of the *fixed* `node:crypto` scrypt path** at `N=16384, r=16` on Workers is unpublished.
   The ~5 s figure in issue #8860 is for the *broken* pure-JS path. Measure it; do not assume it.
 - Whether Nitro 2's `no_nodejs_compat_v2` substitution changes the export-condition resolution that
