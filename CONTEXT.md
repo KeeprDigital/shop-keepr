@@ -4,9 +4,15 @@ Glossary for the domain. Terms here beat synonyms; if code or an issue drifts to
 
 ## Cards and stock
 
-**Card** — a card the store holds or transacts. Identified by the card API's identifier together with its **Condition**: four Near Mint copies and one Lightly Played copy of the same printing are two Cards, each with its own quantity and its own prices. Staff say "card" both for a printing and for the stock the store holds of it; shop-keepr models only the latter, because printing identity belongs to the card API and not to this system. A Card absorbs printing, variation, finish and language — none of which shop-keepr interprets.
+**Game System** — a trading card game the store trades in: Magic: The Gathering, Pokémon, Yu-Gi-Oh and others. Game Systems are never browsed together: a customer or staff member picks one first, because a Game System's attributes are meaningless in another. A card's colour means something in Magic and nothing in Pokémon.
 
-**Condition** — the physical grade of a Card, on the near-universal Magic: The Gathering scale: Near Mint (NM), Lightly Played (LP), Moderately Played (MP), Heavily Played (HP), Damaged (DMG).
+**Catalogue** — the system of record for card data: every Printing across every Game System, and each one's Market Price. It is external to shop-keepr, which consumes it and never writes to it. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
+
+**Printing** — a card as the Catalogue defines it, identified by the Catalogue's own identifier: a specific card in a specific set, variation, finish and language. A Printing exists whether or not the store has ever held one, which is what makes it searchable before any stock does. shop-keepr does not *interpret* a Printing's attributes — it has no rules engine and no notion of legality or play — but it does store, index and display them.
+
+**Card** — a Printing together with a Condition, that the store holds or transacts. Four Near Mint copies and one Lightly Played copy of the same Printing are two Cards, each with its own quantity and its own prices. Staff say "card" for both a Printing and the stock the store holds of it; where the difference matters, use the precise term.
+
+**Condition** — the physical grade of a Card: Near Mint (NM), Lightly Played (LP), Moderately Played (MP), Heavily Played (HP), Damaged (DMG). One scale, used across every Game System the store trades in.
 
 ## Cards moving
 
@@ -27,9 +33,9 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 ## Prices
 
-**Market Price** — a Card's price as supplied by the card API. Not set by the store.
+**Market Price** — a Card's price as supplied by the Catalogue. Not set by the store, and never shown to a customer: it is an input to the store's own prices, not a price anyone is offered.
 
-**Sell Price** — what the store asks for a Card. Derived from Market Price by a rule, and overridable.
+**Sell Price** — what the store asks for a Card. Derived from Market Price by a rule, and overridable. This is the only price a kiosk customer ever sees.
 
 **Buy Price** — what the store pays for a Card. Derived from Market Price by a buy percentage.
 
