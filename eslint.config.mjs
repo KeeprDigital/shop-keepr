@@ -4,7 +4,7 @@ import withNuxt from './.nuxt/eslint.config.mjs';
 
 export default withNuxt(
 	antfu({
-		// Throwaway spike for issue #4; not app code.
+		// Throwaway spikes for issues #4 and #13; not app code.
 		ignores: ['spike/**'],
 		antislop: true,
 		typescript: true,
