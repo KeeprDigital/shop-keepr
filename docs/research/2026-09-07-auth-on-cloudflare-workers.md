@@ -12,21 +12,21 @@ Research findings for [issue #3](https://github.com/KeeprDigital/shop-keepr/issu
 
 **One library, two credentials, two API surfaces.**
 
-| Surface | Mechanism |
-|---|---|
-| Staff internal UI | **Better Auth** email+password, DB-backed session cookie, `cookieCache` **off** |
-| Kiosk screen | **Better Auth API Key plugin**, key delivered as an `HttpOnly` device cookie, read via `customAPIKeyGetter` |
+| Surface           | Mechanism                                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| Staff internal UI | **Better Auth** email+password, DB-backed session cookie, `cookieCache` **off**                             |
+| Kiosk screen      | **Better Auth API Key plugin**, key delivered as an `HttpOnly` device cookie, read via `customAPIKeyGetter` |
 
 Both credentials are rows in the same database, revoked the same way, provisioned from the same
 admin UI. No second identity system, no per-MAU billing, no vendor holding the store's user list.
 
-**Do not use Cloudflare Access as the primary mechanism.** It is a reasonable *extra* network-layer
+**Do not use Cloudflare Access as the primary mechanism.** It is a reasonable _extra_ network-layer
 lock on `/admin` later, once staff have individual identities. It cannot serve the kiosk, and for a
 single shared login it adds a whole second identity system for no gain.
 
 **Do not put the kiosk token in JavaScript-reachable storage.** The kiosk is a public touchscreen;
 anything `localStorage` holds is one devtools session away from a customer. See
-[Challenging the proposed kiosk shape](#challenging-the-proposed-kiosk-shape).
+[Challenging the proposed kiosk shape](#5-challenging-the-proposed-kiosk-shape).
 
 **Four hard requirements** fall out of this and belong in the deployment ticket:
 
@@ -38,7 +38,7 @@ anything `localStorage` holds is one devtools session away from a customer. See
    The Drizzle adapter has an open, unworkaroundable D1 date bug. See [§2](#do-not-use-the-drizzle-adapter-for-the-auth-tables-on-d1).
 
 This last one is a direct correction to the ticket's framing of Better Auth as "self-hosted, Drizzle
-adapter". Drizzle can still own the *application* schema; it should not own the *auth* schema on D1.
+adapter". Drizzle can still own the _application_ schema; it should not own the _auth_ schema on D1.
 
 ---
 
@@ -101,8 +101,8 @@ Workers limits:
 This is the single most important operational finding in this document, and it is not something you
 would discover from any marketing page.
 
-Better Auth issue [#8860](https://github.com/better-auth/better-auth/issues/8860) — *"email/password
-sign-up exceeds CPU time limit on Cloudflare Workers"*, opened 2026-03-31, closed 2026-04-01 —
+Better Auth issue [#8860](https://github.com/better-auth/better-auth/issues/8860) — _"email/password
+sign-up exceeds CPU time limit on Cloudflare Workers"_, opened 2026-03-31, closed 2026-04-01 —
 documents pure-JS `@noble/hashes` scrypt at `N=16384, r=16, p=1` burning **~4.5–5 s of CPU** on
 Workers, hitting `exceededCpu`.
 
@@ -146,10 +146,10 @@ here. But it still rules the Free plan out, and the version pin is still mandato
 ### Bindings at module scope
 
 Better Auth wants a database handle when the `auth` object is constructed. Cloudflare documents
-`import { env } from "cloudflare:workers"` for exactly this: *"Importing `env` from
+`import { env } from "cloudflare:workers"` for exactly this: _"Importing `env` from
 `cloudflare:workers` is useful when you need to access a binding such as secrets or environment
-variables in top-level global scope."* The caveat — *"Workers do not allow I/O from outside a
-request context"* — does not bite, because constructing the adapter performs no I/O.
+variables in top-level global scope."_ The caveat — _"Workers do not allow I/O from outside a
+request context"_ — does not bite, because constructing the adapter performs no I/O.
 
 - Source: <https://developers.cloudflare.com/workers/runtime-apis/bindings/>
 
@@ -159,12 +159,12 @@ inside `defineEventHandler` for request work (Nitro 2 — see the Nitro-version 
 ### Workers KV is disqualified for sessions
 
 If sessions live in KV, revocation is not immediate — and the usual "up to 60 seconds" summary is
-understated. Cloudflare's exact wording is that changes *"may take up to 60 seconds **or more** to be
-visible in other global network locations"*, where 60 s is merely the **default `cacheTtl`** — tuning
+understated. Cloudflare's exact wording is that changes _"may take up to 60 seconds **or more** to be
+visible in other global network locations"_, where 60 s is merely the **default `cacheTtl`** — tuning
 `cacheTtl` up for performance lengthens the window. There is not even a read-your-writes guarantee at
-the writing location: *"At the … location at which changes are made, these changes are usually
+the writing location: _"At the … location at which changes are made, these changes are usually
 immediately visible. However, this is not guaranteed and therefore it is not advised to rely on this
-behaviour."* KV is also *"not ideal for applications where you need support for atomic operations"*
+behaviour."_ KV is also _"not ideal for applications where you need support for atomic operations"_
 and is limited to 1 write/sec per key.
 
 - Sources: <https://developers.cloudflare.com/kv/concepts/how-kv-works/>,
@@ -176,7 +176,7 @@ later.
 
 Related nuance for the #2 thread: **D1 without read replication is single-primary and strongly
 consistent.** With replication enabled you get documented read-your-own-writes and monotonic reads
-*only* if queries route through a single `withSession()` handle — which a general-purpose auth
+_only_ if queries route through a single `withSession()` handle — which a general-purpose auth
 library will not do for you. If #2 turns on D1 read replication, keep the auth tables off it, or
 accept the same staleness class as KV.
 
@@ -198,20 +198,21 @@ environments".
 Better Auth's own database docs carry a Cloudflare D1 example that passes the binding straight in:
 
 ```ts
-import { env } from "cloudflare:workers";
-import { betterAuth } from "better-auth";
+import { betterAuth } from 'better-auth';
+import { env } from 'cloudflare:workers';
 
 export const auth = betterAuth({
-  database: env.DB,
-  // ... rest of config
+	database: env.DB,
+	// ... rest of config
 });
 ```
 
-Because the CLI cannot reach D1 (*"Cloudflare D1 can only be queried through a Cloudflare Worker,
-so the CLI cannot access it directly"*), schema is applied with **programmatic migrations**:
+Because the CLI cannot reach D1 (_"Cloudflare D1 can only be queried through a Cloudflare Worker,
+so the CLI cannot access it directly"_), schema is applied with **programmatic migrations**:
 
 ```ts
-import { getMigrations } from "better-auth/db/migration";
+import { getMigrations } from 'better-auth/db/migration';
+
 const { toBeCreated, toBeAdded, runMigrations } = await getMigrations(auth.options);
 await runMigrations();
 ```
@@ -242,7 +243,7 @@ reaches D1, which rejects it with `D1_TYPE_ERROR: Type 'object' not supported`. 
 (`supportsDates: false` for SQLite); `DrizzleAdapterConfig` exposes no override.
 
 **So: auth tables use Better Auth's built-in D1/Kysely path (`database: env.DB`).** Drizzle remains
-perfectly fine for the *application* schema — inventory, movements, baskets, holds. Two query layers
+perfectly fine for the _application_ schema — inventory, movements, baskets, holds. Two query layers
 against one D1 database is not a problem; they touch disjoint tables and never need a join beyond an
 opaque `actorUserId`. It is a smaller cost than it first sounds, and it buys the first-party,
 documented path.
@@ -281,7 +282,8 @@ Official page. Mount a catch-all Nitro route:
 
 ```ts
 // server/api/auth/[...all].ts
-import { auth } from "~~/lib/auth";
+import { auth } from '~~/lib/auth';
+
 export default defineEventHandler(event => auth.handler(toWebRequest(event)));
 ```
 
@@ -330,25 +332,26 @@ good option here.
 
 Shipped as its own package, `@better-auth/api-key`, since 1.5. Relevant capabilities, all documented:
 
-| Need | API Key plugin |
-|---|---|
-| Long-lived | `expiresIn` in seconds, or omitted for no expiry |
-| Revocable | `auth.api.deleteApiKey()`, `updateApiKey({ enabled: false })` |
-| Scoped | `permissions: Record<string, string[]>` on the key; `verifyApiKey({ key, permissions })` checks them |
-| Usage caps | `remaining` / `refillInterval` / `refillAmount`; key auto-disabled at 0 |
-| Rate limited | `rateLimitEnabled`, `rateLimitTimeWindow`, `rateLimitMax` |
-| Labelled per device | `metadata` |
-| Not in a header | `customAPIKeyGetter(ctx)` — return the key from anywhere on the request, **including a cookie** |
-| Acts as a session | `enableSessionForAPIKeys: true` synthesises a session from a user-owned key |
+| Need                | API Key plugin                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| Long-lived          | `expiresIn` in seconds, or omitted for no expiry                                                     |
+| Revocable           | `auth.api.deleteApiKey()`, `updateApiKey({ enabled: false })`                                        |
+| Scoped              | `permissions: Record<string, string[]>` on the key; `verifyApiKey({ key, permissions })` checks them |
+| Usage caps          | `remaining` / `refillInterval` / `refillAmount`; key auto-disabled at 0                              |
+| Rate limited        | `rateLimitEnabled`, `rateLimitTimeWindow`, `rateLimitMax`                                            |
+| Labelled per device | `metadata`                                                                                           |
+| Not in a header     | `customAPIKeyGetter(ctx)` — return the key from anywhere on the request, **including a cookie**      |
+| Acts as a session   | `enableSessionForAPIKeys: true` synthesises a session from a user-owned key                          |
 
 Sources:
+
 - <https://better-auth.com/docs/plugins/api-key>
 - <https://better-auth.com/docs/plugins/api-key/advanced>
 - <https://better-auth.com/docs/plugins/api-key/reference>
 
-Note the docs' own warning on `enableSessionForAPIKeys`: *"This is generally not recommended, as it
+Note the docs' own warning on `enableSessionForAPIKeys`: _"This is generally not recommended, as it
 can lead to security issues if not used carefully. A leaked api key can be used to impersonate a
-user."* That warning is about keys that map to a **human** user. Here the key maps to a purpose-built
+user."_ That warning is about keys that map to a **human** user. Here the key maps to a purpose-built
 kiosk principal that can do only two things, so the blast radius of a leak is the blast radius of a
 kiosk — which is the design goal, not a flaw. Enable it only if the ergonomics are worth it;
 `verifyApiKey` in a route middleware is the more conservative path and is preferred (see below).
@@ -381,17 +384,17 @@ for this app, in this MVP:
 
 **It cannot serve the kiosk.** The kiosk is a public surface on the same hostname. Serving it means a
 **Bypass** policy on the kiosk paths, and Cloudflare is blunt about what Bypass costs:
-*"The Bypass action in Cloudflare Access disables Access enforcement for specific traffic […] Bypass
-does not enforce any Access security controls and requests are not logged."*
+_"The Bypass action in Cloudflare Access disables Access enforcement for specific traffic […] Bypass
+does not enforce any Access security controls and requests are not logged."_
 
 - Source: <https://developers.cloudflare.com/cloudflare-one/policies/access/>
 
 So Access gives the kiosk nothing, and the app still has to authenticate kiosk requests itself.
 
-**The app must validate the JWT anyway.** Cloudflare: *"You should validate the token with your
-public key to ensure that the request came from Access and not a malicious third party."* Validate
-the `Cf-Access-Jwt-Assertion` header (recommended over the `CF_Authorization` cookie, *"since the
-cookie is not guaranteed to be passed"*) against
+**The app must validate the JWT anyway.** Cloudflare: _"You should validate the token with your
+public key to ensure that the request came from Access and not a malicious third party."_ Validate
+the `Cf-Access-Jwt-Assertion` header (recommended over the `CF_Authorization` cookie, _"since the
+cookie is not guaranteed to be passed"_) against
 `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`.
 
 - Source: <https://developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/validating-json/>
@@ -399,7 +402,7 @@ cookie is not guaranteed to be passed"*) against
 That is JWT-verification code plus a second identity system, on top of the auth the kiosk forces you
 to build anyway.
 
-**It fits the shared-login model badly.** Access authenticates *people* by email through an IdP. A
+**It fits the shared-login model badly.** Access authenticates _people_ by email through an IdP. A
 single shared credential is the thing Access is designed to eliminate. Service tokens exist for
 machine traffic (`CF-Access-Client-Id` / `CF-Access-Client-Secret` headers) but are explicitly
 machine-to-machine credentials, not browser session credentials — putting one in a kiosk browser is
@@ -438,9 +441,9 @@ where the audit joins need them.
 
 - AuthKit is **free to 1M MAU**, then $2,500 per additional 1M. SSO is priced per connection
   ($125 down to $65). Source: <https://workos.com/pricing>
-- M2M exists as **M2M Applications** using the `client_credentials` flow: *"Instead of having a
+- M2M exists as **M2M Applications** using the `client_credentials` flow: _"Instead of having a
   static long-lived secret, your customer uses their client ID and client secret to request
-  short-lived access tokens (JWTs) from WorkOS,"* validated against your environment's JWKS.
+  short-lived access tokens (JWTs) from WorkOS,"_ validated against your environment's JWKS.
   Source: <https://workos.com/docs/authkit/connect/m2m>
 
 Against it for the kiosk specifically: `client_credentials` requires the kiosk to hold a
@@ -453,18 +456,18 @@ The hosted case is strongest when you need SSO, SCIM, MFA, social login and ente
 sync. shop-keepr needs **one password** and **one device credential**. Both vendors also add an
 external dependency to the login path of a tool whose stated failure mode is already "internet down
 means the tool is down" — but there is a difference between depending on Cloudflare (which you
-already are, totally) and depending on Cloudflare *and* a second SaaS.
+already are, totally) and depending on Cloudflare _and_ a second SaaS.
 
 ---
 
 ## 5. Challenging the proposed kiosk shape
 
-The ticket proposed: *a long-lived device token provisioned once by staff, with kiosk endpoints as a
-narrow separate API surface.* Two halves, and they deserve different verdicts.
+The ticket proposed: _a long-lived device token provisioned once by staff, with kiosk endpoints as a
+narrow separate API surface._ Two halves, and they deserve different verdicts.
 
 ### The narrow separate API surface: keep it, it is the actual security control
 
-The credential says *who*; the surface says *what*. Get the surface right and a leaked kiosk token is
+The credential says _who_; the surface says _what_. Get the surface right and a leaked kiosk token is
 a nuisance rather than an incident.
 
 - `/api/kiosk/**` — accepts **only** a kiosk credential. Rejects staff sessions too; a bug that
@@ -536,11 +539,11 @@ per-key usage caps — the right granularity, and revocation is still one DB del
 The analysis was done against all three candidates while #2 was open. **The recommendation survives
 all three**, which is the point of choosing a library over a hosted vendor. Costs differ:
 
-| Data layer | Better Auth verdict | Evidence and cost |
-|---|---|---|
-| **D1** | ✅ **Best fit — first-party, documented** | `database: env.DB` straight from `cloudflare:workers`; auto-detected by duck-typing `batch`/`exec`/`prepare`. Shipped in 1.5. Migrations run programmatically via `getMigrations` (the CLI cannot reach D1), or generate SQL and `wrangler d1 migrations apply`. No interactive transactions. **Use the built-in Kysely path, not Drizzle** (issue #10816). |
-| **Postgres via Hyperdrive** | ⚠️ **Plausible, but nobody has shown it** | PostgreSQL is a core Kysely dialect and Better Auth's Postgres path takes a `pg` Pool, so it *should* compose — but there are **zero** Better Auth docs, examples or issues demonstrating Better Auth + Hyperdrive. It is claimed only by a third-party package. Cloudflare requires `nodejs_compat` and `compatibility_date` ≥ `2024-09-23`; recommended driver is node-postgres (`pg`), with Postgres.js ≥ 3.4.5 and Drizzle ≥ 0.26.2 also listed. Hyperdrive is **free on both plans**, capped at 100,000 queries/day on Free. If #2 picks this, budget a spike. |
-| **Durable Object SQLite** | ❌ **Not usable as the auth store** | `ctx.storage.sql` is reachable **only from inside the DO**; `sql.exec()` is synchronous and returns a cursor that must be consumed before the next `await`. Drizzle's DO support (`drizzle-orm/durable-sqlite`) is constructed inside the DO and its docs still reference `drizzle-orm@rc` — release candidate, not stable. There is no Better Auth doc, issue or PR targeting DO SQLite. Reaching it from the Worker means an RPC hop per adapter operation behind a hand-written facade, and funnels all auth through one global DO — a single-threaded chokepoint with a ~1,000 req/s soft limit. |
+| Data layer                  | Better Auth verdict                       | Evidence and cost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1**                      | ✅ **Best fit — first-party, documented** | `database: env.DB` straight from `cloudflare:workers`; auto-detected by duck-typing `batch`/`exec`/`prepare`. Shipped in 1.5. Migrations run programmatically via `getMigrations` (the CLI cannot reach D1), or generate SQL and `wrangler d1 migrations apply`. No interactive transactions. **Use the built-in Kysely path, not Drizzle** (issue #10816).                                                                                                                                                                                                                                          |
+| **Postgres via Hyperdrive** | ⚠️ **Plausible, but nobody has shown it** | PostgreSQL is a core Kysely dialect and Better Auth's Postgres path takes a `pg` Pool, so it _should_ compose — but there are **zero** Better Auth docs, examples or issues demonstrating Better Auth + Hyperdrive. It is claimed only by a third-party package. Cloudflare requires `nodejs_compat` and `compatibility_date` ≥ `2024-09-23`; recommended driver is node-postgres (`pg`), with Postgres.js ≥ 3.4.5 and Drizzle ≥ 0.26.2 also listed. Hyperdrive is **free on both plans**, capped at 100,000 queries/day on Free. If #2 picks this, budget a spike.                                  |
+| **Durable Object SQLite**   | ❌ **Not usable as the auth store**       | `ctx.storage.sql` is reachable **only from inside the DO**; `sql.exec()` is synchronous and returns a cursor that must be consumed before the next `await`. Drizzle's DO support (`drizzle-orm/durable-sqlite`) is constructed inside the DO and its docs still reference `drizzle-orm@rc` — release candidate, not stable. There is no Better Auth doc, issue or PR targeting DO SQLite. Reaching it from the Worker means an RPC hop per adapter operation behind a hand-written facade, and funnels all auth through one global DO — a single-threaded chokepoint with a ~1,000 req/s soft limit. |
 
 Sources: <https://developers.cloudflare.com/durable-objects/api/storage-api/>,
 <https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/>,
@@ -684,7 +687,7 @@ Stated here so nobody later mistakes them for established fact:
 - **Better Auth + Hyperdrive** has no primary source showing it working. The reasoning is sound; the
   demonstration does not exist. Moot now that #2 chose D1, but it would need proving before any
   future move to Postgres.
-- **CPU cost of the *fixed* `node:crypto` scrypt path** at `N=16384, r=16` on Workers is unpublished.
-  The ~5 s figure in issue #8860 is for the *broken* pure-JS path. Measure it; do not assume it.
+- **CPU cost of the _fixed_ `node:crypto` scrypt path** at `N=16384, r=16` on Workers is unpublished.
+  The ~5 s figure in issue #8860 is for the _broken_ pure-JS path. Measure it; do not assume it.
 - Whether Nitro 2's `no_nodejs_compat_v2` substitution changes the export-condition resolution that
   the scrypt fix depends on. This is the specific interaction the spike in §7 exists to settle.

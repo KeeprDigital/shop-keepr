@@ -8,7 +8,7 @@ Glossary for the domain. Terms here beat synonyms; if code or an issue drifts to
 
 **Catalogue** — the system of record for card data: every Printing across every Game System, and each one's Market Price. It is external to shop-keepr, which consumes it and never writes to it. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
 
-**Printing** — a card as the Catalogue defines it, identified by the Catalogue's own identifier: a specific card in a specific set, variation, finish and language. A Printing exists whether or not the store has ever held one, which is what makes it searchable before any stock does. shop-keepr does not *interpret* a Printing's attributes — it has no rules engine and no notion of legality or play — but it does store, index and display them.
+**Printing** — a card as the Catalogue defines it, identified by the Catalogue's own identifier: a specific card in a specific set, variation, finish and language. A Printing exists whether or not the store has ever held one, which is what makes it searchable before any stock does. shop-keepr does not _interpret_ a Printing's attributes — it has no rules engine and no notion of legality or play — but it does store, index and display them.
 
 **Card** — a Printing together with a Condition, that the store holds or transacts. Four Near Mint copies and one Lightly Played copy of the same Printing are two Cards, each with its own quantity and its own prices. Staff say "card" for both a Printing and the stock the store holds of it; where the difference matters, use the precise term.
 

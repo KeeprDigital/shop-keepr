@@ -48,16 +48,16 @@ failing on `SQLITE_BUSY`, against zero failures for the single conditional state
 Measured against the two engines, alongside the D1 figures from
 `2026-09-07-d1-search-capabilities.md` (branch `research/d1-search`).
 
-| D1 limit (measured)                     | libSQL (measured)          | Turso Database (measured)                        | Turso Cloud (documented)                                                 |
-| --------------------------------------- | -------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
-| `ATTACH` — refused, `SQLITE_AUTH`       | **works**                  | experimental flag only                           | **"deprecated for all new users"**                                       |
-| Temp tables — refused, `SQLITE_AUTH`    | **works**                  | **works**                                        | not documented                                                           |
-| Bound parameters — exactly 100          | **≥ 1,000**                | **≥ 1,000**                                      | not documented                                                           |
-| Compound `SELECT` terms — 5, undocumented | **≥ 500**                | ≥ 1,000, **segfaults at 5,000**                  | not documented                                                           |
-| Statement length — 100,000 bytes        | **≥ 50 MB**                | ≥ 10 MB                                          | not documented                                                           |
-| FTS5 — fully present, all tokenizers    | **fully present**          | **`no such module: fts5`**                       | libSQL: yes. Turso DB: no                                                |
-| FTS5 blocks `wrangler d1 export`        | n/a — different tooling     | n/a                                              | export is per-database, no virtual-table exclusion documented            |
-| 10 GB per database, unraisable          | file-system bound          | file-system bound                                | plan storage quota (5–50 GB), no per-database hard cap documented        |
+| D1 limit (measured)                       | libSQL (measured)       | Turso Database (measured)       | Turso Cloud (documented)                                          |
+| ----------------------------------------- | ----------------------- | ------------------------------- | ----------------------------------------------------------------- |
+| `ATTACH` — refused, `SQLITE_AUTH`         | **works**               | experimental flag only          | **"deprecated for all new users"**                                |
+| Temp tables — refused, `SQLITE_AUTH`      | **works**               | **works**                       | not documented                                                    |
+| Bound parameters — exactly 100            | **≥ 1,000**             | **≥ 1,000**                     | not documented                                                    |
+| Compound `SELECT` terms — 5, undocumented | **≥ 500**               | ≥ 1,000, **segfaults at 5,000** | not documented                                                    |
+| Statement length — 100,000 bytes          | **≥ 50 MB**             | ≥ 10 MB                         | not documented                                                    |
+| FTS5 — fully present, all tokenizers      | **fully present**       | **`no such module: fts5`**      | libSQL: yes. Turso DB: no                                         |
+| FTS5 blocks `wrangler d1 export`          | n/a — different tooling | n/a                             | export is per-database, no virtual-table exclusion documented     |
+| 10 GB per database, unraisable            | file-system bound       | file-system bound               | plan storage quota (5–50 GB), no per-database hard cap documented |
 
 Three of these are real wins for libSQL and worth stating plainly: **the 100-bound-parameter cap
 and the undocumented 5-term compound-`SELECT` cap are gone**, and the 100,000-byte statement
@@ -65,7 +65,7 @@ limit with them. Those are the caps that forced the D1 spike's conclusions "bulk
 inlined literals" and "multi-select facets use `IN`, never `UNION`". On libSQL neither
 workaround would be needed.
 
-But look at what they buy. All three are *seed-path and query-shape* annoyances the D1 spike
+But look at what they buy. All three are _seed-path and query-shape_ annoyances the D1 spike
 already solved, at a cost of one paragraph in the build checklist each. None of them is a
 correctness risk, none blocks a feature, and none has a runtime cost. Trading vendor
 consolidation for them is not a trade #2's reasoning would make.
@@ -134,18 +134,18 @@ IMMEDIATE`; `read` issues `BEGIN TRANSACTION READONLY`; `deferred` issues `BEGIN
 **And it makes #4's design worse.** Measured, 25 concurrent clients racing for one unit of stock,
 40 iterations, the same scenario `spike/d1-hold-atomicity` used:
 
-| Approach                                     | Oversold  | Granted/iter | Errors    |
-| -------------------------------------------- | --------- | ------------ | --------- |
-| Naive read-then-write (**negative control**) | **40/40** | 25.00        | 0         |
-| Interactive transaction (`BEGIN IMMEDIATE`)  | 0/40      | 1.00         | **960**   |
-| Single conditional statement (D1's pattern)  | 0/40      | 1.00         | **0**     |
+| Approach                                     | Oversold  | Granted/iter | Errors  |
+| -------------------------------------------- | --------- | ------------ | ------- |
+| Naive read-then-write (**negative control**) | **40/40** | 25.00        | 0       |
+| Interactive transaction (`BEGIN IMMEDIATE`)  | 0/40      | 1.00         | **960** |
+| Single conditional statement (D1's pattern)  | 0/40      | 1.00         | **0**   |
 
 The negative control overselling maximally — all 25 racers winning, every iteration — is what
 makes the other two rows credible: the harness genuinely interleaves.
 
 Both correct approaches are correct. The difference is the error column. Every one of those 960
 errors is `SQLITE_BUSY: database is locked` — **24 of 25 racers per iteration**. An interactive
-transaction takes an exclusive write lock and other writers *fail* rather than queue, so the
+transaction takes an exclusive write lock and other writers _fail_ rather than queue, so the
 application must own a retry-with-backoff loop, a retry budget, and a user-visible failure mode
 when the budget runs out. The single conditional statement has none of that. It is one
 round trip, it always returns an answer, and the answer is correct.
@@ -233,13 +233,13 @@ Two divergences worth naming for whoever does port something:
 
 ### 5. Operations
 
-| | D1 | Turso Cloud |
-| --- | --- | --- |
+|                        | D1                                                            | Turso Cloud                                                             |
+| ---------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Point-in-time recovery | **30 days**, minute granularity, **always on**, no extra cost | **1 day free / 10 days ($4.99) / 30 days ($24.92) / 90 days ($416.58)** |
-| Restore target | in place | **a new database**, new connection string, new auth token |
-| Export | `wrangler d1 export`, blocked by FTS5 virtual tables | `turso db export`; virtual-table behaviour **unverified** |
-| Migrations | `wrangler d1 migrations`, first-party | `drizzle-kit` + Turso CLI; `PRAGMA user_version` read-only |
-| Idle behaviour | none | **free-plan databases archived after 10 days of inactivity** |
+| Restore target         | in place                                                      | **a new database**, new connection string, new auth token               |
+| Export                 | `wrangler d1 export`, blocked by FTS5 virtual tables          | `turso db export`; virtual-table behaviour **unverified**               |
+| Migrations             | `wrangler d1 migrations`, first-party                         | `drizzle-kit` + Turso CLI; `PRAGMA user_version` read-only              |
+| Idle behaviour         | none                                                          | **free-plan databases archived after 10 days of inactivity**            |
 
 The PITR difference is the sharp one.
 [Turso's PITR docs](https://docs.turso.tech/features/point-in-time-recovery) are explicit:
@@ -315,7 +315,7 @@ conditional statement costs one.
 Against #13's measured D1 query costs — 1–6 ms for FTS5 name search, 5 ms for the faceted
 in-stock price-sorted query — a cross-network hop is not a rounding error. It is plausibly the
 dominant term. **Recorded as the single most important unverified claim in this document**, and
-as the thing that would have to come out *strongly* in Turso's favour to overturn the
+as the thing that would have to come out _strongly_ in Turso's favour to overturn the
 recommendation. Nothing found suggests it would.
 
 ---
@@ -366,7 +366,7 @@ Outstanding obligations for a human, in priority order:
    in this document measures it.
 2. **Turso Cloud's own limits.** Bound parameters, statement length, compound `SELECT` terms,
    request/response size and query duration are **undocumented on every Turso page fetched**. The
-   libSQL figures above are the *engine's*; the service may cap lower. Cloudflare documents all
+   libSQL figures above are the _engine's_; the service may cap lower. Cloudflare documents all
    of these for D1.
 3. **Whether `turso db export` works with FTS5 virtual tables.** No Turso page addresses it.
    D1's equivalent restriction is documented and severe.
@@ -399,7 +399,7 @@ Two things worth carrying forward regardless:
    Cloudflare-adjacent Turso deployment that removes the network hop; or shop-keepr genuinely
    needing more than 10 GB. None applies today.
 2. **Keep the exits open exactly as #2 prescribed** — money as integer minor units, timestamps as
-   epoch-ms integers, `storeId` on every store-owned table, the sync job written against *a*
+   epoch-ms integers, `storeId` on every store-owned table, the sync job written against _a_
    binding. Those keep both the Postgres door and the libSQL door open, and they cost nothing.
 
 ---
