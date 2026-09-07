@@ -1,0 +1,250 @@
+==> container
+PostgreSQL 17.11 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+==> schema
+psql:<stdin>:9: NOTICE:  table "stock" does not exist, skipping
+psql:<stdin>:10: NOTICE:  table "catalogue_printing" does not exist, skipping
+==> COPY (bulk load)
+Timing is on.
+COPY 150000
+Time: 435.622 ms
+COPY 4000
+Time: 8.962 ms
+COPY 60000
+Time: 57.118 ms
+--- wall clock for the same three COPYs, re-run into a scratch table:
+real 0.31
+user 0.01
+sys 0.01
+==> sizes, data only
+ printing |  stock  | database 
+----------+---------+----------
+ 40 MB    | 6984 kB | 54 MB
+(1 row)
+
+==> indexes (build times inline)
+Timing is on.
+CREATE INDEX
+Time: 138.957 ms
+CREATE INDEX
+Time: 100.445 ms
+CREATE INDEX
+Time: 137.902 ms
+CREATE INDEX
+Time: 68.784 ms
+CREATE INDEX
+Time: 86.954 ms
+CREATE INDEX
+Time: 34.546 ms
+CREATE INDEX
+Time: 52.574 ms
+ALTER TABLE
+Time: 1156.084 ms (00:01.156)
+CREATE INDEX
+Time: 165.846 ms
+CREATE EXTENSION
+Time: 8.930 ms
+CREATE INDEX
+Time: 389.540 ms
+CREATE INDEX
+Time: 53.822 ms
+ANALYZE
+Time: 228.185 ms
+ANALYZE
+Time: 46.490 ms
+==> sizes, indexed
+          index          |  size   
+-------------------------+---------
+ cp_name_trgm            | 11 MB
+ catalogue_printing_pkey | 5968 kB
+ cp_game_rarity          | 4760 kB
+ cp_game_set             | 4288 kB
+ cp_search_gin           | 3328 kB
+ stock_sku               | 3160 kB
+ stock_printing          | 2272 kB
+ cp_name_pattern         | 1448 kB
+ cp_name                 | 1448 kB
+ stock_pkey              | 1416 kB
+ cp_game_colour          | 1088 kB
+ stock_price             | 600 kB
+(12 rows)
+
+ printing_total | database 
+----------------+----------
+ 87 MB          | 107 MB
+(1 row)
+
+==> queries
+QUERY                               MEDIAN ms   BUF hit+read           ROWS
+01-fts-single                           5.866          16159             20
+02-fts-two-tokens                       1.464           2188             20
+03-fts-prefix                           0.069            269             20
+04-fts-phrase                           1.342            446             20
+05-fts-facet-join-price                 1.580           7180             20
+06-trgm-substring                       3.323           8116             20
+07-like-prefix-default-index            0.331            810             20
+08-faceted-browse                       1.455           2537             20
+09-facet-count                          1.537           4465              1
+10-faceted-instock-a                    2.453           9247             20
+11-faceted-instock-b                    7.920          50500             20
+12-empty-facet-a                        0.049            458              0
+13-empty-facet-b                        0.047            458              0
+14-multi-select-facets                  0.895           1619             20
+15-deep-pagination                      2.830           6645             20
+16-full-scan-control                    9.997          27826              1
+==> plans for the load-bearing queries
+--- 01-fts-single
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=7750.65..7750.70 rows=20 width=46) (actual time=5.339..5.341 rows=20 loops=1)
+   Buffers: shared hit=5299
+   ->  Sort  (cost=7750.65..7774.83 rows=9675 width=46) (actual time=5.339..5.339 rows=20 loops=1)
+         Sort Key: (ts_rank(search_tsv, '''sentinel'''::tsquery)) DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=5299
+         ->  Bitmap Heap Scan on catalogue_printing  (cost=75.97..7493.20 rows=9675 width=46) (actual time=0.977..4.926 rows=9841 loops=1)
+               Recheck Cond: (search_tsv @@ '''sentinel'''::tsquery)
+               Heap Blocks: exact=5290
+               Buffers: shared hit=5296
+               ->  Bitmap Index Scan on cp_search_gin  (cost=0.00..73.55 rows=9675 width=0) (actual time=0.610..0.610 rows=9841 loops=1)
+                     Index Cond: (search_tsv @@ '''sentinel'''::tsquery)
+                     Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=259
+ Planning Time: 0.652 ms
+ Execution Time: 5.378 ms
+(17 rows)
+
+--- 05-fts-facet-join-price
+                                                                         QUERY PLAN                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.71..2049.18 rows=20 width=49) (actual time=0.071..1.571 rows=20 loops=1)
+   Buffers: shared hit=2238
+   ->  Nested Loop  (cost=0.71..17207.84 rows=168 width=49) (actual time=0.070..1.569 rows=20 loops=1)
+         Buffers: shared hit=2238
+         ->  Index Scan using stock_price on stock s  (cost=0.29..1338.75 rows=3555 width=26) (actual time=0.010..0.116 rows=478 loops=1)
+               Index Cond: (store_id = 'store-a'::text)
+               Filter: (quantity > 0)
+               Rows Removed by Filter: 63
+               Buffers: shared hit=326
+         ->  Index Scan using catalogue_printing_pkey on catalogue_printing p  (cost=0.42..4.46 rows=1 width=42) (actual time=0.003..0.003 rows=0 loops=478)
+               Index Cond: (id = s.printing_id)
+               Filter: ((search_tsv @@ '''sentinel'''::tsquery) AND (game_system = 'magic'::text))
+               Rows Removed by Filter: 1
+               Buffers: shared hit=1912
+ Planning:
+   Buffers: shared hit=466
+ Planning Time: 0.990 ms
+ Execution Time: 1.593 ms
+(18 rows)
+
+--- 06-trgm-substring
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..71.01 rows=20 width=42) (actual time=3.258..3.268 rows=20 loops=1)
+   Buffers: shared hit=3938
+   ->  Index Scan using cp_name on catalogue_printing  (cost=0.42..30994.35 rows=8782 width=42) (actual time=3.257..3.267 rows=20 loops=1)
+         Filter: (name ~~* '%entine%'::text)
+         Rows Removed by Filter: 3921
+         Buffers: shared hit=3938
+ Planning:
+   Buffers: shared hit=240
+ Planning Time: 1.074 ms
+ Execution Time: 3.282 ms
+(10 rows)
+
+--- 07-like-prefix-default-index
+                                                                     QUERY PLAN                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.61..8.64 rows=10 width=42) (actual time=0.355..0.356 rows=20 loops=1)
+   Buffers: shared hit=179
+   ->  Sort  (cost=8.61..8.64 rows=10 width=42) (actual time=0.354..0.354 rows=20 loops=1)
+         Sort Key: name
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=179
+         ->  Index Scan using cp_name_pattern on catalogue_printing  (cost=0.42..8.45 rows=10 width=42) (actual time=0.023..0.333 rows=118 loops=1)
+               Index Cond: ((name ~>=~ 'Thundering Sent'::text) AND (name ~<~ 'Thundering Senu'::text))
+               Filter: ((name ~~ 'Thundering Sent%'::text) AND (game_system = 'magic'::text))
+               Rows Removed by Filter: 54
+               Buffers: shared hit=176
+ Planning:
+   Buffers: shared hit=276
+ Planning Time: 0.883 ms
+ Execution Time: 0.374 ms
+(15 rows)
+
+--- 10-faceted-instock-a
+                                                                           QUERY PLAN                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=5100.74..5100.75 rows=7 width=66) (actual time=2.148..2.150 rows=20 loops=1)
+   Buffers: shared hit=2187
+   ->  Sort  (cost=5100.64..5100.75 rows=47 width=66) (actual time=2.146..2.148 rows=60 loops=1)
+         Sort Key: s.sell_price
+         Sort Method: quicksort  Memory: 35kB
+         Buffers: shared hit=2187
+         ->  Hash Join  (cost=849.06..5099.33 rows=47 width=66) (actual time=0.613..2.123 rows=76 loops=1)
+               Hash Cond: (p.id = s.printing_id)
+               Buffers: shared hit=2184
+               ->  Index Scan using cp_game_colour on catalogue_printing p  (cost=0.29..4242.72 rows=1967 width=55) (actual time=0.019..1.422 rows=2712 loops=1)
+                     Index Cond: ((game_system = 'magic'::text) AND (colour_identity = 'U'::text) AND (rarity = 'common'::text))
+                     Buffers: shared hit=2134
+               ->  Hash  (cost=804.33..804.33 rows=3555 width=30) (actual time=0.518..0.518 rows=3509 loops=1)
+                     Buckets: 4096  Batches: 1  Memory Usage: 250kB
+                     Buffers: shared hit=50
+                     ->  Bitmap Heap Scan on stock s  (cost=51.56..804.33 rows=3555 width=30) (actual time=0.058..0.289 rows=3509 loops=1)
+                           Recheck Cond: (store_id = 'store-a'::text)
+                           Filter: (quantity > 0)
+                           Rows Removed by Filter: 491
+                           Heap Blocks: exact=42
+                           Buffers: shared hit=50
+                           ->  Bitmap Index Scan on stock_price  (cost=0.00..50.67 rows=4051 width=0) (actual time=0.050..0.050 rows=4000 loops=1)
+                                 Index Cond: (store_id = 'store-a'::text)
+                                 Buffers: shared hit=8
+ Planning:
+   Buffers: shared hit=447
+ Planning Time: 1.007 ms
+ Execution Time: 2.202 ms
+(28 rows)
+
+--- 13-empty-facet-b
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=82.07..82.07 rows=1 width=49) (actual time=0.024..0.024 rows=0 loops=1)
+   Buffers: shared hit=5
+   ->  Sort  (cost=82.06..82.07 rows=2 width=49) (actual time=0.023..0.023 rows=0 loops=1)
+         Sort Key: s.sell_price
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=5
+         ->  Nested Loop  (cost=0.71..82.05 rows=2 width=49) (actual time=0.012..0.012 rows=0 loops=1)
+               Buffers: shared hit=2
+               ->  Index Scan using cp_game_colour on catalogue_printing p  (cost=0.29..22.92 rows=7 width=42) (actual time=0.012..0.012 rows=0 loops=1)
+                     Index Cond: ((game_system = 'yugioh'::text) AND (colour_identity = 'WUBRG'::text) AND (rarity = 'secret-rare'::text))
+                     Buffers: shared hit=2
+               ->  Index Scan using stock_printing on stock s  (cost=0.41..8.44 rows=1 width=26) (never executed)
+                     Index Cond: (printing_id = p.id)
+                     Filter: ((quantity > 0) AND (store_id = 'store-b'::text))
+ Planning:
+   Buffers: shared hit=444
+ Planning Time: 1.011 ms
+ Execution Time: 0.050 ms
+(18 rows)
+
+==> generated-column integrity: does the search index follow a rename?
+UPDATE 1
+ matches_new 
+-------------
+           1
+(1 row)
+
+ still_matches_stale 
+---------------------
+                   0
+(1 row)
+
+==> parameter limit: how many bind parameters does one statement take?
+20000
+probe deferred to client driver; the 65535 cap is a wire-protocol limit, not a server SQL limit
+==> pg_dump works with a full-text index present?
+  schema dump OK,      203 lines
+-rw-r--r--    1 root     root       7896821 Sep  7 08:40 /tmp/full.dump
+  full dump OK
+==> done. container 'shopkeepr-pg-spike' left running; docker rm -f shopkeepr-pg-spike to clean up
