@@ -1,0 +1,16 @@
+{
+	"name": "turso-eval-spike",
+	"private": true,
+	"type": "module",
+	"description": "Throwaway spike for issue #18. Not app code. See README.md.",
+	"scripts": {
+		"probe:libsql": "node probe-libsql.mjs",
+		"probe:turso": "bash run-turso-probes.sh",
+		"holds": "node holds.mjs",
+		"probe:fts5": "node fts5-libsql.mjs"
+	},
+	"dependencies": {
+		"@libsql/client": "0.18.0",
+		"@tursodatabase/database": "0.7.2"
+	}
+}
