@@ -29,6 +29,7 @@
 	},
 	"devDependencies": {
 		"@antfu/eslint-config": "^9.5.1",
+		"@cloudflare/vitest-pool-workers": "0.22.0",
 		"@nuxt/test-utils": "^4.2.0",
 		"@nuxt/ui": "^4.11.0",
 		"@playwright/test": "^1.63.0",
@@ -44,6 +45,7 @@
 		"playwright-core": "^1.63.0",
 		"typescript": "6.0.3",
 		"vitest": "^4.1.11",
-		"vue-tsc": "^3.3.11"
+		"vue-tsc": "^3.3.11",
+		"wrangler": "4.129.0"
 	}
 }
