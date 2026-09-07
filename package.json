@@ -1,0 +1,49 @@
+{
+	"name": "shop-keepr",
+	"type": "module",
+	"private": true,
+	"packageManager": "pnpm@12.3.4+sha512.961aa41fb077da3a04a441d9f8e15ebc0c96da8ef710b2eb67bf9ee7cb0610eabd48f1fd85f51cffe73846785fa0f87c56a3a872a1d893f8446741b5cce45457",
+	"engines": {
+		"node": ">=22.0.0",
+		"pnpm": ">=12.0.0"
+	},
+	"scripts": {
+		"build": "nuxt build",
+		"dev": "nuxt dev",
+		"generate": "nuxt generate",
+		"preview": "nuxt preview",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"typecheck": "nuxt typecheck",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:e2e": "playwright test",
+		"postinstall": "nuxt prepare"
+	},
+	"dependencies": {
+		"@nuxt/eslint": "1.17.0",
+		"nuxt": "^4.5.2",
+		"vue": "^3.5.42",
+		"vue-router": "^5.3.1"
+	},
+	"devDependencies": {
+		"@antfu/eslint-config": "^9.5.1",
+		"@nuxt/test-utils": "^4.2.0",
+		"@nuxt/ui": "^4.11.0",
+		"@playwright/test": "^1.63.0",
+		"@prettier/plugin-xml": "^3.4.2",
+		"@vitest/coverage-v8": "^4.1.11",
+		"@vue/test-utils": "^2.5.0",
+		"@vueuse/nuxt": "^14.4.0",
+		"eslint": "^10.10.0",
+		"eslint-plugin-format": "^2.0.1",
+		"eslint-plugin-slop": "^0.1.3",
+		"eslint-plugin-sonarjs": "^4.2.0",
+		"happy-dom": "^20.14.0",
+		"playwright-core": "^1.63.0",
+		"typescript": "6.0.3",
+		"vitest": "^4.1.11",
+		"vue-tsc": "^3.3.11"
+	}
+}
