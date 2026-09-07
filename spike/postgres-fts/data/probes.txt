@@ -1,0 +1,181 @@
+Timing is on.
+--- P1: trigram substring WITHOUT ORDER BY (is the GIN trgm index used?)
+                                                        QUERY PLAN                                                        
+--------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.00..20.01 rows=20 width=42) (actual time=0.053..0.340 rows=20 loops=1)
+   Buffers: shared hit=34
+   ->  Seq Scan on catalogue_printing  (cost=0.00..8787.00 rows=8782 width=42) (actual time=0.052..0.335 rows=20 loops=1)
+         Filter: (name ~~* '%entine%'::text)
+         Rows Removed by Filter: 697
+         Buffers: shared hit=34
+ Planning:
+   Buffers: shared hit=218
+ Planning Time: 1.184 ms
+ Execution Time: 0.356 ms
+(10 rows)
+
+Time: 2.424 ms
+--- P2: trigram substring, unlimited count (forces the index)
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=3571.35..3571.36 rows=1 width=8) (actual time=38.733..38.733 rows=1 loops=1)
+   Buffers: shared hit=10 read=171
+   I/O Timings: shared read=2.490
+   ->  Index Only Scan using cp_name on catalogue_printing  (cost=0.42..3549.40 rows=8782 width=0) (actual time=0.939..38.629 rows=4986 loops=1)
+         Filter: (name ~~* '%entine%'::text)
+         Rows Removed by Filter: 145014
+         Heap Fetches: 22
+         Buffers: shared hit=10 read=171
+         I/O Timings: shared read=2.490
+ Planning:
+   Buffers: shared hit=17
+ Planning Time: 0.157 ms
+ Execution Time: 38.752 ms
+(13 rows)
+
+Time: 39.243 ms
+--- P3: prefix LIKE with text_pattern_ops index DROPPED (the D1 trap, Postgres edition)
+DROP INDEX
+Time: 15.921 ms
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=327.15..327.17 rows=10 width=42) (actual time=3.721..3.722 rows=20 loops=1)
+   Buffers: shared hit=303
+   ->  Sort  (cost=327.15..327.17 rows=10 width=42) (actual time=3.720..3.721 rows=20 loops=1)
+         Sort Key: name
+         Sort Method: top-N heapsort  Memory: 28kB
+         Buffers: shared hit=303
+         ->  Bitmap Heap Scan on catalogue_printing  (cost=272.66..326.98 rows=10 width=42) (actual time=2.495..3.673 rows=118 loops=1)
+               Recheck Cond: (name ~~ 'Thundering Sent%'::text)
+               Filter: (game_system = 'magic'::text)
+               Rows Removed by Filter: 54
+               Heap Blocks: exact=169
+               Buffers: shared hit=300
+               ->  Bitmap Index Scan on cp_name_trgm  (cost=0.00..272.66 rows=14 width=0) (actual time=2.474..2.474 rows=172 loops=1)
+                     Index Cond: (name ~~ 'Thundering Sent%'::text)
+                     Buffers: shared hit=131
+ Planning:
+   Buffers: shared hit=27
+ Planning Time: 0.297 ms
+ Execution Time: 3.842 ms
+(19 rows)
+
+Time: 5.056 ms
+CREATE INDEX
+Time: 56.342 ms
+--- P4: write cost of the generated tsvector + GIN + trgm (single row update, as the delta sync does)
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Update on catalogue_printing  (cost=0.88..8.90 rows=0 width=0) (actual time=0.344..0.345 rows=0 loops=1)
+   Buffers: shared hit=40 read=6 dirtied=6
+   I/O Timings: shared read=0.067
+   InitPlan 1
+     ->  Limit  (cost=0.42..0.46 rows=1 width=19) (actual time=0.030..0.030 rows=1 loops=1)
+           Buffers: shared hit=4
+           ->  Index Only Scan using catalogue_printing_pkey on catalogue_printing catalogue_printing_1  (cost=0.42..5330.67 rows=150000 width=19) (actual time=0.030..0.030 rows=1 loops=1)
+                 Heap Fetches: 0
+                 Buffers: shared hit=4
+   ->  Index Scan using catalogue_printing_pkey on catalogue_printing  (cost=0.42..8.44 rows=1 width=10) (actual time=0.049..0.050 rows=1 loops=1)
+         Index Cond: (id = (InitPlan 1).col1)
+         Buffers: shared hit=8
+ Planning:
+   Buffers: shared hit=26 read=1
+   I/O Timings: shared read=0.009
+ Planning Time: 0.210 ms
+ Execution Time: 0.426 ms
+(17 rows)
+
+Time: 2.458 ms
+--- P5: a 2000-row market-price delta, the shape #13 measured on D1 (4000 rows_written there)
+                                                                                                 QUERY PLAN                                                                                                 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Update on catalogue_printing  (cost=384.42..9217.42 rows=0 width=0) (actual time=68.220..68.221 rows=0 loops=1)
+   Buffers: shared hit=57064 read=949 dirtied=1394 written=209
+   I/O Timings: shared read=9.138 write=0.840
+   ->  Hash Semi Join  (cost=384.42..9217.42 rows=2000 width=53) (actual time=1.359..19.330 rows=2000 loops=1)
+         Hash Cond: (catalogue_printing.id = "ANY_subquery".id)
+         Buffers: shared hit=7226
+         ->  Seq Scan on catalogue_printing  (cost=0.00..8412.00 rows=150000 width=29) (actual time=0.004..12.906 rows=150000 loops=1)
+               Buffers: shared hit=6912
+         ->  Hash  (cost=359.42..359.42 rows=2000 width=62) (actual time=1.351..1.352 rows=2000 loops=1)
+               Buckets: 2048  Batches: 1  Memory Usage: 194kB
+               Buffers: shared hit=314
+               ->  Subquery Scan on "ANY_subquery"  (cost=0.42..359.42 rows=2000 width=62) (actual time=0.753..1.198 rows=2000 loops=1)
+                     Buffers: shared hit=314
+                     ->  Limit  (cost=0.42..339.42 rows=2000 width=19) (actual time=0.659..0.995 rows=2000 loops=1)
+                           Buffers: shared hit=314
+                           ->  Index Scan using catalogue_printing_pkey on catalogue_printing catalogue_printing_1  (cost=0.42..18624.87 rows=109880 width=19) (actual time=0.658..0.929 rows=2000 loops=1)
+                                 Filter: (game_system = 'magic'::text)
+                                 Rows Removed by Filter: 4000
+                                 Buffers: shared hit=314
+ Planning:
+   Buffers: shared hit=22
+ Planning Time: 0.173 ms
+ Execution Time: 68.286 ms
+(23 rows)
+
+Time: 143.276 ms
+--- P6: a name change on 2000 rows, which DOES touch the tsvector and both GIN indexes
+                                                                                                 QUERY PLAN                                                                                                  
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Update on catalogue_printing  (cost=1863.95..10740.26 rows=0 width=0) (actual time=90.882..90.883 rows=0 loops=1)
+   Buffers: shared hit=67878 read=238 dirtied=648 written=399
+   I/O Timings: shared read=1.468 write=2.206
+   ->  Hash Semi Join  (cost=1863.95..10740.26 rows=2000 width=81) (actual time=33.435..39.935 rows=2000 loops=1)
+         Hash Cond: (catalogue_printing.id = "ANY_subquery".id)
+         Buffers: shared hit=16934 read=8
+         I/O Timings: shared read=0.124
+         ->  Seq Scan on catalogue_printing  (cost=0.00..8453.38 rows=150738 width=48) (actual time=0.008..18.474 rows=150000 loops=1)
+               Buffers: shared hit=6946
+         ->  Hash  (cost=1838.95..1838.95 rows=2000 width=62) (actual time=17.080..17.080 rows=2000 loops=1)
+               Buckets: 2048  Batches: 1  Memory Usage: 202kB
+               Buffers: shared hit=9988 read=8
+               I/O Timings: shared read=0.124
+               ->  Subquery Scan on "ANY_subquery"  (cost=0.42..1838.95 rows=2000 width=62) (actual time=16.483..16.922 rows=2000 loops=1)
+                     Buffers: shared hit=9988 read=8
+                     I/O Timings: shared read=0.124
+                     ->  Limit  (cost=0.42..1818.95 rows=2000 width=19) (actual time=16.477..16.810 rows=2000 loops=1)
+                           Buffers: shared hit=9988 read=8
+                           I/O Timings: shared read=0.124
+                           ->  Index Scan using catalogue_printing_pkey on catalogue_printing catalogue_printing_1  (cost=0.42..18745.80 rows=20616 width=19) (actual time=16.476..16.745 rows=2000 loops=1)
+                                 Filter: (game_system = 'pokemon'::text)
+                                 Rows Removed by Filter: 117000
+                                 Buffers: shared hit=9988 read=8
+                                 I/O Timings: shared read=0.124
+ Planning:
+   Buffers: shared hit=10
+ Planning Time: 0.163 ms
+ Execution Time: 90.936 ms
+(28 rows)
+
+Time: 95.729 ms
+--- P7: interactive transaction, read-then-decide-then-write under a row lock (the thing D1 cannot do)
+BEGIN
+Time: 0.026 ms
+ id | quantity 
+----+----------
+  1 |        7
+(1 row)
+
+Time: 0.585 ms
+UPDATE 1
+Time: 0.332 ms
+COMMIT
+Time: 1.349 ms
+--- P8: compound SELECT terms (D1 caps at 5, undocumented)
+ count 
+-------
+    10
+(1 row)
+
+Time: 0.114 ms
+--- P9: index sizes after the writes
+          index          |  size   
+-------------------------+---------
+ cp_name_trgm            | 13 MB
+ catalogue_printing_pkey | 6136 kB
+ cp_game_rarity          | 5384 kB
+ cp_game_set             | 4288 kB
+(4 rows)
+
+Time: 2.054 ms
