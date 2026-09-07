@@ -4,9 +4,9 @@ Glossary for the domain. Terms here beat synonyms; if code or an issue drifts to
 
 ## Cards and stock
 
-**Game System** — a trading card game the store trades in. The Catalogue currently covers One Piece, Dragon Ball Fusion World, Digimon and Gundam, with Riftbound in progress; whether the store also trades games the Catalogue does not carry is an open question ([#22](https://github.com/KeeprDigital/shop-keepr/issues/22)). Game Systems are never browsed together: a customer or staff member picks one first, because a Game System's attributes are meaningless in another. A card's colour means something in Magic and nothing in Pokémon.
+**Game System** — a trading card game the store trades in. The Catalogue carries One Piece, Dragon Ball Fusion World, Digimon and Gundam today, with Riftbound in progress, and is still adding publishers; which games the store trades — and which the Catalogue therefore needs to carry — is an open question ([#22](https://github.com/KeeprDigital/shop-keepr/issues/22)). Game Systems are never browsed together: a customer or staff member picks one first, because a Game System's attributes are meaningless in another. A card's colour means something in Magic and nothing in Pokémon.
 
-**Catalogue** — the system of record for card data: every Printing across every Game System it covers. It carries **no prices**. It is external to shop-keepr, which consumes it and never writes to it. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
+**Catalogue** — the system of record for card data: every Printing across every Game System it covers. It carries **no prices today** ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). It is external to shop-keepr, which consumes it and never writes to it — though it is a sibling project of ours, still under development, so what it carries is partly driven from here. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
 
 **Printing** — a card as the Catalogue defines it, identified by the Catalogue's own identifier: a specific card in a specific set, variation, finish and language. A Printing exists whether or not the store has ever held one, which is what makes it searchable before any stock does. shop-keepr does not _interpret_ a Printing's attributes — it has no rules engine and no notion of legality or play — but it does store, index and display them.
 
@@ -33,7 +33,7 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 ## Prices
 
-**Market Price** — a Card's going rate in the market. **Its source is undecided**: the Catalogue supplies none ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). Not set by the store, and never shown to a customer: it is an input to the store's own prices, not a price anyone is offered.
+**Market Price** — a Card's going rate in the market. **Its source is undecided**: the Catalogue supplies none today, and whether it should is part of the open question ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). Not set by the store, and never shown to a customer: it is an input to the store's own prices, not a price anyone is offered.
 
 **Sell Price** — what the store asks for a Card. Derived from Market Price by a rule, and overridable. This is the only price a kiosk customer ever sees.
 
