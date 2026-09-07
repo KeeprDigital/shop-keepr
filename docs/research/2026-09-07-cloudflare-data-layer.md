@@ -115,6 +115,8 @@ Index guidance worth carrying into the schema: leftmost-prefix rule for composit
 
 **Status is ambiguous.** The docs page carries no beta label, but the only status statement in any changelog is _"public beta"_ from 2025-04-10 and no GA entry exists through 2026-09-01. Do not depend on it for MVP correctness; do use `withSession()` from day one anyway, because it costs nothing and forecloses a read-your-writes bug if replication is ever switched on.
 
+**That protection does not generalise.** A session handle only helps queries that actually route through it, and a third-party library with its own database access will never do so. Per [#3](https://github.com/KeeprDigital/shop-keepr/issues/3), the auth library is exactly such a case. So the `withSession()` convention protects the application schema only, and if replication is ever enabled, any table written by a library outside our query layer has to stay off it.
+
 ### Location and latency
 
 [d1/configuration/data-location](https://developers.cloudflare.com/d1/configuration/data-location/):
@@ -458,7 +460,9 @@ The auth research on [#3](https://github.com/KeeprDigital/shop-keepr/issues/3) (
 
 - **D1 is the best-supported target for auth too.** Better Auth 1.5 takes `database: env.DB` directly, so auth tables can live in the same D1. Under Hyperdrive it should work via the Kysely dialect and a `pg` Pool, but there are no published examples, so it would need a spike. Durable Object SQLite cannot host auth tables at all (`ctx.storage.sql` is DO-internal), though that would not block anything: auth would simply get its own small D1 alongside. So DO SQLite should be ruled out on the grounds in this document, not on the belief that it forces an auth rewrite.
 - **Workers Paid is independently a hard requirement** (the Free plan's 10 ms CPU per request cannot fit scrypt password hashing). That removes any lingering reason to reason about D1's Free-tier row caps.
-- **A live Drizzle-on-D1 maturity signal:** Better Auth's Drizzle adapter is reported broken on D1 ([better-auth#10816](https://github.com/better-auth/better-auth/issues/10816)) because it never sets `supportsDates`, so a raw `Date` reaches D1 and throws `D1_TYPE_ERROR: Type 'object' not supported`. **Unverified** here, but it is exactly the failure mode that the epoch-ms-integer timestamp discipline in the checklist above avoids: never hand D1 a `Date` object. Worth carrying into the build session as a convention, not just a portability nicety.
+- **A live Drizzle-on-D1 maturity signal:** Better Auth's Drizzle adapter is reported broken on D1 ([better-auth#10816](https://github.com/better-auth/better-auth/issues/10816)) because it never sets `supportsDates`, so a raw `Date` reaches D1 and throws `D1_TYPE_ERROR: Type 'object' not supported`. **Unverified** here, but it is the same D1 constraint that the epoch-ms-integer timestamp discipline in the checklist above exists to avoid: never hand D1 a `Date` object. Worth carrying into the build session as a convention, not just a portability nicety.
+
+  Scope note, from #3: this convention applies to the **application schema only**. Better Auth's built-in Kysely/D1 path reportedly sets `supportsDates: false` and serialises internally, so the auth tables already handle it and do not need the rule restated over them. The two documents therefore do not impose overlapping rules on the same tables.
 
 ---
 
