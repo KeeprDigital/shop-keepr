@@ -48,15 +48,23 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 **Market Price** — a Printing's going rate in the market, **supplied by the Catalogue** ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). It attaches to the Printing, not to a SKU: one rate per Printing, from which per-Condition and per-Language prices are derived. Not set by the store. **Visible to staff and never to a customer**: it is an input to the store's own prices, not a price anyone is offered.
 
-**Sell Price** — what the store asks for a SKU. Derived from the Printing's Market Price by a rule that takes Condition and Language into account, and overridable by a Pinned Price. This is the only price a kiosk customer ever sees.
+**Sell Price** — what the store asks for a SKU. Derived from the Printing's Market Price by the store's **Pricing Rules**, and overridable by a Pinned Price. This is the only price a kiosk customer ever sees.
 
-**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by a buy percentage, likewise taking Condition and Language into account.
+**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by the store's **Pricing Rules**, independently of the Sell Price and with its own settings throughout. Quoted for any Printing, including ones the store has never held.
 
-**Pinned Price** — a price a person has fixed by hand, which the pricing rules leave alone however far the Market Price moves. It records who pinned it and when. A pin is a decision, not a state: it stands until someone clears it, and staff are alerted about pins that may have gone stale — never by changing the price.
+**Pricing Rules** — the store's own rules for turning a Market Price into a Sell Price and a Buy Price. They are the store's commercial policy, not a property of any card: the store decides what a Lightly Played copy is worth to it, what it pays for a rare, and what it will never sell below. Rules may be set per Game System, and any rule a Game System does not set falls back to the store's defaults ([#8](https://github.com/KeeprDigital/shop-keepr/issues/8), [ADR 0004](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0004-configurable-pricing-pipeline.md)).
+
+**Pricing Attribute** — an attribute of a Printing that Pricing Rules key on — rarity, most often, and whatever else a Game System prices by. Attributes belong to the Catalogue and their values differ from game to game; shop-keepr does not interpret them, it only matches on them.
+
+**Modifier** — a fixed amount of money a Pricing Rule adds for a Pricing Attribute value, separately for Sell and for Buy. Every matching Modifier applies.
+
+**Floor** — the lowest price the store will accept, below which a calculated price is replaced rather than adjusted. Set per Game System and per Pricing Attribute value; where several apply, the highest holds, since each is a promise not to go lower.
+
+**Pinned Price** — a price a person has fixed by hand, which the Pricing Rules leave alone however far the Market Price moves. Sell and Buy are pinned independently, and a pin attaches to a SKU: it is a statement about a card in a given Condition and Language, not about the Printing. It records who pinned it and when. A pin is a decision, not a state: it stands until someone clears it, and staff are alerted about pins that may have gone stale — never by changing the price.
 
 ## Other
 
-**Store** — the business shop-keepr runs for. One today; every record is scoped to a Store. A Store has settings of its own, including its default **Language** and its Hold expiry period.
+**Store** — the business shop-keepr runs for. One today; every record is scoped to a Store. A Store has settings of its own: its trading currency and default **Language**, its Hold expiry period, and its Pricing Rules in full.
 
 **POS Reference** — the external point-of-sale system's own identifier for a sale, attached loosely to a Transaction. shop-keepr does not integrate with the POS and treats this as an opaque string.
 
