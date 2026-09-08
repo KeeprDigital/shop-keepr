@@ -1,0 +1,3 @@
+# Serialised Orama index: 53 MB, and `node build-index.mjs` reproduces it.
+# Its size is itself a finding — see the README — so the file is not worth keeping.
+data/
