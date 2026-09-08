@@ -8,7 +8,7 @@ These three terms are a ladder, and confusing them is the most common mistake in
 
 **Game System** — a trading card game the store trades in. The store trades **Magic: The Gathering, Riftbound, One Piece and Pokémon**, and intends to trade as many further games as it can over time ([#22](https://github.com/KeeprDigital/shop-keepr/issues/22)). Which Game Systems appear to a customer is a store setting, not a fact about the Catalogue: the Catalogue carries games this store does not trade. Game Systems are never browsed together: a customer or staff member picks one first, because a Game System's attributes are meaningless in another. A card's colour means something in Magic and nothing in Pokémon.
 
-**Catalogue** — the system of record for card data: every Card and Printing across every Game System it covers. Whether it supplies Market Price is undecided ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). It is external to shop-keepr, which consumes it and never writes to it — though it is a sibling project of ours, still under development, so what it carries is partly driven from here. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
+**Catalogue** — the system of record for card data: every Card and Printing across every Game System it covers, **including each Printing's Market Price** ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). It is external to shop-keepr, which consumes it and never writes to it — though it is a sibling project of ours, still under development, so what it carries is partly driven from here. Other systems consume the Catalogue too, so it knows nothing about stores, stock or prices a store sets.
 
 **Card** — a card as a design: the thing with a name. "Do we have any Luffys?" is a question about a Card. A Card is not something the store stocks or prices — it is what its Printings have in common, and shop-keepr uses it mainly to group search results.
 _Avoid_ using "Card" for stock the store holds. That is a **SKU**.
@@ -46,11 +46,13 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 ## Prices
 
-**Market Price** — a Printing's going rate in the market. It attaches to the Printing, not to a SKU: one rate per Printing, from which per-Condition prices are derived. **Its source is undecided**: the Catalogue supplies none today, and whether it should is part of the open question ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). Not set by the store, and never shown to a customer: it is an input to the store's own prices, not a price anyone is offered.
+**Market Price** — a Printing's going rate in the market, **supplied by the Catalogue** ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21)). It attaches to the Printing, not to a SKU: one rate per Printing, from which per-Condition and per-Language prices are derived. Not set by the store. **Visible to staff and never to a customer**: it is an input to the store's own prices, not a price anyone is offered.
 
-**Sell Price** — what the store asks for a SKU. Derived from the Printing's Market Price by a rule that takes Condition into account, and overridable. This is the only price a kiosk customer ever sees.
+**Sell Price** — what the store asks for a SKU. Derived from the Printing's Market Price by a rule that takes Condition and Language into account, and overridable by a Pinned Price. This is the only price a kiosk customer ever sees.
 
-**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by a buy percentage, likewise taking Condition into account.
+**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by a buy percentage, likewise taking Condition and Language into account.
+
+**Pinned Price** — a price a person has fixed by hand, which the pricing rules leave alone however far the Market Price moves. It records who pinned it and when. A pin is a decision, not a state: it stands until someone clears it, and staff are alerted about pins that may have gone stale — never by changing the price.
 
 ## Other
 
