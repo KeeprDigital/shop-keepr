@@ -1,0 +1,22 @@
+/** What does LOADING the serialised index cost? This is the Worker cold-start question. */
+import { readFileSync, statSync } from 'node:fs';
+import { restore } from '@orama/plugin-data-persistence';
+import { search } from '@orama/orama';
+const path = new URL('./data/index.json', import.meta.url);
+const bytes = statSync(path).size;
+const mem = () => Math.round(process.memoryUsage().heapUsed / 1e6);
+console.log(`serialised index: ${(bytes/1e6).toFixed(1)} MB JSON`);
+console.log(`heap at start: ${mem()} MB`);
+let t = Date.now();
+const raw = readFileSync(path, 'utf8');
+console.log(`read into a string: ${Date.now()-t} ms, heap ${mem()} MB`);
+t = Date.now();
+const db = await restore('json', raw);
+const restoreMs = Date.now()-t;
+console.log(`restore('json'): ${restoreMs} ms, heap ${mem()} MB`);
+global.gc?.();
+console.log(`heap after gc: ${mem()} MB`);
+t = Date.now();
+const r = await search(db, { term: 'Lighming Bolt', threshold: 0, tolerance: 2, limit: 3 });
+console.log(`first search after restore: ${Date.now()-t} ms, ${r.count} hits, top: ${r.hits.map(h=>h.document.name).join(' | ')}`);
+console.log(`\nWorker ceiling is 128 MB memory. Startup (global scope) CPU is capped separately.`);

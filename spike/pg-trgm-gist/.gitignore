@@ -1,0 +1,3 @@
+# Generated corpus: ~10 MB, and `node gen.mjs` reproduces it deterministically
+# from spike/typo-search/data/all-card-names.json.
+data/*.tsv

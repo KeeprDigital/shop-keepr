@@ -1,0 +1,2 @@
+# The corpora in data/ ARE committed: they are the sourced evidence, and three
+# other spikes import data/all-card-names.json. `./fetch-data.sh` re-fetches them.
