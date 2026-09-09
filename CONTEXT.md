@@ -40,9 +40,11 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 ## The kiosk
 
-**Basket** — a customer's selection at the kiosk. Mutable while they shop: SKUs added and removed, quantities changed, a different Printing of the same Card chosen. A Basket is not itself a Transaction; on fulfilment it produces a **Sell**.
+**Basket** — a customer's selection at the kiosk. Mutable while they shop: SKUs added and removed, quantities changed, a different Printing of the same Card chosen. A Basket is private to the kiosk until the customer **submits** it, at which point it joins the staff queue and receives a **Basket Number**; a customer cannot change it after that. A Basket is not itself a Transaction; on fulfilment it produces a **Sell** for whatever lines remain, since staff may **remove** a line they cannot sell. A Basket is `open`, `submitted`, `fulfilled`, `cancelled` or `expired`; staff may **revive** an expired Basket for a short while after ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)).
 
-**Hold** — a time-limited reservation against a SKU, created when that SKU is added to a Basket. It expires after a store-configurable period. Available quantity is on-hand minus active Holds.
+**Basket Number** — the short number a customer quotes at the counter, issued when a Basket is submitted. Unique among the store's live Baskets and reused after; deliberately not sequential, so it says nothing about how busy the shop is. It is a handle for people, not an identity for the system.
+
+**Hold** — a reservation against a SKU, created when that SKU is added to a Basket and released when the line is removed or the Basket ends. A Hold has no clock of its own: **the Basket carries the expiry, and every Hold in it expires together** ([ADR 0006](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0006-basket-owns-the-hold-clock.md)). The period is a store setting, reset by the customer's activity and never extended by hand. Available quantity is on-hand minus active Holds.
 
 ## Prices
 
@@ -66,6 +68,6 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 
 **Store** — the business shop-keepr runs for. One today; every record is scoped to a Store. A Store has settings of its own: its trading currency and default **Language**, its Hold expiry period, and its Pricing Rules in full.
 
-**POS Reference** — the external point-of-sale system's own identifier for a sale, attached loosely to a Transaction. shop-keepr does not integrate with the POS and treats this as an opaque string.
+**POS Reference** — the external point-of-sale system's own identifier for a sale, attached to a Transaction. **Every Buy and every Sell carries one**; it is the only thread between cards moving here and money moving through the till ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)). shop-keepr does not integrate with the POS and treats this as an opaque string. Adjustments never have one.
 
 **Buylist** — a list of cards the store specifically wants, at fixed prices. Defined here so the term is not used loosely for anything else. Out of scope for the MVP.
