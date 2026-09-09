@@ -14,6 +14,8 @@ The boundary that decides what belongs here at all is [ADR 0005](adr/0005-catalo
 
 **A generated OpenAPI document, served at a stable path in every environment.** Generated from the implementation rather than hand-maintained, so it cannot drift from what the API does. Served per environment so "which contract is staging running?" is answerable rather than assumed. shop-keepr commits a fetched copy, making contract change visible as a reviewable diff.
 
+**The document describes the bulk export payload as well as the routes.** Record shapes are part of the same OpenAPI document, not a separate artefact, so one committed file and one generator cover everything shop-keepr consumes. shop-keepr generates its types *and* its runtime validators from it and validates every pulled record against them ([#9](https://github.com/KeeprDigital/shop-keepr/issues/9)).
+
 ## Access
 
 **Per-consumer identity, not a shared secret.** A `Consumer` record with API keys hanging off it, scopes, and rate limits keyed on the consumer. shop-keepr is Consumer #1. Filed as [card-keepr#269](https://github.com/KeeprDigital/card-keepr/issues/269); the reasoning is in [#23](https://github.com/KeeprDigital/shop-keepr/issues/23).
