@@ -1,0 +1,20 @@
+{
+  "mode": "direct",
+  "concurrency": 3,
+  "iterations": 50,
+  "requests": 1,
+  "distinctSuccesses": [
+    2
+  ],
+  "oversellIterations": 0,
+  "oversells": [],
+  "statementMsMedian": [
+    48
+  ],
+  "statementMsP95": [
+    53
+  ],
+  "iterationMsMedian": [
+    48
+  ]
+}

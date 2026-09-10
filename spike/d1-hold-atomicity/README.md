@@ -23,6 +23,9 @@ interleaves, and the passing result is not an artefact of a test that never race
 
 ## The outstanding obligation
 
+> [!NOTE]
+> **Discharged 2026-09-10 by [#17](https://github.com/KeeprDigital/shop-keepr/issues/17).** Re-run against a real D1 database from a deployed Worker: 16,250 attempts, **zero oversell**, negative control overselling maximally, every `batch()` case reproducing. A single reserve statement costs 34 ms wall (0.26 ms in D1, 11 `rows_read`). See [`spike/d1-remote/`](../d1-remote/README.md).
+
 **This ran on local workerd/miniflare only.** `wrangler d1 create` was
 unavailable to the agent, so remote D1 is unverified.
 

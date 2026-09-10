@@ -1,0 +1,528 @@
+{
+  "negativeControl": {
+    "concurrency": 25,
+    "iterations": 50,
+    "distinctSuccesses": [
+      25
+    ],
+    "oversellIterations": 50
+  },
+  "direct": [
+    {
+      "mode": "direct",
+      "concurrency": 2,
+      "iterations": 50,
+      "requests": 1,
+      "distinctSuccesses": [
+        1
+      ],
+      "oversellIterations": 0,
+      "oversells": [],
+      "statementMsMedian": [
+        35
+      ],
+      "statementMsP95": [
+        39
+      ],
+      "iterationMsMedian": [
+        35
+      ]
+    },
+    {
+      "mode": "direct",
+      "concurrency": 10,
+      "iterations": 50,
+      "requests": 1,
+      "distinctSuccesses": [
+        1
+      ],
+      "oversellIterations": 0,
+      "oversells": [],
+      "statementMsMedian": [
+        49
+      ],
+      "statementMsP95": [
+        66
+      ],
+      "iterationMsMedian": [
+        49
+      ]
+    },
+    {
+      "mode": "direct",
+      "concurrency": 50,
+      "iterations": 50,
+      "requests": 5,
+      "distinctSuccesses": [
+        1
+      ],
+      "oversellIterations": 0,
+      "oversells": [],
+      "statementMsMedian": [
+        147,
+        129,
+        161,
+        138,
+        152
+      ],
+      "statementMsP95": [
+        218,
+        153,
+        242,
+        167,
+        257
+      ],
+      "iterationMsMedian": [
+        160,
+        129,
+        161,
+        141,
+        152
+      ]
+    },
+    {
+      "mode": "direct",
+      "concurrency": 200,
+      "iterations": 50,
+      "requests": 25,
+      "distinctSuccesses": [
+        1
+      ],
+      "oversellIterations": 0,
+      "oversells": [],
+      "statementMsMedian": [
+        550,
+        497,
+        564,
+        544,
+        448,
+        586,
+        481,
+        444,
+        547,
+        478,
+        487,
+        546,
+        543,
+        435,
+        542,
+        482,
+        617,
+        505,
+        584,
+        484,
+        496,
+        463,
+        599,
+        484,
+        425
+      ],
+      "statementMsP95": [
+        623,
+        497,
+        611,
+        638,
+        504,
+        586,
+        481,
+        481,
+        547,
+        479,
+        488,
+        546,
+        543,
+        435,
+        542,
+        482,
+        617,
+        505,
+        585,
+        496,
+        496,
+        477,
+        599,
+        484,
+        425
+      ],
+      "iterationMsMedian": [
+        623,
+        497,
+        611,
+        638,
+        504,
+        586,
+        481,
+        481,
+        547,
+        479,
+        488,
+        546,
+        543,
+        435,
+        542,
+        482,
+        617,
+        505,
+        585,
+        496,
+        496,
+        477,
+        599,
+        484,
+        425
+      ]
+    }
+  ],
+  "batch25": {
+    "mode": "batch",
+    "concurrency": 25,
+    "iterations": 50,
+    "requests": 3,
+    "distinctSuccesses": [
+      1
+    ],
+    "oversellIterations": 0,
+    "oversells": [],
+    "statementMsMedian": [
+      80,
+      84,
+      77
+    ],
+    "statementMsP95": [
+      254,
+      349,
+      89
+    ],
+    "iterationMsMedian": [
+      81,
+      84,
+      77
+    ]
+  },
+  "partialQty": {
+    "mode": "direct",
+    "concurrency": 3,
+    "iterations": 50,
+    "requests": 1,
+    "distinctSuccesses": [
+      0
+    ],
+    "oversellIterations": 50,
+    "oversells": [
+      {
+        "iteration": 0,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 1,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 2,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 3,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 4,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 5,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 6,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 7,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 8,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 9,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 10,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 11,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 12,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 13,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 14,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 15,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 16,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 17,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 18,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 19,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 20,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 21,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 22,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 23,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 24,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 25,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 26,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 27,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 28,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 29,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 30,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 31,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 32,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 33,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 34,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 35,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 36,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 37,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 38,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 39,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 40,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 41,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 42,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 43,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 44,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 45,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 46,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 47,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 48,
+        "rows": 0,
+        "granted": 0
+      },
+      {
+        "iteration": 49,
+        "rows": 0,
+        "granted": 0
+      }
+    ],
+    "statementMsMedian": [
+      22
+    ],
+    "statementMsP95": [
+      26
+    ],
+    "iterationMsMedian": [
+      23
+    ]
+  },
+  "mixed": {
+    "onHand": 7,
+    "iterations": 50,
+    "distinctHeldTotals": [
+      6,
+      7
+    ],
+    "overCommits": 0,
+    "_clientMs": 6135
+  },
+  "http25": {
+    "concurrency": 25,
+    "iterations": 50,
+    "distinctSuccesses": [
+      1
+    ],
+    "oversellIterations": 0,
+    "colos": [
+      "MEL"
+    ],
+    "reserveMsInWorker": {
+      "median": 55,
+      "p95": 72,
+      "max": 293
+    }
+  },
+  "batchCases": {
+    "sameItemPairChanges": [
+      1,
+      0
+    ],
+    "sameItemPairRows": 1,
+    "unconditionalFollowOn": {
+      "holdChanges": 0,
+      "onHandAfter": 0
+    },
+    "gatedFollowOn": {
+      "holdChanges": 0,
+      "followOnChanges": 0,
+      "onHandAfter": 1
+    },
+    "failingBatchRolledBack": true,
+    "expiredHoldIgnored": true,
+    "reserveStatementLatency": {
+      "label": "single reserve statement, warm",
+      "runs": 9,
+      "wallMedianMs": 34,
+      "wallMinMs": 32,
+      "wallMaxMs": 40,
+      "d1DurationMedianMs": 0.26,
+      "rowsRead": 11,
+      "returned": 0
+    },
+    "_clientMs": 1117
+  }
+}

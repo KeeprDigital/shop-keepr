@@ -33,6 +33,9 @@ Full write-up, with the numbers and the sources:
 
 ## The outstanding obligation
 
+> [!NOTE]
+> **Discharged 2026-09-10 by [#17](https://github.com/KeeprDigital/shop-keepr/issues/17).** Re-run on real D1: every `rows_read` figure here is counted identically remotely; every query plan is the same. Wall-clock does not transfer: every query pays a ~20 ms Worker→D1 floor, and the empty-facet tail is **408 ms** remotely (109 ms here). The 150k seed takes 5.2 s. `wrangler d1 export` fails with FTS5 present but `--table` exports work. See [`spike/d1-remote/`](../d1-remote/README.md).
+
 **This ran on local workerd/miniflare only** — the same gap the
 [#4 spike](../d1-hold-atomicity/README.md) left open. The Wrangler OAuth token available to the
 agent carries no D1 scope (`account:read`, `user:read`, `workers*:write`, `workers_kv:write`), so

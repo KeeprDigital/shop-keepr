@@ -1,0 +1,17 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "shop-keepr-d1-remote-spike",
+	"main": "worker.ts",
+	"compatibility_date": "2026-08-22",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"limits": { "cpu_ms": 30000 },
+	"observability": { "enabled": false },
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "shop-keepr-d1-spike",
+			"database_id": "725dc9a3-b96a-46fd-a40d-b65b0559f536"
+		}
+	]
+}

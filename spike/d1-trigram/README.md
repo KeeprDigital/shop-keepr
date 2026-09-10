@@ -77,6 +77,9 @@ and statement packing are identical to #13's and the numbers are comparable.
 
 ## The outstanding obligation
 
+> [!NOTE]
+> **Discharged 2026-09-10 by [#17](https://github.com/KeeprDigital/shop-keepr/issues/17)** for the per-token shape #24 chose: `rows_read` counts identically, but the posting-list arithmetic under-predicts real D1 by **2.8×** (mean 11,343 against 4,051) because the `GROUP BY`/`ORDER BY` temp B-trees are counted as reads; D1 time is 3–7 ms on a 20 ms floor. See [`spike/d1-remote/`](../d1-remote/README.md).
+
 **This ran on local workerd/miniflare only** — the same gap
 [#13](../d1-search/README.md) and [#4](../d1-hold-atomicity/README.md) left open. No
 remote D1 was reachable and this ticket's ground rules forbade provisioning one.

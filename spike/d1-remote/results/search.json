@@ -1,0 +1,946 @@
+{
+  "schema": {
+    "ok": true,
+    "sizeAfter": 45056,
+    "_clientMs": 173
+  },
+  "seedPages": [
+    {
+      "from": 0,
+      "to": 20000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 90001,
+      "meanStatementBytes": 88249,
+      "totalMs": 1161,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 1161,
+          "rowsWritten": 40000,
+          "d1DurationMs": 181.08
+        }
+      ],
+      "sizeAfter": 4689920,
+      "_clientMs": 1526
+    },
+    {
+      "from": 20000,
+      "to": 40000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 89999,
+      "meanStatementBytes": 88217,
+      "totalMs": 703,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 703,
+          "rowsWritten": 40000,
+          "d1DurationMs": 258.75
+        }
+      ],
+      "sizeAfter": 9359360,
+      "_clientMs": 959
+    },
+    {
+      "from": 40000,
+      "to": 60000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 90000,
+      "meanStatementBytes": 88267,
+      "totalMs": 668,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 668,
+          "rowsWritten": 40000,
+          "d1DurationMs": 252.24
+        }
+      ],
+      "sizeAfter": 14045184,
+      "_clientMs": 855
+    },
+    {
+      "from": 60000,
+      "to": 80000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 90000,
+      "meanStatementBytes": 88254,
+      "totalMs": 659,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 659,
+          "rowsWritten": 40000,
+          "d1DurationMs": 255.85
+        }
+      ],
+      "sizeAfter": 18731008,
+      "_clientMs": 834
+    },
+    {
+      "from": 80000,
+      "to": 100000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 89998,
+      "meanStatementBytes": 88154,
+      "totalMs": 498,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 498,
+          "rowsWritten": 40000,
+          "d1DurationMs": 173.14
+        }
+      ],
+      "sizeAfter": 23408640,
+      "_clientMs": 681
+    },
+    {
+      "from": 100000,
+      "to": 120000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 51,
+      "rowsPerStatement": 392.16,
+      "largestStatementBytes": 89998,
+      "meanStatementBytes": 89700,
+      "totalMs": 669,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 51,
+          "ms": 669,
+          "rowsWritten": 40000,
+          "d1DurationMs": 209.96
+        }
+      ],
+      "sizeAfter": 28147712,
+      "_clientMs": 855
+    },
+    {
+      "from": 120000,
+      "to": 140000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 20000,
+      "statements": 52,
+      "rowsPerStatement": 384.62,
+      "largestStatementBytes": 89998,
+      "meanStatementBytes": 88977,
+      "totalMs": 659,
+      "rowsWritten": 40000,
+      "batches": [
+        {
+          "statements": 52,
+          "ms": 659,
+          "rowsWritten": 40000,
+          "d1DurationMs": 230.82
+        }
+      ],
+      "sizeAfter": 32870400,
+      "_clientMs": 837
+    },
+    {
+      "from": 140000,
+      "to": 150000,
+      "maxBytes": 90000,
+      "perBatch": 200,
+      "rows": 10000,
+      "statements": 26,
+      "rowsPerStatement": 384.62,
+      "largestStatementBytes": 89997,
+      "meanStatementBytes": 89656,
+      "totalMs": 214,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 26,
+          "ms": 214,
+          "rowsWritten": 20000,
+          "d1DurationMs": 102.29
+        }
+      ],
+      "sizeAfter": 35262464,
+      "_clientMs": 296
+    }
+  ],
+  "detailPages": [
+    {
+      "from": 0,
+      "to": 10000,
+      "bytesPerRecord": 1353,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 89999,
+      "meanStatementBytes": 88756,
+      "totalMs": 1299,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 1299,
+          "rowsWritten": 20000,
+          "d1DurationMs": 211.76
+        }
+      ],
+      "sizeAfter": 55255040,
+      "_clientMs": 1885
+    },
+    {
+      "from": 10000,
+      "to": 20000,
+      "bytesPerRecord": 1356,
+      "rows": 10000,
+      "statements": 155,
+      "rowsPerStatement": 64.52,
+      "largestStatementBytes": 89996,
+      "meanStatementBytes": 89357,
+      "totalMs": 2596,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 155,
+          "ms": 2596,
+          "rowsWritten": 20000,
+          "d1DurationMs": 174.45
+        }
+      ],
+      "sizeAfter": 75284480,
+      "_clientMs": 3104
+    },
+    {
+      "from": 20000,
+      "to": 30000,
+      "bytesPerRecord": 1362,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 90001,
+      "meanStatementBytes": 88773,
+      "totalMs": 2154,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 2154,
+          "rowsWritten": 20000,
+          "d1DurationMs": 167.39
+        }
+      ],
+      "sizeAfter": 95354880,
+      "_clientMs": 2742
+    },
+    {
+      "from": 30000,
+      "to": 40000,
+      "bytesPerRecord": 1358,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 89997,
+      "meanStatementBytes": 88760,
+      "totalMs": 2217,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 2217,
+          "rowsWritten": 20000,
+          "d1DurationMs": 159.69
+        }
+      ],
+      "sizeAfter": 115425280,
+      "_clientMs": 2860
+    },
+    {
+      "from": 40000,
+      "to": 50000,
+      "bytesPerRecord": 1360,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 90001,
+      "meanStatementBytes": 88743,
+      "totalMs": 2614,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 2614,
+          "rowsWritten": 20000,
+          "d1DurationMs": 193.09
+        }
+      ],
+      "sizeAfter": 135499776,
+      "_clientMs": 3143
+    },
+    {
+      "from": 50000,
+      "to": 60000,
+      "bytesPerRecord": 1356,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 89996,
+      "meanStatementBytes": 88795,
+      "totalMs": 2382,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 2382,
+          "rowsWritten": 20000,
+          "d1DurationMs": 155.3
+        }
+      ],
+      "sizeAfter": 155701248,
+      "_clientMs": 2992
+    },
+    {
+      "from": 60000,
+      "to": 70000,
+      "bytesPerRecord": 1357,
+      "rows": 10000,
+      "statements": 156,
+      "rowsPerStatement": 64.1,
+      "largestStatementBytes": 89989,
+      "meanStatementBytes": 88788,
+      "totalMs": 2273,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 156,
+          "ms": 2273,
+          "rowsWritten": 20000,
+          "d1DurationMs": 147.91
+        }
+      ],
+      "sizeAfter": 175767552,
+      "_clientMs": 2861
+    },
+    {
+      "from": 70000,
+      "to": 80000,
+      "bytesPerRecord": 1357,
+      "rows": 10000,
+      "statements": 155,
+      "rowsPerStatement": 64.52,
+      "largestStatementBytes": 90001,
+      "meanStatementBytes": 89323,
+      "totalMs": 2308,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 155,
+          "ms": 2308,
+          "rowsWritten": 20000,
+          "d1DurationMs": 212.26
+        }
+      ],
+      "sizeAfter": 195842048,
+      "_clientMs": 2934
+    },
+    {
+      "from": 80000,
+      "to": 90000,
+      "bytesPerRecord": 1357,
+      "rows": 10000,
+      "statements": 155,
+      "rowsPerStatement": 64.52,
+      "largestStatementBytes": 90001,
+      "meanStatementBytes": 89289,
+      "totalMs": 2886,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 155,
+          "ms": 2886,
+          "rowsWritten": 20000,
+          "d1DurationMs": 195.6
+        }
+      ],
+      "sizeAfter": 215863296,
+      "_clientMs": 3262
+    },
+    {
+      "from": 90000,
+      "to": 100000,
+      "bytesPerRecord": 1359,
+      "rows": 10000,
+      "statements": 155,
+      "rowsPerStatement": 64.52,
+      "largestStatementBytes": 89996,
+      "meanStatementBytes": 89285,
+      "totalMs": 2694,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 155,
+          "ms": 2694,
+          "rowsWritten": 20000,
+          "d1DurationMs": 197.29
+        }
+      ],
+      "sizeAfter": 235880448,
+      "_clientMs": 3191
+    },
+    {
+      "from": 100000,
+      "to": 110000,
+      "bytesPerRecord": 1355,
+      "rows": 10000,
+      "statements": 155,
+      "rowsPerStatement": 64.52,
+      "largestStatementBytes": 89997,
+      "meanStatementBytes": 89330,
+      "totalMs": 2388,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 155,
+          "ms": 2388,
+          "rowsWritten": 20000,
+          "d1DurationMs": 167.64
+        }
+      ],
+      "sizeAfter": 255913984,
+      "_clientMs": 2989
+    },
+    {
+      "from": 110000,
+      "to": 120000,
+      "bytesPerRecord": 1373,
+      "rows": 10000,
+      "statements": 157,
+      "rowsPerStatement": 63.69,
+      "largestStatementBytes": 89963,
+      "meanStatementBytes": 89067,
+      "totalMs": 2778,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 157,
+          "ms": 2778,
+          "rowsWritten": 20000,
+          "d1DurationMs": 178
+        }
+      ],
+      "sizeAfter": 276762624,
+      "_clientMs": 3372
+    },
+    {
+      "from": 120000,
+      "to": 130000,
+      "bytesPerRecord": 1372,
+      "rows": 10000,
+      "statements": 157,
+      "rowsPerStatement": 63.69,
+      "largestStatementBytes": 89956,
+      "meanStatementBytes": 89034,
+      "totalMs": 2474,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 157,
+          "ms": 2474,
+          "rowsWritten": 20000,
+          "d1DurationMs": 162.78
+        }
+      ],
+      "sizeAfter": 297611264,
+      "_clientMs": 3128
+    },
+    {
+      "from": 130000,
+      "to": 140000,
+      "bytesPerRecord": 1365,
+      "rows": 10000,
+      "statements": 157,
+      "rowsPerStatement": 63.69,
+      "largestStatementBytes": 89891,
+      "meanStatementBytes": 88690,
+      "totalMs": 2442,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 157,
+          "ms": 2442,
+          "rowsWritten": 20000,
+          "d1DurationMs": 200.92
+        }
+      ],
+      "sizeAfter": 318185472,
+      "_clientMs": 3013
+    },
+    {
+      "from": 140000,
+      "to": 150000,
+      "bytesPerRecord": 1365,
+      "rows": 10000,
+      "statements": 157,
+      "rowsPerStatement": 63.69,
+      "largestStatementBytes": 89996,
+      "meanStatementBytes": 89194,
+      "totalMs": 2661,
+      "rowsWritten": 20000,
+      "batches": [
+        {
+          "statements": 157,
+          "ms": 2661,
+          "rowsWritten": 20000,
+          "d1DurationMs": 224
+        }
+      ],
+      "sizeAfter": 338903040,
+      "_clientMs": 3203
+    }
+  ],
+  "stockA": {
+    "store": "store-001",
+    "skus": 4000,
+    "rows": 4000,
+    "statements": 3,
+    "rowsPerStatement": 1333.33,
+    "largestStatementBytes": 89990,
+    "meanStatementBytes": 65489,
+    "totalMs": 438,
+    "rowsWritten": 4003,
+    "batches": [
+      {
+        "statements": 3,
+        "ms": 438,
+        "rowsWritten": 4003,
+        "d1DurationMs": 6.57
+      }
+    ],
+    "sizeAfter": 339087360,
+    "_clientMs": 783
+  },
+  "stockB": {
+    "store": "store-002",
+    "skus": 60000,
+    "rows": 60000,
+    "statements": 33,
+    "rowsPerStatement": 1818.18,
+    "largestStatementBytes": 89998,
+    "meanStatementBytes": 89282,
+    "totalMs": 300,
+    "rowsWritten": 60033,
+    "batches": [
+      {
+        "statements": 33,
+        "ms": 300,
+        "rowsWritten": 60033,
+        "d1DurationMs": 101.23
+      }
+    ],
+    "sizeAfter": 341917696,
+    "_clientMs": 520
+  },
+  "indexes": {
+    "indexes": [
+      {
+        "sql": "CREATE INDEX cp_game_rarity ON catalogue_printing (game_system, rarity",
+        "ms": 553,
+        "rowsWritten": 150001,
+        "d1DurationMs": 440.16
+      },
+      {
+        "sql": "CREATE INDEX cp_game_colour ON catalogue_printing (game_system, colour",
+        "ms": 305,
+        "rowsWritten": 150001,
+        "d1DurationMs": 228.34
+      },
+      {
+        "sql": "CREATE INDEX cp_game_set ON catalogue_printing (game_system, set_code,",
+        "ms": 269,
+        "rowsWritten": 150001,
+        "d1DurationMs": 215.03
+      },
+      {
+        "sql": "CREATE INDEX cp_name ON catalogue_printing (name);",
+        "ms": 313,
+        "rowsWritten": 150001,
+        "d1DurationMs": 253.6
+      },
+      {
+        "sql": "CREATE UNIQUE INDEX stock_sku ON stock (store_id, printing_id, conditi",
+        "ms": 178,
+        "rowsWritten": 64001,
+        "d1DurationMs": 103.62
+      },
+      {
+        "sql": "CREATE INDEX stock_price ON stock (store_id, sell_price);",
+        "ms": 118,
+        "rowsWritten": 64001,
+        "d1DurationMs": 70.35
+      },
+      {
+        "sql": "CREATE INDEX stock_printing ON stock (printing_id);",
+        "ms": 127,
+        "rowsWritten": 64001,
+        "d1DurationMs": 69.4
+      },
+      {
+        "sql": "CREATE INDEX cp_facet_covering ON catalogue_printing (game_system, rar",
+        "ms": 457,
+        "rowsWritten": 150001,
+        "d1DurationMs": 363
+      }
+    ],
+    "totalMs": 2320,
+    "bytesBefore": 341917696,
+    "bytesAfter": 375066624,
+    "_clientMs": 2504
+  },
+  "fts": {
+    "fts5": {
+      "ms": 387,
+      "d1DurationMs": 276.71,
+      "rowsWritten": 150000,
+      "bytes": 7593984
+    },
+    "trigramFts5": {
+      "ms": 3260,
+      "d1DurationMs": 3058.54,
+      "rowsWritten": 150000,
+      "bytes": 17018880
+    },
+    "_clientMs": 3829
+  },
+  "denorm": {
+    "ms": 625,
+    "rowsWritten": 64000,
+    "_clientMs": 742
+  },
+  "measure": {
+    "results": [
+      {
+        "label": "round-trip floor: SELECT 1",
+        "runs": 9,
+        "wallMedianMs": 20,
+        "wallMinMs": 17,
+        "wallMaxMs": 27,
+        "d1DurationMedianMs": 0.11,
+        "rowsRead": 0,
+        "returned": 1
+      },
+      {
+        "label": "point lookup by primary key",
+        "runs": 9,
+        "wallMedianMs": 19,
+        "wallMinMs": 17,
+        "wallMaxMs": 21,
+        "d1DurationMedianMs": 0.13,
+        "rowsRead": 1,
+        "returned": 1
+      },
+      {
+        "label": "CONTROL full scan (unindexed LIKE)",
+        "runs": 3,
+        "wallMedianMs": 49,
+        "wallMinMs": 45,
+        "wallMaxMs": 58,
+        "d1DurationMedianMs": 29.12,
+        "rowsRead": 150000,
+        "returned": 1
+      },
+      {
+        "label": "faceted browse (covering index present)",
+        "runs": 7,
+        "wallMedianMs": 20,
+        "wallMinMs": 20,
+        "wallMaxMs": 28,
+        "d1DurationMedianMs": 0.3,
+        "rowsRead": 60,
+        "returned": 20
+      },
+      {
+        "label": "faceted browse, page 250",
+        "runs": 7,
+        "wallMedianMs": 21,
+        "wallMinMs": 20,
+        "wallMaxMs": 30,
+        "d1DurationMedianMs": 0.55,
+        "rowsRead": 2020,
+        "returned": 20
+      },
+      {
+        "label": "facet count",
+        "runs": 7,
+        "wallMedianMs": 19,
+        "wallMinMs": 18,
+        "wallMaxMs": 21,
+        "d1DurationMedianMs": 0.32,
+        "rowsRead": 2713,
+        "returned": 1
+      },
+      {
+        "label": "faceted browse, multi-select facets",
+        "runs": 7,
+        "wallMedianMs": 55,
+        "wallMinMs": 50,
+        "wallMaxMs": 60,
+        "d1DurationMedianMs": 33.42,
+        "rowsRead": 27543,
+        "returned": 20
+      },
+      {
+        "label": "faceted browse, pokemon",
+        "runs": 7,
+        "wallMedianMs": 20,
+        "wallMinMs": 19,
+        "wallMaxMs": 22,
+        "d1DurationMedianMs": 0.3,
+        "rowsRead": 60,
+        "returned": 20
+      },
+      {
+        "label": "faceted in-stock, price sort, 4k-SKU store",
+        "runs": 7,
+        "wallMedianMs": 40,
+        "wallMinMs": 38,
+        "wallMaxMs": 46,
+        "d1DurationMedianMs": 18.44,
+        "rowsRead": 6042,
+        "returned": 20
+      },
+      {
+        "label": "facet count, in-stock",
+        "runs": 7,
+        "wallMedianMs": 30,
+        "wallMinMs": 27,
+        "wallMaxMs": 33,
+        "d1DurationMedianMs": 9.42,
+        "rowsRead": 2875,
+        "returned": 1
+      },
+      {
+        "label": "faceted in-stock, rare+mythic slice",
+        "runs": 7,
+        "wallMedianMs": 45,
+        "wallMinMs": 41,
+        "wallMaxMs": 47,
+        "d1DurationMedianMs": 22.83,
+        "rowsRead": 7510,
+        "returned": 0
+      },
+      {
+        "label": "faceted in-stock with ATP",
+        "runs": 7,
+        "wallMedianMs": 42,
+        "wallMinMs": 38,
+        "wallMaxMs": 43,
+        "d1DurationMedianMs": 20.68,
+        "rowsRead": 9282,
+        "returned": 20
+      },
+      {
+        "label": "faceted in-stock, 60k-SKU store",
+        "runs": 7,
+        "wallMedianMs": 47,
+        "wallMinMs": 46,
+        "wallMaxMs": 55,
+        "d1DurationMedianMs": 25.83,
+        "rowsRead": 6513,
+        "returned": 20
+      },
+      {
+        "label": "faceted in-stock, 60k store, EMPTY facet",
+        "runs": 7,
+        "wallMedianMs": 408,
+        "wallMinMs": 381,
+        "wallMaxMs": 478,
+        "d1DurationMedianMs": 380.47,
+        "rowsRead": 112803,
+        "returned": 0
+      },
+      {
+        "label": "faceted in-stock, 4k store, EMPTY facet",
+        "runs": 7,
+        "wallMedianMs": 43,
+        "wallMinMs": 38,
+        "wallMaxMs": 52,
+        "d1DurationMedianMs": 22.88,
+        "rowsRead": 7510,
+        "returned": 0
+      },
+      {
+        "label": "same empty facet, denormalised",
+        "runs": 7,
+        "wallMedianMs": 19,
+        "wallMinMs": 18,
+        "wallMaxMs": 21,
+        "d1DurationMedianMs": 0.18,
+        "rowsRead": 0,
+        "returned": 0
+      },
+      {
+        "label": "faceted in-stock, denormalised",
+        "runs": 7,
+        "wallMedianMs": 20,
+        "wallMinMs": 18,
+        "wallMaxMs": 28,
+        "d1DurationMedianMs": 0.36,
+        "rowsRead": 63,
+        "returned": 20
+      },
+      {
+        "label": "FTS5 single token",
+        "runs": 7,
+        "wallMedianMs": 38,
+        "wallMinMs": 36,
+        "wallMaxMs": 42,
+        "d1DurationMedianMs": 18.12,
+        "rowsRead": 39,
+        "returned": 20
+      },
+      {
+        "label": "FTS5 two tokens",
+        "runs": 7,
+        "wallMedianMs": 24,
+        "wallMinMs": 22,
+        "wallMaxMs": 27,
+        "d1DurationMedianMs": 3.45,
+        "rowsRead": 39,
+        "returned": 20
+      },
+      {
+        "label": "FTS5 prefix token",
+        "runs": 7,
+        "wallMedianMs": 39,
+        "wallMinMs": 35,
+        "wallMaxMs": 42,
+        "d1DurationMedianMs": 19.24,
+        "rowsRead": 39,
+        "returned": 20
+      },
+      {
+        "label": "FTS5 phrase",
+        "runs": 7,
+        "wallMedianMs": 24,
+        "wallMinMs": 23,
+        "wallMaxMs": 26,
+        "d1DurationMedianMs": 3.92,
+        "rowsRead": 39,
+        "returned": 20
+      },
+      {
+        "label": "FTS5 + facets + stock",
+        "runs": 7,
+        "wallMedianMs": 42,
+        "wallMinMs": 40,
+        "wallMaxMs": 57,
+        "d1DurationMedianMs": 20.03,
+        "rowsRead": 20194,
+        "returned": 20
+      },
+      {
+        "label": "trigram MATCH substring",
+        "runs": 7,
+        "wallMedianMs": 21,
+        "wallMinMs": 19,
+        "wallMaxMs": 22,
+        "d1DurationMedianMs": 0.4,
+        "rowsRead": 19,
+        "returned": 20
+      },
+      {
+        "label": "LIKE prefix, bound parameter",
+        "runs": 3,
+        "wallMedianMs": 358,
+        "wallMinMs": 344,
+        "wallMaxMs": 360,
+        "d1DurationMedianMs": 318.21,
+        "rowsRead": 110119,
+        "returned": 20
+      },
+      {
+        "label": "printing_detail by primary key",
+        "runs": 7,
+        "wallMedianMs": 20,
+        "wallMinMs": 18,
+        "wallMaxMs": 21,
+        "d1DurationMedianMs": 0.19,
+        "rowsRead": 1,
+        "returned": 1
+      }
+    ],
+    "plans": {
+      "faceted browse": [
+        "SEARCH catalogue_printing USING INDEX cp_facet_covering (game_system=? AND rarity=? AND colour_identity=?)"
+      ],
+      "faceted in-stock": [
+        "SEARCH s USING INDEX stock_price (store_id=?)",
+        "SEARCH p USING INDEX sqlite_autoindex_catalogue_printing_1 (id=?)"
+      ],
+      "empty facet 60k": [
+        "SEARCH s USING INDEX stock_price (store_id=?)",
+        "SEARCH p USING INDEX sqlite_autoindex_catalogue_printing_1 (id=?)"
+      ],
+      "FTS5 single token": [
+        "SCAN f VIRTUAL TABLE INDEX 32:M3",
+        "SEARCH p USING INTEGER PRIMARY KEY (rowid=?)"
+      ]
+    },
+    "corpus": {
+      "printings": 150000,
+      "names": 9000
+    },
+    "sizeAfter": 405958656,
+    "_clientMs": 9167
+  },
+  "reseed": {
+    "reseed5000": {
+      "totalMs": 742,
+      "rowsWritten": 35000,
+      "batches": [
+        {
+          "statements": 14,
+          "ms": 742,
+          "rowsWritten": 35000,
+          "d1DurationMs": 350.91
+        }
+      ],
+      "rowsWrittenPerRow": 7
+    },
+    "delta2000": {
+      "ms": 1542,
+      "rowsWritten": 4000,
+      "rowsWrittenPerRow": 2,
+      "statements": 40
+    },
+    "_clientMs": 2375
+  },
+  "size": {
+    "sizeAfter": 411750400,
+    "_clientMs": 37
+  }
+}
