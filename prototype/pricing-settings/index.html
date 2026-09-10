@@ -180,6 +180,7 @@
   @media (max-width:900px){.shell{grid-template-columns:1fr}.side{display:none}.main{padding:14px}.cols,.clayout,.sheetlayout{grid-template-columns:1fr}.savebar{left:16px}.probe{display:none}}
 </style>
 <body>
+<div id="app"></div>
 
 <script>
 /* ============================================================================
@@ -539,7 +540,7 @@ function modalHtml(){
 /* ---------- render ---------- */
 function render(){
   const v = ui.variant==='A'?variantA():ui.variant==='B'?variantB():variantC();
-  document.body.innerHTML = shell(v) + switcher() + probeHtml() + modalHtml() + (ui.toast?`<div class="toast">${esc(ui.toast)}</div>`:'');
+  document.getElementById('app').innerHTML = shell(v) + switcher() + probeHtml() + modalHtml() + (ui.toast?`<div class="toast">${esc(ui.toast)}</div>`:'');
   document.title = `Pricing Settings · ${ui.variant}`;
   checkTask();
 }
