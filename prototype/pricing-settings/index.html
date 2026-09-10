@@ -1,0 +1,608 @@
+<meta charset="utf-8">
+<title>Pricing Settings</title>
+<!--
+  PROTOTYPE — throwaway. shop-keepr issue #42: "Does the pricing settings layout decided in #26 let a shop owner
+  change one buy percentage without meeting the whole pipeline?"
+
+  Three variants of Settings › Pricing on one page, switchable with ?variant=A|B|C, the floating bar, or ← →.
+    A  Stacked        — #26 as decided: scope selector, stacked sections, Sell | Buy side by side, inherited
+                        values greyed with Override, step order + calculator in a collapsed Advanced section,
+                        per-section Save confirming the sweep.
+    B  Sheet          — one matrix per side: rows are settings, columns are Store defaults and each Game System.
+                        Click a cell to edit it in a drawer. One Save for the whole sheet.
+    C  Setting-first  — pick the setting, then see it across every scope on one screen. Calculator always docked.
+
+  One file, no build, no server. Everything is in memory; reload wipes it. Switching variants does not reload.
+  The pure pricing module (settings model, per-setting resolution chain, evaluator, sweep estimate) is the first
+  <script>; the page is a shell over it. The probe panel (bottom-left) counts clicks / scroll / keys / seconds
+  per task per variant, so "meets the whole pipeline" is a number and not a feeling.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#F1F3F2; --panel:#FFFFFF; --ink:#1B1F1D; --muted:#64706B; --faint:#98A39E; --line:#D9DEDB; --line-strong:#B9C2BD;
+    --accent:#0F6E56; --accent-ink:#FFFFFF; --accent-tint:#E3F1EC; --accent-tint-2:#C8E6DA;
+    --warn:#9A5B00; --warn-tint:#FFF3DC; --danger:#A32D2D; --danger-tint:#FBE7E7; --inh:#F6F8F7;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);padding:0 0 110px}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  h1,h2,h3{margin:0}
+  a{color:var(--accent)}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)} .faint{color:var(--faint)} .small{font-size:12px}
+  .warn{color:var(--warn)} .danger{color:var(--danger)}
+
+  /* shell */
+  .shell{display:grid;grid-template-columns:184px 1fr;min-height:100vh}
+  .side{background:#FAFBFA;border-right:1px solid var(--line);padding:18px 12px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand{font-weight:600;letter-spacing:.02em;padding:4px 8px 16px}
+  .brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  .nav a{display:block;padding:6px 8px;border-radius:6px;color:var(--ink);text-decoration:none;font-size:13px}
+  .nav a.on{background:var(--accent-tint);color:var(--accent);font-weight:600}
+  .nav a.dim{color:var(--muted)}
+  .sidefoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px}
+  .sidefoot .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:4px}
+  .sidefoot .bar i{display:block;height:100%;background:var(--accent);width:0}
+  .main{padding:22px 28px 28px;min-width:0}
+  .head{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+  .head h1{font-size:20px;font-weight:600}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--muted);font-weight:500}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{border:0;background:none;padding:6px 12px;border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--accent);color:#fff;font-weight:500}
+  .seg.sm button{padding:3px 9px;font-size:12px}
+
+  /* controls */
+  .btn{border:1px solid var(--line-strong);background:#fff;border-radius:6px;padding:5px 11px;font-size:13px;font-weight:500}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary.clean{background:#E4E7E5;border-color:#E4E7E5;color:var(--muted)}
+  .btn.tiny{padding:1px 7px;font-size:12px;font-weight:400}
+  .btn.link{border:0;background:none;color:var(--accent);padding:0;font-weight:400;text-decoration:underline}
+  .btn.danger{color:var(--danger)}
+  input.f,select.f{border:1px solid var(--line);border-radius:6px;padding:4px 7px;background:#fff;min-width:0}
+  input.f{width:76px;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  input.f.w{width:110px;text-align:left;font-family:var(--sans)}
+  input.f:focus,select.f:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+  .aff{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .aff .u{color:var(--muted);font-size:12px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:middle}
+  .dot.hide{display:none}
+  .badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:500;background:#E4E7E5;color:var(--muted);white-space:nowrap}
+  .badge.ov{background:var(--accent-tint);color:var(--accent)}
+  .badge.warn{background:var(--warn-tint);color:var(--warn)}
+  .badge.store{background:#EEF1F0;color:var(--muted)}
+  .note{font-size:12px;color:var(--muted);margin:4px 0 0}
+  .toast{position:fixed;top:14px;right:14px;background:var(--ink);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.2)}
+
+  /* cards & sections */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{font-size:14px;font-weight:600}
+  .card .ch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .card .ch .desc{font-size:12px;color:var(--muted);margin-top:1px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .col h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:600}
+  .field{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff;min-height:44px}
+  .field.inh{background:var(--inh);border-style:dashed;color:var(--muted)}
+  .field.inh .ed{opacity:.55;pointer-events:none}
+  .field.inh .whyinh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+  .field .rev{margin-top:6px;font-size:12px}
+  table.t{border-collapse:collapse;font-size:13px}
+  table.t th{font-weight:500;color:var(--muted);text-align:left;padding:2px 8px 4px 0;font-size:12px}
+  table.t td{padding:2px 8px 2px 0;white-space:nowrap}
+  table.t td.r,table.t th.r{text-align:right}
+  .maprow{display:flex;flex-wrap:wrap;gap:6px 14px}
+  .maprow label{display:flex;flex-direction:column;font-size:11px;color:var(--muted);gap:2px}
+  .steps{list-style:none;padding:0;margin:0}
+  .steps li{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+  .steps li .n{width:18px;color:var(--faint);font-family:var(--mono);font-size:12px}
+  .steps li .lab{flex:1}
+  .steps li.lock{color:var(--muted)}
+  .adv summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  .adv summary::-webkit-details-marker{display:none}
+  .adv summary .chev{color:var(--muted);font-weight:400;font-size:12px}
+  .adv[open] summary{margin-bottom:12px}
+
+  /* calculator */
+  .calc .in{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px 10px;margin-bottom:12px}
+  .calc .in label{display:flex;flex-direction:column;font-size:11px;color:var(--muted);gap:2px}
+  .calc .in input.f,.calc .in select.f{width:100%;text-align:left}
+  .calc .out{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .calc .price{font:500 22px var(--mono);font-variant-numeric:tabular-nums}
+  .calc .tr{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+  .calc .tr td{padding:2px 4px 2px 0;border-bottom:1px dashed var(--line);vertical-align:top}
+  .calc .tr td.v{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .calc .tr tr.hl td{background:var(--accent-tint)}
+  .calc .tr tr.big td{font-weight:600;color:var(--danger)}
+  .calc.vert .out{grid-template-columns:1fr}
+  .calc.vert .in{grid-template-columns:1fr 1fr}
+
+  /* variant B */
+  .sheetwrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:10px}
+  table.sheet{border-collapse:separate;border-spacing:0;min-width:900px;width:100%;font-size:13px}
+  table.sheet th{position:sticky;top:0;background:#FAFBFA;border-bottom:1px solid var(--line);text-align:left;padding:8px 12px;font-weight:600;z-index:1}
+  table.sheet th.store{background:#EEF1F0}
+  table.sheet td{border-bottom:1px solid var(--line);padding:6px 12px;vertical-align:top}
+  table.sheet td.lab{width:220px;font-weight:500;background:#fff;position:sticky;left:0;border-right:1px solid var(--line)}
+  table.sheet td.lab .d{font-weight:400;color:var(--muted);font-size:12px}
+  table.sheet tr.grp td{background:#F6F8F7;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:4px 12px}
+  table.sheet td.cell{cursor:pointer;min-width:150px}
+  table.sheet td.cell:hover{background:var(--accent-tint)}
+  table.sheet td.cell.inh{color:var(--faint);font-style:italic;background:var(--inh)}
+  table.sheet td.cell.sel{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+  table.sheet td.cell.dirty{box-shadow:inset 3px 0 0 var(--warn)}
+  table.sheet td.na{color:var(--faint);background:#FCFCFC}
+  .sheetlayout{display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start}
+  .sheetlayout.nodrawer{grid-template-columns:1fr}
+  .drawer{position:sticky;top:14px}
+  .savebar{position:fixed;left:200px;right:16px;bottom:56px;background:var(--ink);color:#fff;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  .savebar .btn{border-color:#555}
+  .savebar .btn.primary{background:var(--accent);border-color:var(--accent)}
+
+  /* variant C */
+  .clayout{display:grid;grid-template-columns:230px 1fr 320px;gap:16px;align-items:start}
+  .clist{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;position:sticky;top:14px}
+  .clist input.f{width:100%;text-align:left;font-family:var(--sans);margin-bottom:8px}
+  .clist h4{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 8px 4px;font-weight:600}
+  .clist button{display:flex;width:100%;text-align:left;border:0;background:none;padding:5px 8px;border-radius:6px;font-size:13px;align-items:center;justify-content:space-between}
+  .clist button.on{background:var(--accent-tint);color:var(--accent);font-weight:600}
+  .scope{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff;display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:start}
+  .scope.inh{background:var(--inh);border-style:dashed}
+  .scope .sn{font-weight:600}
+  .scope .sn small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+  .scope.inh .ed{opacity:.55;pointer-events:none}
+  .rail{position:sticky;top:14px}
+
+  /* switcher + probe + modal */
+  .pill{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:10px;font-size:13px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:var(--mono)}
+  .pill button{background:#333;color:#fff;border:0;border-radius:999px;width:28px;height:28px;font-size:14px}
+  .pill b{font-weight:500;letter-spacing:.02em}
+  .probe{position:fixed;left:14px;bottom:14px;width:300px;background:#fff;border:2px solid #111;border-radius:10px;padding:10px 12px;font-size:12px;z-index:65;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+  .probe h5{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between}
+  .probe select{width:100%;font-size:12px;margin-bottom:6px}
+  .probe .cnt{display:flex;gap:10px;font-family:var(--mono);margin:6px 0}
+  .probe table{border-collapse:collapse;width:100%;font-size:11px;margin-top:6px;font-family:var(--mono)}
+  .probe td,.probe th{padding:1px 4px;text-align:right;border-top:1px solid var(--line)}
+  .probe th:first-child,.probe td:first-child{text-align:left}
+  .probe.min{width:auto} .probe.min .body{display:none}
+  .overlay{position:fixed;inset:0;background:rgba(20,25,23,.45);display:flex;align-items:center;justify-content:center;z-index:80}
+  .modal{background:#fff;border-radius:12px;padding:20px 22px;width:440px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h3{font-size:16px;margin-bottom:8px}
+  .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  .modal ul{margin:8px 0;padding-left:18px;font-size:13px}
+  @media (max-width:900px){.shell{grid-template-columns:1fr}.side{display:none}.main{padding:14px}.cols,.clayout,.sheetlayout{grid-template-columns:1fr}.savebar{left:16px}.probe{display:none}}
+</style>
+<body>
+
+<script>
+/* ============================================================================
+   PURE MODULE — the pricing model. No DOM in here.
+   Settings model, per-setting resolution (attribute row → Game System → store defaults),
+   the evaluator (ADR 0004 fold), and the sweep estimate.
+   ============================================================================ */
+const FX = 0.78;                              // USD → GBP, stepped rate (ADR 0003). Market Price arrives in USD.
+const GAMES = [
+  {id:'mtg', name:'Magic: The Gathering', short:'Magic',     skus:8000, attrs:{rarity:['common','uncommon','rare','mythic'], finish:['nonfoil','foil']}},
+  {id:'pkm', name:'Pokémon',              short:'Pokémon',   skus:3200, attrs:{rarity:['common','uncommon','rare','double rare','illustration rare'], finish:['nonholo','holo','reverse holo']}},
+  {id:'op',  name:'One Piece',            short:'One Piece', skus:1100, attrs:{rarity:['C','UC','R','SR','SEC','L'], finish:['normal','parallel']}},
+  {id:'rb',  name:'Riftbound',            short:'Riftbound', skus:400,  attrs:{rarity:['common','uncommon','rare','epic'], finish:['standard','foil']}},
+];
+const G = Object.fromEntries(GAMES.map(g=>[g.id,g]));
+const SCOPES = ['store', ...GAMES.map(g=>g.id)];
+const scopeName = s => s==='store' ? 'Store defaults' : G[s].short;
+const CONDS = ['NM','LP','MP','HP','DMG'];
+const LANGS = ['en','ja','de','fr','it'];
+const STEPS = {
+  fx:{label:'× FX (USD → GBP)', lock:true}, condition:{label:'× Condition multiplier'}, language:{label:'× Language multiplier'},
+  percentage:{label:'× Percentage (Value Band picks it)'}, stock:{label:'× Stock multiplier (Stock Band)', buy:true},
+  quantity:{label:'× Quantity multiplier (Quantity Band)', buy:true}, modifiers:{label:'+ Modifiers'}, round:{label:'Round'}, floor:{label:'Floor'},
+};
+const DEFAULT_STEPS = {sell:['fx','condition','language','percentage','modifiers','round','floor'],
+                       buy:['fx','condition','language','percentage','stock','quantity','modifiers','round','floor']};
+
+// Every setting the page must expose (#8, #43, #48). `rows` = attribute rows (Modifiers & Floors per Pricing Attribute).
+const KEYS = [
+  {key:'valueBands', label:'Percentage & Value Bands', desc:'Percentage of the converted Market Price, chosen by the band the Market Price falls in.', sides:['sell','buy'], step:'percentage'},
+  {key:'condition',  label:'Condition multipliers',   desc:'One multiplier per Condition. NM is the reference.', sides:['sell','buy'], step:'condition'},
+  {key:'language',   label:'Language multipliers',    desc:'One multiplier per Language on the store\'s list.', sides:['sell','buy'], step:'language'},
+  {key:'stockBands', label:'Stock Bands',             desc:'By copies we already hold of the SKU (on-hand before the buy; Holds ignored).', sides:['buy'], step:'stock'},
+  {key:'qtyBands',   label:'Quantity Bands',          desc:'By copies of the SKU on one line of the buy. One price per line.', sides:['buy'], step:'quantity'},
+  {key:'rows',       label:'Modifiers & Floors by attribute', desc:'Per Pricing Attribute value (rarity, finish). Every matching Modifier applies; the highest Floor wins.', gameOnly:true, step:'modifiers'},
+  {key:'floor',      label:'Floor', buyLabel:'Bulk Price', desc:'The lowest the store sells at / the lowest the store ever pays. Attribute floors may sit above it.', sides:['sell','buy'], step:'floor'},
+  {key:'rounding',   label:'Rounding',                desc:'Increment and direction. Runs before the Floor by default.', sides:['sell','buy'], step:'round'},
+  {key:'tender',     label:'Tender',                  desc:'Default Tender every Buy Price is quoted in, and the Tender Modifier for the other one. Applies to a Buy\'s total, never a line.', sides:['buy'], storeOnly:true, step:null},
+  {key:'steps',      label:'Calculation order',       desc:'The order the steps run in. FX is always first; Round before Floor is the default and the trap.', sides:['sell','buy'], step:'*'},
+];
+const K = Object.fromEntries(KEYS.map(k=>[k.key,k]));
+const keyLabel = (key, side) => (side==='buy' && K[key].buyLabel) || K[key].label;
+
+function seed(){
+  const store = {
+    sell:{ valueBands:[{from:0,pct:100},{from:1000,pct:105},{from:5000,pct:110}], condition:{NM:1,LP:.85,MP:.7,HP:.5,DMG:.3},
+           language:{en:1,ja:.9,de:.8,fr:.8,it:.8}, rounding:{inc:10,dir:'up'}, floor:25, steps:[...DEFAULT_STEPS.sell] },
+    buy: { valueBands:[{from:0,pct:50},{from:500,pct:60},{from:2000,pct:65}], condition:{NM:1,LP:.8,MP:.6,HP:.4,DMG:.2},
+           language:{en:1,ja:.8,de:.7,fr:.7,it:.7}, rounding:{inc:5,dir:'down'}, floor:5,
+           stockBands:[{from:0,mult:1},{from:4,mult:.75},{from:8,mult:.5}], qtyBands:[{from:1,mult:1},{from:4,mult:.9}],
+           tender:{def:'cash',mod:25}, steps:[...DEFAULT_STEPS.buy] },
+  };
+  const S = {store};
+  for (const g of GAMES) S[g.id] = {sell:{}, buy:{}, rows:[]};
+  // A few overrides so inheritance has something to show.
+  S.mtg.buy.valueBands = [{from:0,pct:55},{from:500,pct:62},{from:2000,pct:70}];
+  S.mtg.rows = [{attr:'rarity',value:'mythic',sell:{mod:100,floor:100,pct:null},buy:{mod:0,floor:50,pct:null}},
+                {attr:'finish',value:'foil',  sell:{mod:50, floor:null,pct:null},buy:{mod:0,floor:null,pct:null}}];
+  S.pkm.sell.condition = {NM:1,LP:.9,MP:.75,HP:.55,DMG:.35};
+  S.pkm.rows = [{attr:'rarity',value:'illustration rare',sell:{mod:0,floor:200,pct:null},buy:{mod:0,floor:100,pct:null}}];
+  S.op.buy.floor = 10;
+  return S;
+}
+const clone = x => JSON.parse(JSON.stringify(x));
+const getAt = (S,scope,side,key) => key==='rows' ? S[scope].rows : S[scope][side][key];
+function setAt(S,scope,side,key,v){ if (key==='rows') S[scope].rows=v; else if (v===undefined) delete S[scope][side][key]; else S[scope][side][key]=v; }
+const inherited = (S,scope,side,key) => scope!=='store' && key!=='rows' && S[scope][side][key]===undefined;
+// Per-setting resolution: game → store defaults (attribute rows are matched inside the evaluator).
+function res(S,scope,side,key){ if (scope!=='store' && S[scope][side][key]!==undefined) return {v:S[scope][side][key],from:scope}; return {v:S.store[side][key],from:'store'}; }
+
+const m = p => (p/100).toFixed(2);
+const gbp = p => '£'+m(p);
+const usd = p => '$'+m(p);
+
+function evaluate(S, side, q){ // q: {game, cond, lang, marketUsd, attrs:{rarity,finish}, onHand, qty}
+  const R = k => res(S,q.game,side,k).v;
+  const rows = (S[q.game].rows||[]).filter(r => q.attrs[r.attr]===r.value);
+  const tr = [];
+  let p = Math.round(q.marketUsd*FX); const conv = p;
+  tr.push({step:'fx', note:`${usd(q.marketUsd)} × ${FX}`, v:p, before:q.marketUsd});
+  for (const st of R('steps')){
+    const before = p;
+    if (st==='fx') continue;
+    if (st==='condition'){ const k=R('condition')[q.cond]; p=Math.round(p*k); tr.push({step:st,note:`${q.cond} × ${k}`,v:p,before}); }
+    else if (st==='language'){ const k=R('language')[q.lang]??1; p=Math.round(p*k); tr.push({step:st,note:`${q.lang} × ${k}`,v:p,before}); }
+    else if (st==='percentage'){ const bands=R('valueBands'); const b=[...bands].reverse().find(b=>conv>=b.from)||bands[0];
+      const rowPct=rows.map(r=>r[side].pct).find(x=>x!=null); const pct=rowPct??b.pct; p=Math.round(p*pct/100);
+      tr.push({step:st,note:(rowPct!=null?'attribute row':`band ${gbp(b.from)}+`)+` → ${pct}%`,v:p,before}); }
+    else if (st==='stock'){ if (side!=='buy') continue; const bands=R('stockBands'); const b=[...bands].reverse().find(b=>q.onHand>=b.from)||bands[0]; p=Math.round(p*b.mult); tr.push({step:st,note:`hold ${q.onHand} → band ${b.from}+ × ${b.mult}`,v:p,before}); }
+    else if (st==='quantity'){ if (side!=='buy') continue; const bands=R('qtyBands'); const b=[...bands].reverse().find(b=>q.qty>=b.from)||bands[0]; p=Math.round(p*b.mult); tr.push({step:st,note:`buying ${q.qty} → band ${b.from}+ × ${b.mult}`,v:p,before}); }
+    else if (st==='modifiers'){ const ms=rows.filter(r=>r[side].mod); const sum=ms.reduce((n,r)=>n+r[side].mod,0); p+=sum; tr.push({step:st,note:ms.length?ms.map(r=>`${r.value} ${sum>=0?'+':''}${gbp(r[side].mod)}`).join(', '):'no matching row',v:p,before}); }
+    else if (st==='round'){ const {inc,dir}=R('rounding'); const f=dir==='up'?Math.ceil:dir==='down'?Math.floor:Math.round; p=f(p/inc)*inc; tr.push({step:st,note:`${inc}p, ${dir}`,v:p,before}); }
+    else if (st==='floor'){ const base=R('floor'); const rf=rows.map(r=>r[side].floor).filter(x=>x!=null); const f=Math.max(base,...rf);
+      const who = rf.length&&f>base ? rows.find(r=>r[side].floor===f).value : (side==='buy'?'Bulk Price':'Floor'); if (p<f){ p=f; tr.push({step:st,note:`raised to ${who} ${gbp(f)}`,v:p,before}); } else tr.push({step:st,note:`above ${who} ${gbp(f)}`,v:p,before}); }
+  }
+  let biggest=null; for (const t of tr){ if (t.step==='fx') continue; const d=t.before-t.v; if (d>0 && (!biggest||d>biggest.d)) biggest={step:t.step,d}; }
+  return {price:p, trace:tr, biggest};
+}
+
+// Which SKUs a set of changed settings reprices. Tender changes never sweep: they act on a total, not a price.
+function sweep(S, changes){
+  const games=new Set();
+  for (const c of changes){
+    if (c.key==='tender') continue;
+    if (c.scope!=='store') games.add(c.scope);
+    else for (const g of GAMES) if (S[g.id][c.side][c.key]===undefined) games.add(g.id);
+  }
+  return {games:[...games], skus:[...games].reduce((n,id)=>n+G[id].skus,0)};
+}
+function diffKeys(a,b,items){ return items.filter(i => JSON.stringify(getAt(a,i.scope,i.side,i.key)) !== JSON.stringify(getAt(b,i.scope,i.side,i.key))); }
+function allItems(){ const out=[]; for (const s of SCOPES) for (const k of KEYS){ if (k.key==='rows'){ if (s!=='store') out.push({scope:s,side:'rows',key:'rows'}); continue; } if (k.storeOnly&&s!=='store') continue; for (const side of k.sides) out.push({scope:s,side,key:k.key}); } return out; }
+</script>
+
+<script>
+/* ============================================================================
+   PAGE — state, shell, three variants, switcher, probe.
+   ============================================================================ */
+let saved = seed(), draft = clone(saved);
+const VARIANTS = {A:'Stacked', B:'Sheet', C:'Setting-first'};
+const params = new URLSearchParams(location.search);
+const ui = {
+  variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
+  tab:'pricing', scope:'store', advOpen:false, toast:null, modal:null, reprice:null,
+  b:{side:'sell', sel:null, drawer:null},            // B: selected cell {scope,side,key}; drawer 'cell'|'calc'
+  c:{side:'buy', key:'valueBands', game:'mtg', q:''}, // C: selected setting
+  calc:{game:'mtg', cond:'NM', lang:'en', marketUsd:1000, rarity:'rare', finish:'nonfoil', onHand:0, qty:1},
+};
+const calcVisible = () => ui.variant==='C' || (ui.variant==='A' && ui.advOpen) || (ui.variant==='B' && ui.b.drawer==='calc');
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isDirty = (scope,side,key) => JSON.stringify(getAt(saved,scope,side,key)) !== JSON.stringify(getAt(draft,scope,side,key));
+const anyDirty = items => items.some(i=>isDirty(i.scope,i.side,i.key));
+const itemsStr = items => items.map(i=>`${i.scope}|${i.side}|${i.key}`).join(',');
+const parseItems = s => s.split(',').filter(Boolean).map(x=>{const [scope,side,key]=x.split('|');return {scope,side,key};});
+
+/* ---------- shared editors (return HTML; inputs carry data-path + data-type) ---------- */
+const P = (scope,side,key,...rest) => [scope, key==='rows'?'rows':side, key, ...rest].join('.');
+const num = (path,type,val,cls='') => `<input class="f ${cls}" data-path="${path}" data-type="${type}" value="${type==='money'?m(val):val}">`;
+function bandsEditor(scope,side,key){
+  const bands = getAt(draft,scope,side,key) ?? getAt(draft,'store',side,key);
+  const money = key==='valueBands'; const path = P(scope,side,key);
+  const rows = bands.map((b,i)=>`<tr>
+    <td>${i===0?'<span class="muted small">from</span>':'from'} ${money?`<span class="aff">£${num(path+'.'+i+'.from','money',b.from)}</span>`:`${num(path+'.'+i+'.from','int',b.from)} <span class="u small muted">copies</span>`}</td>
+    <td class="r">${money?`<span class="aff">${num(path+'.'+i+'.pct','int',b.pct)}<span class="u">%</span></span>`:`<span class="aff">×${num(path+'.'+i+'.mult','float',b.mult)}</span>`}</td>
+    <td>${bands.length>1?`<button class="btn tiny" data-act="bandrm" data-path="${path}" data-i="${i}" title="Remove band">×</button>`:''}</td></tr>`).join('');
+  return `<div class="ed"><table class="t"><tr><th>${money?'Market Price':'Copies'}</th><th class="r">${money?'Percentage':'Multiplier'}</th><th></th></tr>${rows}</table>
+    <button class="btn tiny" data-act="bandadd" data-path="${path}" data-money="${money}">+ band</button></div>`;
+}
+function mapEditor(scope,side,key){
+  const map = getAt(draft,scope,side,key) ?? getAt(draft,'store',side,key); const path=P(scope,side,key);
+  return `<div class="ed maprow">${Object.keys(map).map(k=>`<label>${k}<span class="aff">×${num(path+'.'+k,'float',map[k])}</span></label>`).join('')}</div>`;
+}
+function moneyEditor(scope,side,key){ const v=getAt(draft,scope,side,key)??getAt(draft,'store',side,key); return `<div class="ed"><span class="aff">£${num(P(scope,side,key),'money',v)}</span></div>`; }
+function roundingEditor(scope,side,key){
+  const r=getAt(draft,scope,side,key)??getAt(draft,'store',side,key); const path=P(scope,side,key);
+  const sel=(p,opts,cur,fmt)=>`<select class="f" data-path="${p}" data-type="${typeof cur==='number'?'int':'str'}">${opts.map(o=>`<option value="${o}" ${o===cur?'selected':''}>${fmt?fmt(o):o}</option>`).join('')}</select>`;
+  return `<div class="ed" style="display:flex;gap:8px;align-items:center">to ${sel(path+'.inc',[1,5,10,25,50,100],r.inc,o=>o+'p')} rounding ${sel(path+'.dir',['nearest','up','down'],r.dir)}</div>`;
+}
+function tenderEditor(){
+  const t=draft.store.buy.tender; const path='store.buy.tender';
+  return `<div class="ed" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+    <label class="small muted" style="display:flex;flex-direction:column;gap:2px">Default Tender<select class="f" data-path="${path}.def" data-type="str"><option value="cash" ${t.def==='cash'?'selected':''}>Cash</option><option value="credit" ${t.def==='credit'?'selected':''}>Store credit</option></select></label>
+    <label class="small muted" style="display:flex;flex-direction:column;gap:2px">Tender Modifier<span class="aff">${num(path+'.mod','int',t.mod)}<span class="u">%</span></span></label>
+    <div class="note" style="flex-basis:100%">${t.def==='cash'?`Store credit pays <b>${t.mod}% more</b> on a Buy's total.`:`Cash pays <b>${t.mod}% less</b> on a Buy's total.`} Lines always show the ${t.def} price.</div></div>`;
+}
+function stepsEditor(scope,side){
+  const steps = getAt(draft,scope,side,'steps') ?? getAt(draft,'store',side,'steps');
+  const fi=steps.indexOf('floor'), ri=steps.indexOf('round'); const trap = fi<ri;
+  return `<div class="ed"><ol class="steps">${steps.map((s,i)=>`<li class="${STEPS[s].lock?'lock':''}"><span class="n">${i+1}</span><span class="lab">${STEPS[s].label}</span>
+    ${STEPS[s].lock?'<span class="badge">always first</span>':`<button class="btn tiny" data-act="stepmove" data-scope="${scope}" data-side="${side}" data-i="${i}" data-d="-1" ${i<=1?'disabled':''}>↑</button><button class="btn tiny" data-act="stepmove" data-scope="${scope}" data-side="${side}" data-i="${i}" data-d="1" ${i>=steps.length-1?'disabled':''}>↓</button>`}</li>`).join('')}</ol>
+    ${trap?`<p class="note warn">Floor runs before Round: a ${gbp(res(draft,scope,side,'floor').v)} floor can round down below itself (ADR 0004).</p>`:''}
+    <button class="btn link small" data-act="stepreset" data-scope="${scope}" data-side="${side}">Reset to default order</button></div>`;
+}
+function rowsEditor(scope){
+  const g=G[scope]; const rows=draft[scope].rows||[]; const path=`${scope}.rows`;
+  const mi=(i,side,f)=>{ const v=rows[i][side][f]; return `<span class="aff">£<input class="f" data-path="${path}.${i}.${side}.${f}" data-type="money-null" value="${v==null?'':m(v)}" placeholder="—"></span>`; };
+  return `<div class="ed"><table class="t"><tr><th>Attribute</th><th>Value</th><th class="r">Sell Modifier</th><th class="r">Sell Floor</th><th class="r">Buy Modifier</th><th class="r">Buy Floor</th><th></th></tr>
+    ${rows.map((r,i)=>`<tr><td class="muted">${r.attr}</td><td>${esc(r.value)}</td><td class="r">${mi(i,'sell','mod')}</td><td class="r">${mi(i,'sell','floor')}</td><td class="r">${mi(i,'buy','mod')}</td><td class="r">${mi(i,'buy','floor')}</td><td><button class="btn tiny" data-act="rowrm" data-scope="${scope}" data-i="${i}">×</button></td></tr>`).join('')}
+    ${rows.length?'':'<tr><td colspan="7" class="muted">No attribute rows yet.</td></tr>'}</table>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px"><select class="f" id="rowattr-${scope}">${Object.keys(g.attrs).map(a=>`<option>${a}</option>`).join('')}</select>
+    <select class="f" id="rowval-${scope}">${Object.entries(g.attrs).flatMap(([a,vs])=>vs.map(v=>`<option data-attr="${a}" value="${esc(v)}">${a}: ${esc(v)}</option>`)).join('')}</select>
+    <button class="btn tiny" data-act="rowadd" data-scope="${scope}">+ row</button></div></div>`;
+}
+function editorFor(scope,side,key){
+  switch(key){ case 'valueBands': case 'stockBands': case 'qtyBands': return bandsEditor(scope,side,key);
+    case 'condition': case 'language': return mapEditor(scope,side,key);
+    case 'floor': return moneyEditor(scope,side,key); case 'rounding': return roundingEditor(scope,side,key);
+    case 'tender': return tenderEditor(); case 'steps': return stepsEditor(scope,side); case 'rows': return rowsEditor(scope); }
+}
+// A field = editor wrapped with the inheritance chrome (greyed + Override, or Revert).
+function field(scope,side,key){
+  const inh = inherited(draft,scope,side,key);
+  const rev = scope!=='store' && !inh && key!=='rows' ? `<div class="rev"><button class="btn link" data-act="revert" data-scope="${scope}" data-side="${side}" data-key="${key}">Revert to Store defaults</button></div>` : '';
+  const badge = scope!=='store' && !inh && key!=='rows' ? `<span class="badge ov">${scopeName(scope)} override</span> ` : '';
+  return `<div class="field ${inh?'inh':''}">${inh?`<div class="whyinh"><span><span class="badge">Inherited from Store defaults</span></span><button class="btn tiny" data-act="override" data-scope="${scope}" data-side="${side}" data-key="${key}">Override</button></div>`:badge}${editorFor(scope,side,key)}${rev}</div>`;
+}
+const saveBtn = (items,label='Save') => `<button class="btn primary ${anyDirty(items)?'':'clean'}" data-act="save" data-items="${itemsStr(items)}" data-dirtyfor="${itemsStr(items)}">${label}</button>`;
+const dirtyDot = items => `<span class="dot ${anyDirty(items)?'':'hide'}" data-dot="${itemsStr(items)}"></span>`;
+
+/* ---------- calculator ---------- */
+function summary(scope,side,key){ // compact one-line summary for B cells and C inherited cards
+  const v = getAt(draft,scope,side,key) ?? getAt(draft,'store',side,key);
+  switch(key){
+    case 'valueBands': return v.map(b=>`${gbp(b.from)}+ ${b.pct}%`).join(' · ');
+    case 'stockBands': case 'qtyBands': return v.map(b=>`${b.from}+ ×${b.mult}`).join(' · ');
+    case 'condition': case 'language': return Object.entries(v).map(([k,x])=>`${k} ${x}`).join(' · ');
+    case 'floor': return gbp(v); case 'rounding': return `${v.inc}p ${v.dir}`;
+    case 'tender': return `${v.def} · other ${v.def==='cash'?'+':'−'}${v.mod}%`;
+    case 'steps': { const d = JSON.stringify(v)===JSON.stringify(DEFAULT_STEPS[side]); return d?'default':(v.indexOf('floor')<v.indexOf('round')?'custom — floor before round':'custom'); }
+    case 'rows': { const rows=draft[scope].rows||[]; return rows.length? rows.map(r=>r.value).join(' · ') : 'none'; }
+  }
+}
+function calcHtml(opts={}){
+  const c=ui.calc; const g=G[c.game]; const q={game:c.game,cond:c.cond,lang:c.lang,marketUsd:c.marketUsd,attrs:{rarity:c.rarity,finish:c.finish},onHand:c.onHand,qty:c.qty};
+  const sel=(k,opts)=>`<select class="f" data-calc="${k}">${opts.map(o=>`<option value="${esc(o)}" ${String(o)===String(c[k])?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  const side = s => { const r=evaluate(draft,s,q); return `<div><div class="small muted" style="text-transform:uppercase;letter-spacing:.08em">${s==='sell'?'Sell Price':'Buy Price'}</div><div class="price">${gbp(r.price)}</div>
+    <table class="tr">${r.trace.map(t=>`<tr class="${opts.hl && (opts.hl==='*'||opts.hl===t.step||(opts.hl==='modifiers'&&t.step==='floor'))?'hl':''} ${r.biggest&&r.biggest.step===t.step?'big':''}"><td class="muted">${STEPS[t.step].label.split(' (')[0]}</td><td>${t.note}</td><td class="v">${gbp(t.v)}</td></tr>`).join('')}</table>
+    ${r.biggest?`<p class="note">Biggest cut: <b class="danger">${STEPS[r.biggest.step].label.split(' (')[0]}</b> (−${gbp(r.biggest.d)}).</p>`:''}</div>`; };
+  return `<div class="calc ${opts.vert?'vert':''}" id="calc"><div class="in">
+    <label>Game System ${sel('game',GAMES.map(g=>g.id))}</label>
+    <label>rarity ${sel('rarity',g.attrs.rarity)}</label><label>finish ${sel('finish',g.attrs.finish)}</label>
+    <label>Condition ${sel('cond',CONDS)}</label><label>Language ${sel('lang',LANGS)}</label>
+    <label>Market Price $<input class="f" data-calc="marketUsd" data-type="money" value="${m(c.marketUsd)}"></label>
+    <label>we hold <input class="f" data-calc="onHand" data-type="int" value="${c.onHand}"></label>
+    <label>buying <input class="f" data-calc="qty" data-type="int" value="${c.qty}"></label></div>
+    <div class="out" id="calc-out">${side('sell')}${side('buy')}</div></div>`;
+}
+
+/* ---------- shell ---------- */
+const NAV = ['Lookup','Queue','Customer Lists','Large Buy','Ingest','Inventory','Pinned Prices','History','Settings','System'];
+function shell(inner){
+  const rp = ui.reprice;
+  return `<div class="shell"><aside class="side"><div class="brand">shop-keepr<small>staff</small></div><nav class="nav">${NAV.map(n=>`<a href="#" class="${n==='Settings'?'on':'dim'}">${n}</a>`).join('')}</nav>
+    <div class="sidefoot" id="sidefoot">${rp?`Repricing ${rp.label} <span class="mono">${rp.done.toLocaleString()}/${rp.total.toLocaleString()}</span><div class="bar"><i style="width:${Math.round(100*rp.done/rp.total)}%"></i></div>`:'<span class="faint">Prices up to date</span>'}</div></aside>
+    <main class="main"><div class="head"><div><h1>Settings</h1></div></div>
+    <div class="tabs">${['general','game systems','kiosks','pricing'].map(t=>`<button class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</div>
+    ${ui.tab==='pricing'?inner:otherTab()}</main></div>`;
+}
+function otherTab(){
+  if (ui.tab==='general') return `<div class="card"><div class="ch"><div><h2>General</h2><div class="desc">Not the question this prototype asks; here so the tabs are real.</div></div></div>
+    <div class="maprow" style="gap:14px 28px"><label>Currency<select class="f"><option>GBP</option></select></label><label>Default Language<select class="f"><option>en</option></select></label><label>Hold TTL<span class="aff"><input class="f" value="20"><span class="u">min</span></span></label>
+    <label>FX rate (stepped)<span class="aff"><input class="f" value="${FX}"><span class="u">GBP/USD</span></span></label><label>FX step threshold<span class="aff"><input class="f" value="2"><span class="u">%</span></span></label><label>Pin drift alert<span class="aff"><input class="f" value="25"><span class="u">%</span></span></label><label>Pin age alert<span class="aff"><input class="f" value="90"><span class="u">days</span></span></label></div></div>`;
+  return `<div class="card"><h2>${ui.tab[0].toUpperCase()+ui.tab.slice(1)}</h2><p class="muted">Not in this prototype.</p></div>`;
+}
+
+/* ---------- VARIANT A: Stacked (#26 as decided) ---------- */
+function variantA(){
+  const s = ui.scope, store = s==='store';
+  const sec = (title,desc,items,body) => `<section class="card"><div class="ch"><div><h2>${title}${dirtyDot(items)}</h2><div class="desc">${desc}</div></div>${saveBtn(items)}</div>${body}</section>`;
+  const two = (key) => `<div class="cols"><div class="col"><h3>Sell</h3>${field(s,'sell',key)}</div><div class="col"><h3>Buy</h3>${field(s,'buy',key)}</div></div>`;
+  const it = (key,sides=['sell','buy']) => sides.map(side=>({scope:s,side,key}));
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap">
+      <div class="seg">${SCOPES.map(x=>`<button class="${x===s?'on':''}" data-act="scope" data-scope="${x}">${scopeName(x)}</button>`).join('')}</div>
+      <span class="small muted">${store?'Every Game System starts from these.':`Anything ${scopeName(s)} does not set comes from Store defaults.`}</span></div>
+    ${sec('Percentage & Value Bands', K.valueBands.desc, it('valueBands'), two('valueBands'))}
+    ${sec('Condition multipliers', K.condition.desc, it('condition'), two('condition'))}
+    ${sec('Language multipliers', K.language.desc, it('language'), two('language'))}
+    ${sec('Stock & quantity', 'Buy side only. '+K.stockBands.desc, it('stockBands',['buy']).concat(it('qtyBands',['buy'])),
+      `<div class="cols"><div class="col"><h3>Sell</h3><div class="field" style="color:var(--faint)">Sell Prices do not move with stock (ADR 0003).</div></div>
+       <div class="col"><h3>Buy</h3><div class="small muted" style="margin-bottom:4px">By copies we hold</div>${field(s,'buy','stockBands')}<div class="small muted" style="margin:8px 0 4px">By copies in this buy</div>${field(s,'buy','qtyBands')}</div></div>`)}
+    ${store ? `<section class="card"><div class="ch"><div><h2>Modifiers & Floors by attribute</h2><div class="desc">${K.rows.desc}</div></div></div><p class="muted small" style="margin:0">Pricing Attributes belong to a Game System. Pick one above to add rows.</p></section>`
+            : sec('Modifiers & Floors by attribute', K.rows.desc+' Money in £.', [{scope:s,side:'rows',key:'rows'}], `<div class="field">${rowsEditor(s)}</div>`)}
+    ${sec('Floors', K.floor.desc, it('floor'), `<div class="cols"><div class="col"><h3>Sell Floor</h3>${field(s,'sell','floor')}</div><div class="col"><h3>Bulk Price <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(Buy Floor)</span></h3>${field(s,'buy','floor')}</div></div>`)}
+    ${sec('Rounding', K.rounding.desc, it('rounding'), two('rounding'))}
+    ${store ? sec('Tender', K.tender.desc, it('tender',['buy']), `<div class="cols"><div class="col"><h3>Sell</h3><div class="field" style="color:var(--faint)">A Sell records no Tender.</div></div><div class="col"><h3>Buy</h3><div class="field">${tenderEditor()}</div></div></div>`)
+            : `<section class="card"><div class="ch"><div><h2>Tender</h2><div class="desc">${K.tender.desc}</div></div></div><p class="muted small" style="margin:0">Store-level. Set under Store defaults: currently <b>${summary('store','buy','tender')}</b>.</p></section>`}
+    <details class="card adv" ${ui.advOpen?'open':''} id="adv"><summary>Advanced${dirtyDot(it('steps'))}<span class="chev">${ui.advOpen?'▲ hide':'▼ calculation order · try a price'}</span></summary>
+      <div class="ch"><h2>Calculation order</h2>${saveBtn(it('steps'))}</div>${two('steps')}
+      <h2 style="margin:18px 0 8px">Try a price</h2>${calcHtml()}</details>`;
+}
+
+/* ---------- VARIANT B: Sheet ---------- */
+function variantB(){
+  const side=ui.b.side, sel=ui.b.sel;
+  const items = allItems().filter(i=>i.side===side || i.key==='rows');
+  const dirty = diffKeys(saved,draft,items); const sw = sweep(draft,dirty);
+  const cell = (scope,key) => {
+    if (key==='rows' && scope==='store') return `<td class="na">per Game System</td>`;
+    if (K[key].storeOnly && scope!=='store') return `<td class="na">store-level</td>`;
+    const inh = inherited(draft,scope,side,key); const on = sel && sel.scope===scope && sel.key===key;
+    const dsd = isDirty(scope, key==='rows'?'rows':side, key);
+    return `<td class="cell ${inh?'inh':''} ${on?'sel':''} ${dsd?'dirty':''}" data-act="bsel" data-scope="${scope}" data-key="${key}" title="${inh?'Inherited from Store defaults — click to override':'Click to edit'}">${esc(summary(scope,side,key))}</td>`;
+  };
+  const groups = [['Price', ['valueBands','condition','language']], ...(side==='buy'?[['Stock', ['stockBands','qtyBands']]]:[]), ['Attributes', ['rows']], ['Bottom', ['floor','rounding']], ...(side==='buy'?[['Tender', ['tender']]]:[]), ['Advanced', ['steps']]];
+  const row = key => `<tr><td class="lab">${keyLabel(key,side)}<div class="d">${key==='rows'?'Modifiers · Floors':''}</div></td>${SCOPES.map(sc=>cell(sc,key)).join('')}</tr>`;
+  const table = `<div class="sheetwrap"><table class="sheet"><thead><tr><th>${side==='sell'?'Sell':'Buy'} setting</th>${SCOPES.map(s=>`<th class="${s==='store'?'store':''}">${scopeName(s)}${s!=='store'?`<div class="small muted" style="font-weight:400">${G[s].skus.toLocaleString()} stocked SKUs</div>`:'<div class="small muted" style="font-weight:400">inherited when blank</div>'}</th>`).join('')}</tr></thead>
+    <tbody>${groups.map(([g,keys])=>`<tr class="grp"><td colspan="6">${g}</td></tr>${keys.map(row).join('')}`).join('')}</tbody></table></div>`;
+  let drawer='';
+  if (ui.b.drawer==='calc') drawer = `<div class="card drawer"><div class="ch"><h2>Try a price</h2><button class="btn tiny" data-act="bdrawer" data-d="">close</button></div>${calcHtml({vert:true})}</div>`;
+  else if (ui.b.drawer==='cell' && sel){
+    const key=sel.key, sc=sel.scope, sd = key==='rows'?'rows':side;
+    drawer = `<div class="card drawer"><div class="ch"><div><h2>${keyLabel(key,side)}${dirtyDot([{scope:sc,side:sd,key}])}</h2><div class="desc">${scopeName(sc)} · ${side==='sell'?'Sell':'Buy'}</div></div><button class="btn tiny" data-act="bdrawer" data-d="">close</button></div>
+      <p class="note" style="margin:0 0 10px">${K[key].desc}</p>${field(sc,side,key)}</div>`;
+  }
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+      <div class="seg">${['sell','buy'].map(x=>`<button class="${x===side?'on':''}" data-act="bside" data-side="${x}">${x==='sell'?'Sell prices':'Buy prices'}</button>`).join('')}</div>
+      <div><span class="small muted" style="margin-right:10px">Grey italic = inherited from Store defaults. Click any cell to edit.</span><button class="btn" data-act="bdrawer" data-d="calc">Try a price</button></div></div>
+    <div class="sheetlayout ${drawer?'':'nodrawer'}">${table}${drawer}</div>
+    ${dirty.length?`<div class="savebar" data-savebar><span><b>${dirty.length}</b> unsaved change${dirty.length>1?'s':''} on the ${side} sheet · reprices <b>~${sw.skus.toLocaleString()} SKUs</b>${sw.games.length?' ('+sw.games.map(g=>G[g].short).join(', ')+')':''}</span><span style="flex:1"></span><button class="btn" data-act="discard" data-items="${itemsStr(items)}">Discard</button><button class="btn primary" data-act="save" data-items="${itemsStr(items)}">Save sheet</button></div>`:''}`;
+}
+
+/* ---------- VARIANT C: Setting-first ---------- */
+function variantC(){
+  const {side,key,game,q} = ui.c;
+  const list = (title, side, keys) => `<h4>${title}</h4>${keys.filter(k=>!q||keyLabel(k,side).toLowerCase().includes(q.toLowerCase())).map(k=>{
+      const items = k==='rows' ? GAMES.map(g=>({scope:g.id,side:'rows',key:'rows'})) : SCOPES.filter(s=>!(K[k].storeOnly&&s!=='store')).map(s=>({scope:s,side,key:k}));
+      return `<button class="${ui.c.side===side&&ui.c.key===k?'on':''}" data-act="csel" data-side="${side}" data-key="${k}"><span>${keyLabel(k,side)}</span>${dirtyDot(items)}</button>`;}).join('')}`;
+  const left = `<div class="clist"><input class="f" placeholder="Find a setting…" data-act-input="cq" value="${esc(q)}">
+    ${list('Sell', 'sell', ['valueBands','condition','language','floor','rounding','steps'])}
+    ${list('Buy', 'buy', ['valueBands','condition','language','stockBands','qtyBands','floor','rounding','tender','steps'])}
+    ${list('Per Game System', 'rows', ['rows'])}</div>`;
+  let mid, items;
+  if (key==='rows'){
+    items = GAMES.map(g=>({scope:g.id,side:'rows',key:'rows'}));
+    mid = `<div class="card"><div class="ch"><div><h2>Modifiers & Floors by attribute${dirtyDot(items)}</h2><div class="desc">${K.rows.desc}</div></div>${saveBtn(items)}</div>
+      <div class="seg sm" style="margin-bottom:10px">${GAMES.map(g=>`<button class="${g.id===game?'on':''}" data-act="cgame" data-game="${g.id}">${g.short}</button>`).join('')}</div>${rowsEditor(game)}</div>`;
+  } else {
+    const scopes = K[key].storeOnly ? ['store'] : SCOPES; items = scopes.map(s=>({scope:s,side,key}));
+    const card = s => { const inh=inherited(draft,s,side,key);
+      return `<div class="scope ${inh?'inh':''}"><div class="sn">${scopeName(s)}<small>${s==='store'?'what every game starts from':inh?'inherits Store defaults':'sets its own'}</small>
+        ${s!=='store'?(inh?`<button class="btn tiny" data-act="override" data-scope="${s}" data-side="${side}" data-key="${key}" style="margin-top:6px">Override</button>`:`<button class="btn link small" data-act="revert" data-scope="${s}" data-side="${side}" data-key="${key}">Revert</button>`):''}</div>
+        <div>${inh?`<div class="muted small" style="margin-bottom:4px">${esc(summary(s,side,key))}</div>`:''}${inh?'':editorFor(s,side,key)}</div></div>`; };
+    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}</div></div>${saveBtn(items)}</div>${scopes.map(card).join('')}</div>`;
+  }
+  const hl = key==='rows' ? 'modifiers' : K[key].step;
+  const right = `<div class="card rail"><div class="ch"><h2>Try a price</h2><span class="small muted">live</span></div>${K[key].step===null?'<p class="note" style="margin:0 0 8px">Tender acts on a Buy\'s total; no step to show.</p>':''}${calcHtml({vert:true, hl})}</div>`;
+  return `<div class="clayout">${left}<div>${mid}</div>${right}</div>`;
+}
+
+/* ---------- switcher, probe, modal ---------- */
+function switcher(){ return `<div class="pill"><button data-act="var" data-d="-1" title="previous (←)">‹</button><b>${ui.variant} · ${VARIANTS[ui.variant]}</b><button data-act="var" data-d="1" title="next (→)">›</button></div>`; }
+const TASKS = [
+  {id:'t1', title:'Change the store-default Buy percentage for cards under £5 from 50% to 55%', check:()=>saved.store.buy.valueBands[0].pct===55},
+  {id:'t2', title:'Give Magic rares a +£0.50 Sell Modifier', check:()=>(saved.mtg.rows||[]).some(r=>r.attr==='rarity'&&r.value==='rare'&&r.sell.mod===50)},
+  {id:'t3', title:'Set Pokémon\'s Bulk Price to 10p; Magic and Riftbound keep the store default', check:()=>saved.pkm.buy.floor===10&&saved.mtg.buy.floor===undefined&&saved.rb.buy.floor===undefined},
+  {id:'t4', title:'Find what the store pays for a Magic foil rare, LP, Japanese, market $10.00, when it already holds 5 — and which step cut the most', check:()=>{const c=ui.calc;return calcVisible()&&c.game==='mtg'&&c.cond==='LP'&&c.lang==='ja'&&c.finish==='foil'&&c.rarity==='rare'&&c.onHand===5&&c.marketUsd===1000;}},
+  {id:'t5', title:'On Riftbound Buy prices, apply the Floor before Rounding', check:()=>{const s=saved.rb.buy.steps;return !!s&&s.indexOf('floor')<s.indexOf('round');}},
+];
+const probe = {task:'t1', active:null, results:{A:{},B:{},C:{}}, min:false};
+function probeHtml(){
+  const a=probe.active; const t=TASKS.find(t=>t.id===probe.task);
+  const rows = TASKS.map(t=>`<tr><td>${t.id}</td>${['A','B','C'].map(v=>{const r=probe.results[v][t.id];return `<td>${r?`${r.clicks}c ${r.keys}k ${Math.round(r.scroll/100)}s ${r.secs}″`:'—'}</td>`;}).join('')}</tr>`).join('');
+  return `<div class="probe ${probe.min?'min':''}"><h5><span>Probe · ${ui.variant}</span><button class="btn tiny" data-act="pmin">${probe.min?'+':'–'}</button></h5><div class="body">
+    ${a?`<div><b>${esc(a.title)}</b></div><div class="cnt"><span id="p-c">0 clicks</span><span id="p-k">0 keys</span><span id="p-s">0 scroll</span><span id="p-t">0″</span></div><button class="btn tiny" data-act="pabandon">Abandon</button>`
+       :`<select data-act-input="ptask">${TASKS.map(t=>`<option value="${t.id}" ${t.id===probe.task?'selected':''}>${t.id} · ${esc(t.title)}</option>`).join('')}</select><button class="btn primary tiny" data-act="pstart">Start task (resets settings)</button>`}
+    <table><tr><th>task</th><th>A</th><th>B</th><th>C</th></tr>${rows}</table><div class="faint" style="margin-top:4px">c clicks · k keys · s scroll (×100px) · ″ seconds</div></div></div>`;
+}
+function modalHtml(){
+  const md=ui.modal; if (!md) return '';
+  if (md.kind==='save'){ const sw=md.sweep;
+    return `<div class="overlay" data-act="modalbg"><div class="modal"><h3>Save ${md.changes.length} change${md.changes.length>1?'s':''}?</h3>
+      <ul>${md.changes.map(c=>`<li>${scopeName(c.scope)} · ${c.key==='rows'?'attribute rows':(c.side==='sell'?'Sell':'Buy')+' '+keyLabel(c.key,c.side)}</li>`).join('')}</ul>
+      ${sw.skus?`<p>This reprices <b>~${sw.skus.toLocaleString()} SKUs</b> (${sw.games.map(g=>G[g].short).join(', ')}). The store keeps trading while it runs; a mid-flight price is the previous price.</p>`:`<p>No reprice needed: ${md.changes.every(c=>c.key==='tender')?'Tender applies to a Buy\'s total, not to any price.':'nothing stocked inherits this.'}</p>`}
+      <div class="acts"><button class="btn" data-act="modalclose">Cancel</button><button class="btn primary" data-act="saveconfirm">${sw.skus?'Save & reprice':'Save'}</button></div></div></div>`; }
+  return '';
+}
+
+/* ---------- render ---------- */
+function render(){
+  const v = ui.variant==='A'?variantA():ui.variant==='B'?variantB():variantC();
+  document.body.innerHTML = shell(v) + switcher() + probeHtml() + modalHtml() + (ui.toast?`<div class="toast">${esc(ui.toast)}</div>`:'');
+  document.title = `Pricing Settings · ${ui.variant}`;
+  checkTask();
+}
+function softRefresh(){ // after a value edit: update dirty dots, save buttons, summaries, calculator. Never replace the element being clicked.
+  document.querySelectorAll('[data-dot]').forEach(el=>el.classList.toggle('hide', !anyDirty(parseItems(el.dataset.dot))));
+  document.querySelectorAll('[data-dirtyfor]').forEach(el=>el.classList.toggle('clean', !anyDirty(parseItems(el.dataset.dirtyfor))));
+  const out=document.getElementById('calc-out'); if (out){ const tmp=document.createElement('div'); tmp.innerHTML=calcHtml({vert:true, hl: ui.variant==='C'?(ui.c.key==='rows'?'modifiers':K[ui.c.key].step):null}); out.innerHTML=tmp.querySelector('#calc-out').innerHTML; }
+  if (ui.variant==='B' && !document.querySelector('[data-savebar]') && diffKeys(saved,draft,allItems()).length) setTimeout(render,250);
+  checkTask();
+}
+function toast(msg){ ui.toast=msg; render(); setTimeout(()=>{ui.toast=null; render();},1800); }
+function setPath(obj,path,val){ const ps=path.split('.'); let o=obj; for (const p of ps.slice(0,-1)) o=o[p]; o[ps[ps.length-1]]=val; }
+function parseVal(type,raw){ raw=raw.trim(); switch(type){ case 'money': return Math.round(parseFloat(raw||'0')*100)||0; case 'money-null': return raw===''?null:(Math.round(parseFloat(raw)*100)||0); case 'int': return parseInt(raw||'0',10)||0; case 'float': return parseFloat(raw||'0')||0; default: return raw; } }
+function ensureOwn(scope,side,key){ if (inherited(draft,scope,side,key)) setAt(draft,scope,side,key,clone(getAt(draft,'store',side,key))); }
+function startReprice(sw){ if (!sw.skus) return; ui.reprice={label:sw.games.map(g=>G[g].short).join(', '), done:0, total:sw.skus}; const t=setInterval(()=>{ if(!ui.reprice) return clearInterval(t); ui.reprice.done=Math.min(ui.reprice.total, ui.reprice.done+Math.ceil(ui.reprice.total/24)); const f=document.getElementById('sidefoot'); if (f){ f.innerHTML=`Repricing ${ui.reprice.label} <span class="mono">${ui.reprice.done.toLocaleString()}/${ui.reprice.total.toLocaleString()}</span><div class="bar"><i style="width:${Math.round(100*ui.reprice.done/ui.reprice.total)}%"></i></div>`; } if (ui.reprice.done>=ui.reprice.total){ clearInterval(t); setTimeout(()=>{ui.reprice=null; const f=document.getElementById('sidefoot'); if (f) f.innerHTML='<span class="faint">Prices up to date</span>';},900);} },250); }
+
+document.addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const d = el.dataset; const a = d.act;
+  if (a==='tab'){ ui.tab=d.tab; }
+  else if (a==='scope'){ ui.scope=d.scope; }
+  else if (a==='override'){ ensureOwn(d.scope,d.side,d.key); }
+  else if (a==='revert'){ setAt(draft,d.scope,d.side,d.key,undefined); }
+  else if (a==='bandadd'){ const [scope,side,key]=d.path.split('.'); ensureOwn(scope,side,key); const b=getAt(draft,scope,side,key); const last=b[b.length-1]; b.push(d.money==='true'?{from:last.from+1000,pct:last.pct}:{from:last.from+4,mult:last.mult}); }
+  else if (a==='bandrm'){ const [scope,side,key]=d.path.split('.'); ensureOwn(scope,side,key); getAt(draft,scope,side,key).splice(+d.i,1); }
+  else if (a==='stepmove'){ ensureOwn(d.scope,d.side,'steps'); const s=getAt(draft,d.scope,d.side,'steps'); const i=+d.i, j=i+ +d.d; if (j<1||j>=s.length) return; [s[i],s[j]]=[s[j],s[i]]; }
+  else if (a==='stepreset'){ setAt(draft,d.scope,d.side,'steps',[...DEFAULT_STEPS[d.side]]); }
+  else if (a==='rowadd'){ const attr=document.getElementById('rowattr-'+d.scope).value; const vs=document.getElementById('rowval-'+d.scope); const opt=vs.selectedOptions[0]; const value=opt.value, at=opt.dataset.attr; draft[d.scope].rows.push({attr:at,value,sell:{mod:0,floor:null,pct:null},buy:{mod:0,floor:null,pct:null}}); }
+  else if (a==='rowrm'){ draft[d.scope].rows.splice(+d.i,1); }
+  else if (a==='save'){ const items=parseItems(d.items); const changes=diffKeys(saved,draft,items); if (!changes.length) return toast('Nothing to save'); ui.modal={kind:'save',changes,sweep:sweep(draft,changes)}; }
+  else if (a==='saveconfirm'){ const md=ui.modal; for (const c of md.changes) setAt(saved,c.scope,c.side,c.key,clone(getAt(draft,c.scope,c.side,c.key))); ui.modal=null; startReprice(md.sweep); render(); return toast(md.sweep.skus?`Saved · repricing ~${md.sweep.skus.toLocaleString()} SKUs`:'Saved'); }
+  else if (a==='discard'){ for (const i of parseItems(d.items)) setAt(draft,i.scope,i.side,i.key,clone(getAt(saved,i.scope,i.side,i.key))); }
+  else if (a==='modalclose'){ ui.modal=null; }
+  else if (a==='modalbg'){ if (e.target===el) ui.modal=null; else return; }
+  else if (a==='bside'){ ui.b.side=d.side; ui.b.sel=null; if (ui.b.drawer==='cell') ui.b.drawer=null; }
+  else if (a==='bsel'){ ui.b.sel={scope:d.scope,key:d.key}; ui.b.drawer='cell'; if (d.key!=='rows') ensureOwn(d.scope,ui.b.side,d.key); }
+  else if (a==='bdrawer'){ ui.b.drawer=d.d||null; if (!d.d) ui.b.sel=null; }
+  else if (a==='csel'){ ui.c.side=d.side; ui.c.key=d.key; }
+  else if (a==='cgame'){ ui.c.game=d.game; }
+  else if (a==='var'){ const ks=Object.keys(VARIANTS); ui.variant=ks[(ks.indexOf(ui.variant)+ +d.d+ks.length)%ks.length]; history.replaceState(null,'',`?variant=${ui.variant}`); }
+  else if (a==='pstart'){ saved=seed(); draft=clone(saved); ui.scope='store'; ui.advOpen=false; ui.b={side:'sell',sel:null,drawer:null}; ui.c={side:'buy',key:'valueBands',game:'mtg',q:''}; ui.calc={game:'mtg',cond:'NM',lang:'en',marketUsd:1000,rarity:'rare',finish:'nonfoil',onHand:0,qty:1}; probe.active={...TASKS.find(t=>t.id===probe.task), clicks:0, keys:0, scroll:0, t0:Date.now(), variant:ui.variant}; }
+  else if (a==='pabandon'){ probe.active=null; }
+  else if (a==='pmin'){ probe.min=!probe.min; }
+  else return;
+  e.preventDefault(); render();
+});
+document.addEventListener('toggle', e=>{ if (e.target.id==='adv' && e.target.open!==ui.advOpen){ ui.advOpen=e.target.open; render(); } }, true);
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if (el.dataset.path){ const [scope,side,key]=el.dataset.path.split('.'); if (key!=='rows') ensureOwn(scope,side,key); setPath(draft, el.dataset.path, parseVal(el.dataset.type, el.value)); softRefresh(); }
+  else if (el.dataset.calc){ const k=el.dataset.calc; ui.calc[k]= el.dataset.type ? parseVal(el.dataset.type, el.value) : el.value; if (k==='game'){ ui.calc.rarity=G[ui.calc.game].attrs.rarity[0]; ui.calc.finish=G[ui.calc.game].attrs.finish[0]; render(); } else softRefresh(); }
+  else if (el.dataset.actInput==='ptask'){ probe.task=el.value; }
+});
+document.addEventListener('input', e=>{ if (e.target.dataset.actInput==='cq'){ ui.c.q=e.target.value; const v=e.target.value; render(); const i=document.querySelector('[data-act-input="cq"]'); if (i){ i.focus(); i.setSelectionRange(v.length,v.length);} } });
+document.addEventListener('keydown', e=>{
+  if (probe.active) probe.active.keys++;
+  const tag=(e.target.tagName||'').toLowerCase(); if (tag==='input'||tag==='select'||tag==='textarea'||e.target.isContentEditable) return;
+  if (e.key==='ArrowLeft'||e.key==='ArrowRight'){ const ks=Object.keys(VARIANTS); ui.variant=ks[(ks.indexOf(ui.variant)+(e.key==='ArrowRight'?1:-1)+3)%3]; history.replaceState(null,'',`?variant=${ui.variant}`); render(); }
+  if (e.key==='Escape' && ui.modal){ ui.modal=null; render(); }
+});
+document.addEventListener('pointerdown', e=>{ if (probe.active && !e.target.closest('.probe')) probe.active.clicks++; });
+document.addEventListener('wheel', e=>{ if (probe.active) probe.active.scroll+=Math.abs(e.deltaY); }, {passive:true});
+setInterval(()=>{ const a=probe.active; if (!a) return; const s=(id,t)=>{const el=document.getElementById(id); if (el) el.textContent=t;}; s('p-c',`${Math.max(0,a.clicks)} clicks`); s('p-k',`${a.keys} keys`); s('p-s',`${Math.round(a.scroll)}px`); s('p-t',`${Math.round((Date.now()-a.t0)/1000)}″`); },300);
+function checkTask(){ const a=probe.active; if (!a) return; if (a.check()){ probe.results[a.variant][a.id]={clicks:Math.max(0,a.clicks), keys:a.keys, scroll:a.scroll, secs:Math.round((Date.now()-a.t0)/1000)}; probe.active=null; setTimeout(()=>toast(`Task ${a.id} done on ${a.variant}: ${probe.results[a.variant][a.id].clicks} clicks`),0); } }
+render();
+</script>
