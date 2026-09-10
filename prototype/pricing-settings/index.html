@@ -159,6 +159,14 @@
   .scope .sn small{display:block;font-weight:400;color:var(--muted);font-size:12px}
   .scope.inh .ed{opacity:.55;pointer-events:none}
   .rail{position:sticky;top:14px}
+  .scopecols{display:grid;gap:8px}
+  .scopecol{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;min-width:0;overflow-x:auto}
+  .scopecol.inh{background:var(--inh);border-style:dashed}
+  .scopecol .sn{font-weight:600;margin-bottom:6px}
+  .scopecol .sn small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+  .scopecol input.f{width:64px}
+  .scopecol table.t td,.scopecol table.t th{padding-right:4px}
+  .scopecol .maprow{gap:4px 8px}
 
   /* switcher + probe + modal */
   .pill{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:10px;font-size:13px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:var(--mono)}
@@ -305,7 +313,7 @@ const ui = {
   variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
   tab:'pricing', scope:'store', advOpen:false, toast:null, modal:null, reprice:null,
   b:{side:'sell', sel:null, drawer:null},            // B: selected cell {scope,side,key}; drawer 'cell'|'calc'
-  c:{side:'buy', key:'valueBands', game:'mtg', q:''}, // C: selected setting
+  c:{side:'buy', key:'valueBands', game:'mtg', q:'', layout:'tabs', scope:'store'}, // C: selected setting; layout = stack|tabs|cols
   calc:{game:'mtg', cond:'NM', lang:'en', marketUsd:1000, rarity:'rare', finish:'nonfoil', onHand:0, qty:1},
 };
 const calcVisible = () => ui.variant==='C' || (ui.variant==='A' && ui.advOpen) || (ui.variant==='B' && ui.b.drawer==='calc');
@@ -502,7 +510,21 @@ function variantC(){
       return `<div class="scope ${inh?'inh':''}"><div class="sn">${scopeName(s)}<small>${s==='store'?'what every game starts from':inh?'inherits Store defaults':'sets its own'}</small>
         ${s!=='store'?(inh?`<button class="btn tiny" data-act="override" data-scope="${s}" data-side="${side}" data-key="${key}" style="margin-top:6px">Override</button>`:`<button class="btn link small" data-act="revert" data-scope="${s}" data-side="${side}" data-key="${key}">Revert</button>`):''}</div>
         <div>${inh?`<div class="muted small" style="margin-bottom:4px">${esc(summary(s,side,key))}</div>`:''}${inh?'':editorFor(s,side,key)}</div></div>`; };
-    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}</div></div>${saveBtn(items)}</div>${scopes.map(card).join('')}</div>`;
+    const L = ui.c.layout;
+    const layoutSeg = `<div class="seg sm" title="Prototype control: how the scopes are arranged">${[['stack','Stacked'],['tabs','Tabs'],['cols','Columns']].map(([k,l])=>`<button class="${L===k?'on':''}" data-act="clayout" data-l="${k}">${l}</button>`).join('')}</div>`;
+    let body;
+    if (L==='stack' || scopes.length===1) body = scopes.map(card).join('');
+    else if (L==='tabs'){
+      const sc = scopes.includes(ui.c.scope) ? ui.c.scope : 'store';
+      body = `<div class="seg" style="margin-bottom:10px">${scopes.map(x=>`<button class="${x===sc?'on':''}" data-act="cscope" data-scope="${x}">${scopeName(x)}${x!=='store'&&!inherited(draft,x,side,key)?' <span class="badge ov" style="margin-left:4px">own</span>':''}</button>`).join('')}</div>
+        <div class="small muted" style="margin-bottom:6px">${sc==='store'?'What every Game System starts from.':inherited(draft,sc,side,key)?`${scopeName(sc)} inherits this from Store defaults.`:`${scopeName(sc)} sets its own.`}</div>${field(sc,side,key)}`;
+    } else {
+      body = `<div class="scopecols" style="grid-template-columns:repeat(${scopes.length},minmax(0,1fr))">${scopes.map(x=>{ const inh=inherited(draft,x,side,key);
+        return `<div class="scopecol ${inh?'inh':''}"><div class="sn">${scopeName(x)}<small>${x==='store'?'defaults':inh?'inherits':'own'}</small></div>
+          ${inh?`<div class="muted small" style="margin:6px 0">${esc(summary(x,side,key))}</div><button class="btn tiny" data-act="override" data-scope="${x}" data-side="${side}" data-key="${key}">Override</button>`
+               :`${editorFor(x,side,key)}${x!=='store'?`<div class="rev"><button class="btn link small" data-act="revert" data-scope="${x}" data-side="${side}" data-key="${key}">Revert</button></div>`:''}`}</div>`;}).join('')}</div>`;
+    }
+    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}</div></div><div style="display:flex;gap:8px;align-items:center">${scopes.length>1?layoutSeg:''}${saveBtn(items)}</div></div>${body}</div>`;
   }
   const hl = key==='rows' ? 'modifiers' : K[key].step;
   const right = `<div class="card rail"><div class="ch"><h2>Try a price</h2><span class="small muted">live</span></div>${K[key].step===null?'<p class="note" style="margin:0 0 8px">Tender acts on a Buy\'s total; no step to show.</p>':''}${calcHtml({vert:true, hl})}</div>`;
@@ -580,8 +602,10 @@ document.addEventListener('click', e=>{
   else if (a==='bdrawer'){ ui.b.drawer=d.d||null; if (!d.d) ui.b.sel=null; }
   else if (a==='csel'){ ui.c.side=d.side; ui.c.key=d.key; }
   else if (a==='cgame'){ ui.c.game=d.game; }
+  else if (a==='clayout'){ ui.c.layout=d.l; }
+  else if (a==='cscope'){ ui.c.scope=d.scope; }
   else if (a==='var'){ const ks=Object.keys(VARIANTS); ui.variant=ks[(ks.indexOf(ui.variant)+ +d.d+ks.length)%ks.length]; history.replaceState(null,'',`?variant=${ui.variant}`); }
-  else if (a==='pstart'){ saved=seed(); draft=clone(saved); ui.scope='store'; ui.advOpen=false; ui.b={side:'sell',sel:null,drawer:null}; ui.c={side:'buy',key:'valueBands',game:'mtg',q:''}; ui.calc={game:'mtg',cond:'NM',lang:'en',marketUsd:1000,rarity:'rare',finish:'nonfoil',onHand:0,qty:1}; probe.active={...TASKS.find(t=>t.id===probe.task), clicks:0, keys:0, scroll:0, t0:Date.now(), variant:ui.variant}; }
+  else if (a==='pstart'){ saved=seed(); draft=clone(saved); ui.scope='store'; ui.advOpen=false; ui.b={side:'sell',sel:null,drawer:null}; ui.c={side:'buy',key:'valueBands',game:'mtg',q:'',layout:ui.c.layout,scope:'store'}; ui.calc={game:'mtg',cond:'NM',lang:'en',marketUsd:1000,rarity:'rare',finish:'nonfoil',onHand:0,qty:1}; probe.active={...TASKS.find(t=>t.id===probe.task), clicks:0, keys:0, scroll:0, t0:Date.now(), variant:ui.variant}; }
   else if (a==='pabandon'){ probe.active=null; }
   else if (a==='pmin'){ probe.min=!probe.min; }
   else return;
