@@ -26,6 +26,9 @@ _Avoid_: cache, local catalogue.
 
 A SKU is arrived at rather than named: staff find the Printing, then apply the Condition. It is a store-system term and **not** something anyone says on the shop floor — where staff say "card", they mean a Card or a Printing, and the precise term is for code and specs.
 
+**Inventory** — the SKUs the store holds, viewed as a whole: every Printing with stock on hand or a Pinned Price, in each Condition and Language ([#26](https://github.com/KeeprDigital/shop-keepr/issues/26)). "Inventory" is the noun for the whole; **stock** stays the word for quantity moving — stock in, stock out, on hand. Lookup answers "do we have this card"; Inventory answers "what do we hold".
+_Avoid_: collection (a customer's own cards), catalogue (that is the Catalogue).
+
 **Condition** — the physical grade of a SKU: Near Mint (NM), Lightly Played (LP), Moderately Played (MP), Heavily Played (HP), Damaged (DMG). One scale, used across every Game System the store trades in.
 
 **Language** — the language a SKU is printed in, recorded as a BCP 47 tag from a controlled list (`en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `es-ES`, `es-419`, `pt-BR`, `zh-Hans`, `zh-Hant`, and `x-phyrex` for Magic's Phyrexian printings). Language belongs to the SKU and not to the Printing: the Catalogue describes a Card in one language, and the store records which language the copies it holds are actually in.
