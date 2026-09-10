@@ -36,7 +36,13 @@ Every Store has a **default Language** for its region, so staff set a language o
 
 The perspective matters and inverts at the kiosk: a customer buying a card produces a **Sell**.
 
-A Sell arrives by one of three routes and is the same thing whichever way: the kiosk (a fulfilled **Basket**), the **counter**, or a **Customer List**. A counter Sell is the exception rather than the norm: the counter's first job is **lookup** — *do we have this card, and how many* — and selling or buying is an action taken from what lookup found. What was sold is recorded at the price it was actually sold for, alongside the price the store was asking; there is no separate notion of a discount ([#31](https://github.com/KeeprDigital/shop-keepr/issues/31)).
+A Sell arrives by one of three routes and is the same thing whichever way: the kiosk (a fulfilled **Basket**), the **counter**, or a **Customer List**. A Buy arrives at the counter, through **Intake**, or from a Customer List. At the counter, **lookup** comes first — *do we have this card, and how many* — and selling or buying is an action taken from what lookup found, adding the card to the sell side or the buy side of one draft ([#31](https://github.com/KeeprDigital/shop-keepr/issues/31), [#11](https://github.com/KeeprDigital/shop-keepr/issues/11)). What was sold or bought is recorded at the price it was actually transacted for, alongside the price the store was asking or offering; there is no separate notion of a discount.
+
+Every Transaction records its **net**: the money that actually moved at the till, from the store's perspective. It is the number the POS receipt shows and the one audit reconciles against; it is fixed when the Transaction is recorded and never recalculated.
+
+**Trade** — a Buy and a Sell settled with one customer in one act, where the money that moves is the difference. A Trade is not a third kind of Transaction: it is a Buy and a Sell recorded together, each carrying the same net ([#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [ADR 0007](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0007-trade-is-a-linked-buy-and-sell.md)). Whether a counter draft becomes a Buy, a Sell or a Trade depends only on which sides have cards in them.
+
+**Intake** — the workflow for a pile of cards: find each Printing, grade it, count it, next. A large Buy goes through Intake rather than the counter. Whether loading the store's existing stock is the same workflow is open ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
 
 **Adjustment** — a correction to stock that is not a Transaction: a miscount, damage, shrinkage, or cards found. An Adjustment requires a **Reason** and is deliberately kept separate from buying and selling, so that stock corrections can never be mistaken for trade.
 

@@ -1,0 +1,21 @@
+---
+status: accepted
+---
+
+# A Trade is a linked Buy and Sell, not a third Transaction kind
+
+When a customer hands cards over and takes cards away in one act, shop-keepr records a Buy and a Sell in one atomic write, both carrying the same `trade_id`, the same POS Reference and the same `net`. The ledger keeps exactly three kinds: Buy, Sell and Adjustment. Decided in [#11](https://github.com/KeeprDigital/shop-keepr/issues/11).
+
+## Considered options
+
+**A `trade` kind holding both directions.** One header with every detail of the trade. Rejected: its lines need a direction and a price pair each (buy list/transacted or sell list/transacted); every query that means "sales" or "purchases" must read `sell` or `buy` rows *plus* `trade` rows filtered by direction, forever; the on-hand projection handles signed lines per kind; and [ADR 0001](./0001-append-only-ledger.md)'s reversal rule gains the same direction filter. A fourth kind is a permanent tax on every stock and money query for the sake of one row where two will do.
+
+**Two Transactions sharing a POS Reference, nothing more.** Already permitted, since a POS Reference is not unique. Rejected as too loose: "show me that trade" has no query, and the net cannot be placed anywhere.
+
+## Consequences
+
+**`trade_id` is a nullable column on the Transaction header.** Null for an ordinary Buy or Sell; the same value on both halves of a Trade. A Trade is one query on it.
+
+**Both halves carry the same `net`**, the money that moved at the till, which for a Trade is the difference between the two sides. It is a snapshot with the standing of a transacted price: immutable, the audit number beside the POS Reference, never used to derive anything. A partial reversal of one half is its own entry with its own net and does not touch the original.
+
+**Which outcome a counter draft commits as is decided by its contents.** A draft has a sell side and a buy side; lines on one side make a Sell or a Buy, lines on both make a Trade. There is no "start a Trade" mode, and the Buy and Sell services are the only write paths, invoked together for a Trade.
