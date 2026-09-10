@@ -36,6 +36,8 @@ Every Store has a **default Language** for its region, so staff set a language o
 
 The perspective matters and inverts at the kiosk: a customer buying a card produces a **Sell**.
 
+A Sell arrives by one of three routes and is the same thing whichever way: the kiosk (a fulfilled **Basket**), the **counter**, or a **Customer List**. A counter Sell is the exception rather than the norm: the counter's first job is **lookup** — *do we have this card, and how many* — and selling or buying is an action taken from what lookup found. What was sold is recorded at the price it was actually sold for, alongside the price the store was asking; there is no separate notion of a discount ([#31](https://github.com/KeeprDigital/shop-keepr/issues/31)).
+
 **Adjustment** — a correction to stock that is not a Transaction: a miscount, damage, shrinkage, or cards found. An Adjustment requires a **Reason** and is deliberately kept separate from buying and selling, so that stock corrections can never be mistaken for trade.
 
 ## The kiosk
@@ -71,3 +73,5 @@ The perspective matters and inverts at the kiosk: a customer buying a card produ
 **POS Reference** — the external point-of-sale system's own identifier for a sale, attached to a Transaction. **Every Buy and every Sell carries one**; it is the only thread between cards moving here and money moving through the till ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)). shop-keepr does not integrate with the POS and treats this as an opaque string. Adjustments never have one.
 
 **Buylist** — a list of cards the store specifically wants, at fixed prices. Defined here so the term is not used loosely for anything else. Out of scope for the MVP.
+
+**Customer List** — a list of cards a customer supplies, however it arrives: pasted text, an email, a photo. Staff resolve it into Printings and turn it into a Buy or a Sell. It is the customer's list, where a Buylist is the store's; it is not a Basket and not a Transaction, though it produces one ([#33](https://github.com/KeeprDigital/shop-keepr/issues/33)).
