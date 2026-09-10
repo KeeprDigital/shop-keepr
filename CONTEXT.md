@@ -17,6 +17,8 @@ _Avoid_ using "Card" for stock the store holds. That is a **SKU**.
 
 **The Catalogue is the sole origin of a Printing**: shop-keepr never creates one and never constructs or parses a Printing's identity — it stores the identifier the Catalogue gave it, and treats it as opaque. A card staff cannot find is a gap in the Catalogue to be fixed there, not something worked around here. shop-keepr does not _interpret_ a Printing's attributes — it has no rules engine and no notion of legality or play — but it does store, index and display them.
 
+**Facet** — an attribute of a Printing that a customer or staff member filters by, such as its set, rarity, colour or card type. Facets are chosen per Game System, because an attribute that means something in one game means nothing in another, and only a small number of a Printing's attributes are Facets: the rest are stored and shown but never filtered on. Which attributes are Facets is a shop-keepr decision about what the store needs to find, not a fact about the Catalogue ([#15](https://github.com/KeeprDigital/shop-keepr/issues/15)). Gameplay attributes such as a card's cost are not Facets, since nobody buys by them.
+
 **SKU** — a Printing in a given **Condition** and **Language**, held by one Store. This is the unit the store counts, prices, holds and transacts: four Near Mint copies and one Lightly Played copy of the same Printing are two SKUs, each with its own quantity and its own prices.
 
 A SKU is arrived at rather than named: staff find the Printing, then apply the Condition. It is a store-system term and **not** something anyone says on the shop floor — where staff say "card", they mean a Card or a Printing, and the precise term is for code and specs.
