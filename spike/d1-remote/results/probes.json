@@ -1,0 +1,59 @@
+{
+  "batch": [
+    {
+      "n": 1000,
+      "ok": true,
+      "results": 1000,
+      "ms": 259,
+      "_clientMs": 358
+    },
+    {
+      "n": 5000,
+      "ok": true,
+      "results": 5000,
+      "ms": 531,
+      "_clientMs": 571
+    },
+    {
+      "n": 20000,
+      "ok": true,
+      "results": 20000,
+      "ms": 1911,
+      "_clientMs": 2009
+    },
+    {
+      "n": 50000,
+      "ok": true,
+      "results": 50000,
+      "ms": 5230,
+      "_clientMs": 5466
+    },
+    {
+      "n": 100000,
+      "ok": true,
+      "results": 100000,
+      "ms": 11216,
+      "_clientMs": 11762
+    }
+  ],
+  "statementBytes": [
+    {
+      "bytes": 99000,
+      "ok": true,
+      "n": 98978,
+      "_clientMs": 43
+    },
+    {
+      "bytes": 100000,
+      "ok": true,
+      "n": 99978,
+      "_clientMs": 54
+    },
+    {
+      "bytes": 100001,
+      "ok": false,
+      "error": "D1_ERROR: statement too long: SQLITE_TOOBIG",
+      "_clientMs": 122
+    }
+  ]
+}

@@ -287,6 +287,9 @@ Against D1's 10 GB hard ceiling that is **about 1%**, so the decision is untouch
 
 ## What remains unverified
 
+> [!NOTE]
+> **Amended 2026-09-10.** Items 1–4 below were re-measured against a real D1 database by [#17](https://github.com/KeeprDigital/shop-keepr/issues/17); see [`spike/d1-remote/README.md`](../../spike/d1-remote/README.md). In short: `rows_read` and the plans transfer exactly; wall-clock does not — a ~20 ms Worker→D1 floor on every query, the empty-facet tail at 408 ms, the 150k seed in 5.2 s, the 100 KB statement cap exact, no `batch()` statement-count limit up to 100,000, and FTS5 blocking whole-database export while per-table export works. Item 5 remains unverified.
+
 **This spike ran on local workerd/miniflare only.** The Wrangler OAuth token available carries no D1 scope at all (`account:read`, `user:read`, `workers:write`, `workers_kv:write`, `workers_routes:write`, `workers_scripts:write`, `workers_tail:read`), so no remote database could be created or read, and the ground rules for this spike forbade provisioning one regardless. **This is the same outstanding obligation the [#4 spike](../../spike/d1-hold-atomicity/README.md) left open, and it is left open again deliberately rather than papered over.**
 
 What should transfer unchanged, because it is SQLite-level and enforced by the same `workerd` authorizer that backs both: every capability answer, every query plan, every `rows_read` count, every limit.

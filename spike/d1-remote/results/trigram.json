@@ -1,0 +1,81 @@
+{
+  "build": {
+    "names": 38001,
+    "tokens": 23600,
+    "tableRows": 222579,
+    "nameLoad": {
+      "totalMs": 299,
+      "rowsWritten": 38001
+    },
+    "rows": 222579,
+    "statements": 48,
+    "rowsPerStatement": 4637.06,
+    "largestStatementBytes": 90001,
+    "meanStatementBytes": 88267,
+    "load": {
+      "totalMs": 874,
+      "rowsWritten": 222579,
+      "batches": 1
+    },
+    "index": {
+      "ms": 464,
+      "rowsWritten": 222580
+    },
+    "bytes": 11718656,
+    "_clientMs": 2068
+  },
+  "measure": {
+    "queries": 200,
+    "plans": {
+      "full": [
+        "SEARCH token_trigram USING COVERING INDEX token_trigram_covering (trigram=?)",
+        "USE TEMP B-TREE FOR GROUP BY",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    },
+    "fullQuery": {
+      "rowsRead": {
+        "predictedMean": 4051,
+        "measuredMean": 11343,
+        "predictedP95": 7503,
+        "measuredP95": 19873,
+        "exactMatches": 0
+      },
+      "wallMs": {
+        "median": 25,
+        "p95": 32,
+        "max": 40
+      },
+      "d1DurationMs": {
+        "median": 3.35,
+        "p95": 6.86
+      }
+    },
+    "rarest5": {
+      "rowsRead": {
+        "predictedMean": 138,
+        "measuredMean": 412,
+        "measuredP95": 1030
+      },
+      "wallMs": {
+        "median": 21,
+        "p95": 24
+      }
+    },
+    "cheapPathMiss": {
+      "rowsRead": {
+        "max": 0,
+        "mean": 0
+      },
+      "wallMs": {
+        "median": 21,
+        "p95": 25
+      }
+    },
+    "_clientMs": 13903
+  },
+  "size": {
+    "sizeAfter": 423469056,
+    "_clientMs": 43
+  }
+}
