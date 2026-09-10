@@ -1,0 +1,751 @@
+<meta charset="utf-8">
+<title>Large Buy Entry</title>
+<!--
+  PROTOTYPE — throwaway. shop-keepr issue #27: "What does the Large Buy screen actually feel like to use?"
+  One file, no build, no server. Open it in a browser. Everything is in memory; reload wipes it.
+  The pure entry-loop module lives in the first <script> block (search, reduce, pricing, simulatePile). The page is a shell over it.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#F1F3F2; --panel:#FFFFFF; --ink:#1B1F1D; --muted:#64706B; --line:#D9DEDB; --line-strong:#B9C2BD;
+    --accent:#0F6E56; --accent-ink:#FFFFFF; --accent-tint:#E3F1EC; --accent-tint-2:#C8E6DA;
+    --warn:#9A5B00; --warn-tint:#FFF3DC; --danger:#A32D2D; --danger-tint:#FBE7E7;
+    --rail:#151A18; --rail-ink:#E9EEEB;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);padding:0 0 132px 0}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  kbd{font:12px var(--mono);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#fff;color:var(--ink);white-space:nowrap}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--accent)}
+
+  /* ---------- shell ---------- */
+  .shell{display:grid;grid-template-columns:184px 1fr;min-height:100vh}
+  .side{background:#FAFBFA;border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh}
+  .brand{font-weight:600;letter-spacing:.02em;padding:4px 8px 16px;color:var(--ink)}
+  .brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  .nav a{display:block;padding:6px 8px;border-radius:6px;color:var(--ink);text-decoration:none;font-size:13px}
+  .nav a.on{background:var(--accent-tint);color:var(--accent);font-weight:600}
+  .nav a.dim{color:var(--muted)}
+  .main{padding:22px 28px 28px;min-width:0}
+  @media (max-width:760px){.shell{grid-template-columns:1fr}.side{display:none}.main{padding:16px}}
+
+  /* ---------- header ---------- */
+  .head{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+  .head h1{font-size:20px;font-weight:600;margin:0 0 2px;text-wrap:balance}
+  .head .sub{color:var(--muted);font-size:13px}
+  .session{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px}
+  .session input{border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:#fff;min-width:0}
+  .session input.name{width:220px;font-weight:500}
+  .session input.details{width:300px}
+  .session select{border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:#fff}
+  .status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--accent-tint);color:var(--accent)}
+  .status.committing{background:var(--warn-tint);color:var(--warn)}
+  .status.committed{background:#E4E7E5;color:var(--muted)}
+  .stats{display:grid;grid-auto-flow:column;gap:20px;text-align:right}
+  .stat label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:20px;font-weight:500}
+  .stat .v.small{font-size:14px}
+  @media (max-width:760px){.stats{grid-auto-flow:row;text-align:left}}
+
+  /* ---------- search ---------- */
+  .searchwrap{position:relative;margin-bottom:14px}
+  .searchrow{display:flex;gap:8px;align-items:stretch}
+  .search{flex:1;font-size:18px;padding:11px 14px;border:2px solid var(--line-strong);border-radius:8px;background:#fff;outline:none}
+  .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+  .sticky{display:flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff}
+  .sticky label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+  .sticky select{border:0;background:transparent;font-weight:600;font-family:var(--mono);padding:2px}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px;min-height:18px}
+  .hint b{color:var(--ink);font-weight:500}
+  .results{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--line-strong);border-radius:8px;box-shadow:0 10px 30px rgba(20,30,25,.14);margin-top:4px;overflow:hidden;max-height:420px;overflow-y:auto}
+  .r{display:grid;grid-template-columns:38px 1fr auto auto;gap:12px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);cursor:pointer}
+  .r:first-child{border-top:0}
+  .r.hi{background:var(--accent-tint)}
+  .r .n{font-weight:500}
+  .r .p{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .r .p b{color:var(--ink);font-weight:500}
+  .r .held{font-size:12px;color:var(--muted)}
+  .r .mk{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .r .boost{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-left:6px}
+  .none{padding:12px;color:var(--muted)}
+  .thumb{width:38px;height:52px;border-radius:4px;display:grid;place-items:center;color:#fff;font:600 10px/1.1 var(--mono);text-align:center;flex:none}
+  .thumb small{font-weight:400;opacity:.85;font-size:9px}
+  .g-mtg{background:#7A5A2D}.g-pkm{background:#B08A12}.g-op{background:#A5352C}.g-rift{background:#3F5490}
+
+  /* ---------- lines ---------- */
+  .lines{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:auto}
+  table{width:100%;border-collapse:collapse;min-width:720px}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:500;white-space:nowrap}
+  td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  th.num,td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr.line{outline:0}
+  tr.line.last td{background:#FBFCFB}
+  tr.line.cell td{background:var(--accent-tint);box-shadow:inset 3px 0 0 var(--accent)}
+  tr.line.cell td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  tr.line.flash td{animation:flash 1.6s ease-out}
+  @keyframes flash{0%{background:var(--accent-tint-2)}60%{background:var(--accent-tint)}100%{background:transparent}}
+  @media (prefers-reduced-motion:reduce){tr.line.flash td{animation:none;background:var(--accent-tint)}}
+  .card .n{font-weight:500}
+  .card .p{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;font-family:var(--mono);font-weight:500;font-size:12px;padding:1px 7px;border-radius:999px;background:#EEF1EF;border:1px solid var(--line)}
+  .pill.NM{background:var(--accent-tint);border-color:var(--accent-tint-2);color:var(--accent)}
+  .pill.LP{background:#EAF0FA;border-color:#C7D6EE;color:#2A4E86}
+  .pill.MP{background:var(--warn-tint);border-color:#F3DDAE;color:var(--warn)}
+  .pill.HP,.pill.DMG{background:var(--danger-tint);border-color:#F0C6C6;color:var(--danger)}
+  .tag{font-size:11px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+  .merged{display:inline-block;margin-left:8px;font-size:12px;color:var(--accent);font-weight:500}
+  .price{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end}
+  .price input{width:76px;text-align:right;font-family:var(--mono);border:1px solid transparent;border-radius:4px;padding:2px 6px;background:transparent}
+  .price input:hover,.price input:focus{border-color:var(--line-strong);background:#fff;outline:0}
+  .price.over input{border-color:#F3DDAE;background:var(--warn-tint);color:var(--warn);font-weight:500}
+  .was{font-size:11px;color:var(--muted);text-decoration:line-through}
+  .revert{border:0;background:transparent;color:var(--muted);font-size:11px;padding:0 2px}
+  .pin{color:var(--warn);font-size:12px}
+  .del{border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;padding:2px 6px;border-radius:4px}
+  .del:hover{background:var(--danger-tint);color:var(--danger)}
+  .empty{padding:36px;text-align:center;color:var(--muted)}
+  tfoot td{background:#FAFBFA;font-weight:500;border-top:1px solid var(--line-strong)}
+
+  /* ---------- foot / totals / commit ---------- */
+  .foot{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:space-between;margin-top:14px}
+  .totals{display:flex;gap:28px}
+  .totals .t label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .totals .t .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:24px;font-weight:500}
+  .totals .t.market .v{color:var(--muted);font-size:18px}
+  .btn{border:1px solid var(--line-strong);background:#fff;border-radius:6px;padding:8px 14px;font-weight:500}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary:disabled{opacity:.45;cursor:not-allowed}
+  .btn.quiet{border-color:transparent;color:var(--muted)}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  .customer{margin-top:16px;background:#fff;border:1px dashed var(--line-strong);border-radius:8px;padding:14px 16px;max-width:520px}
+  .customer h3{margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .customer pre{margin:0;font:13px/1.5 var(--mono);white-space:pre-wrap}
+
+  .inspector{margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+  .inspector h3{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .inspector table{min-width:0;font-size:12px}
+  .inspector td,.inspector th{padding:4px 8px}
+
+  /* ---------- ingest bits ---------- */
+  .fix{margin-top:16px;background:#fff;border:1px solid #F3DDAE;border-radius:8px;overflow:hidden}
+  .fix h3{margin:0;padding:10px 14px;background:var(--warn-tint);color:var(--warn);font-size:13px;font-weight:600}
+  .fix h3 span{font-weight:400;color:var(--muted);margin-left:8px}
+  .fixrow{display:grid;grid-template-columns:1fr 1.2fr auto;gap:12px;align-items:center;padding:8px 14px;border-top:1px solid var(--line)}
+  .fixrow .q{font-family:var(--mono);font-size:13px}
+  .fixrow .why{font-size:12px;color:var(--muted)}
+  .fixrow input{border:1px solid var(--line);border-radius:6px;padding:5px 8px;width:100%}
+  .fixpick{position:relative}
+  .fixpick .results{max-height:220px}
+  .progress{font-family:var(--mono);color:var(--warn)}
+
+  /* ---------- modal ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(20,30,25,.35);display:grid;place-items:center;z-index:50}
+  .modal{background:#fff;border-radius:10px;padding:22px 24px;width:min(560px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:90vh;overflow:auto}
+  .modal h2{margin:0 0 4px;font-size:17px}
+  .modal p{margin:6px 0 12px;color:var(--muted)}
+  .modal label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .modal input,.modal select{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+  .modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .modal .err{color:var(--danger);font-size:12px;margin-top:6px}
+  .map{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px}
+  .map .h{font-family:var(--mono);color:var(--muted)}
+  .csv{font:12px/1.5 var(--mono);background:#FAFBFA;border:1px solid var(--line);padding:8px;border-radius:6px;overflow:auto;white-space:pre}
+
+  /* ---------- prototype rail ---------- */
+  .rail{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--rail);color:var(--rail-ink);font-size:13px;box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+  .railbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:8px 16px;border-bottom:1px solid #2B3330}
+  .railbar .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8E9A95;margin-right:6px}
+  .seg{display:inline-flex;border:1px solid #3A4441;border-radius:6px;overflow:hidden}
+  .seg button{background:transparent;border:0;color:#B9C4BF;padding:4px 10px;border-right:1px solid #3A4441}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:#2A6F58;color:#fff;font-weight:600}
+  .railbar .toggle{background:transparent;border:1px solid #3A4441;color:#B9C4BF;border-radius:6px;padding:4px 10px}
+  .railbar .toggle.on{border-color:#7AC8AE;color:#fff}
+  .railbar .proto{font-weight:600;color:#FFD37A;letter-spacing:.06em;font-size:11px;text-transform:uppercase}
+  .walk{display:none;padding:10px 16px 12px;max-height:44vh;overflow:auto}
+  .rail.open .walk{display:block}
+  .tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+  .tabs button{background:transparent;border:1px solid #3A4441;color:#B9C4BF;border-radius:6px;padding:3px 9px;font-size:12px}
+  .tabs button.on{background:#E9EEEB;color:var(--rail);font-weight:600;border-color:#E9EEEB}
+  .wdesc{max-width:76ch;color:#D5DDD9;margin:0 0 8px}
+  .wdesc b{color:#fff}
+  .steps{display:flex;flex-wrap:wrap;gap:6px}
+  .steps button{background:#232B28;border:1px solid #3A4441;color:#fff;border-radius:6px;padding:6px 10px;text-align:left;font-size:12px;max-width:34ch}
+  .steps button.done{opacity:.5}
+  .steps button:hover{border-color:#7AC8AE}
+  .steps button kbd{background:#0E1211;border-color:#3A4441;color:#FFD37A}
+  .simtable{margin-top:8px;border-collapse:collapse;min-width:0;font-size:12px}
+  .simtable th,.simtable td{border:1px solid #3A4441;padding:4px 8px;color:#E9EEEB;text-align:left}
+  .simtable td.n{text-align:right;font-family:var(--mono)}
+  .simtable tr.best td{background:#1F3A31}
+  .toast{position:fixed;right:20px;bottom:150px;background:var(--rail);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:45;max-width:44ch}
+  .toast b{color:#FFD37A}
+</style>
+
+<div class="shell">
+  <aside class="side">
+    <div class="brand">shop-keepr<small>staff</small></div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="rail" id="rail">
+  <div class="railbar">
+    <span class="proto">Prototype #27</span>
+    <span><span class="lbl">Screen</span><span class="seg" id="segScreen"></span></span>
+    <span><span class="lbl">Hotkeys</span><span class="seg" id="segScheme"></span></span>
+    <span><span class="lbl">Sticky</span><span class="seg" id="segSticky"></span></span>
+    <button class="toggle" id="tCustomer">Customer slip</button>
+    <button class="toggle" id="tInspector">Under the hood</button>
+    <button class="toggle" id="tWalk">Walkthroughs ▴</button>
+    <button class="toggle" id="tReset">Reset</button>
+  </div>
+  <div class="walk" id="walk"></div>
+</div>
+<div id="toast"></div>
+
+<!-- ============================================================
+     PURE MODULE — no DOM. Search, reducer, pricing, pile simulation.
+     ============================================================ -->
+<script>
+const M = (() => {
+  const CONDITIONS = ['NM','LP','MP','HP','DMG'];
+  const COND_KEY = { n:'NM', l:'LP', m:'MP', h:'HP', d:'DMG' };
+  const LANG_KEY = { e:'en', j:'ja' };            // prototype: two languages are enough to feel it
+  const STORE_LANG = 'en';
+  const RULES = { buyPct:0.5, cond:{NM:1,LP:.85,MP:.7,HP:.5,DMG:.3}, lang:{en:1,ja:.9}, roundTo:10, floor:10 };
+
+  // ---- fake Catalogue mirror: [game, name, set, num, finish, release, market pence]
+  const G = { mtg:'Magic', pkm:'Pokémon', op:'One Piece', rift:'Riftbound' };
+  const raw = [
+    ['mtg','Lightning Bolt','LEA',161,'nonfoil',1993.08,32000],['mtg','Lightning Bolt','M10',146,'nonfoil',2009.07,240],['mtg','Lightning Bolt','STA',42,'etched foil',2021.04,650],['mtg','Lightning Bolt','CLB',187,'nonfoil',2022.06,120],
+    ['mtg','Counterspell','ICE',64,'nonfoil',1995.06,180],['mtg','Counterspell','MH2',267,'nonfoil',2021.06,110],['mtg','Counterspell','CMM',81,'nonfoil',2023.08,90],
+    ['mtg','Sol Ring','C21',263,'nonfoil',2021.04,150],['mtg','Sol Ring','CMM',395,'nonfoil',2023.08,120],['mtg','Sol Ring','LTC',284,'nonfoil',2023.06,210],
+    ['mtg','Jace, the Mind Sculptor','WWK',31,'nonfoil',2010.02,5500],['mtg','Jace, the Mind Sculptor','EMA',57,'nonfoil',2016.06,3000],['mtg','Jace, the Mind Sculptor','2XM',56,'nonfoil',2020.08,2500],
+    ['mtg','Ragavan, Nimble Pilferer','MH2',138,'nonfoil',2021.06,4500],['mtg','Ragavan, Nimble Pilferer','MH2',138,'foil',2021.06,6500],['mtg','Ragavan, Nimble Pilferer','MH2',383,'extended art',2021.06,7000],['mtg','Ragavan, Nimble Pilferer','MH2',421,'sketch',2021.06,6000],
+    ['mtg','Thoughtseize','LRW',145,'nonfoil',2007.10,1400],['mtg','Thoughtseize','THS',107,'nonfoil',2013.09,1100],['mtg','Thoughtseize','2XM',109,'nonfoil',2020.08,900],
+    ['mtg','Snapcaster Mage','ISD',78,'nonfoil',2011.09,1800],['mtg','Snapcaster Mage','MM3',56,'nonfoil',2017.03,1400],['mtg','Snapcaster Mage','UMA',71,'nonfoil',2018.12,1300],
+    ['mtg','Force of Will','ALL',25,'nonfoil',1996.06,7000],['mtg','Force of Will','EMA',49,'nonfoil',2016.06,5500],['mtg','Force of Will','2XM',60,'nonfoil',2020.08,4500],
+    ['mtg','Delighted Halfling','LTR',158,'nonfoil',2023.06,600],['mtg','The One Ring','LTR',246,'nonfoil',2023.06,4000],['mtg','The One Ring','LTR',380,'extended art',2023.06,5500],
+    ['mtg','Fatal Push','AER',57,'nonfoil',2017.01,200],['mtg','Fatal Push','KLR',79,'nonfoil',2020.11,150],
+    ['mtg','Elvish Mystic','M14',169,'nonfoil',2013.07,40],['mtg','Elvish Mystic','M15',175,'nonfoil',2014.07,40],
+    ['mtg',"Urza's Saga",'MH2',259,'nonfoil',2021.06,3000],['mtg','Esper Sentinel','MH2',12,'nonfoil',2021.06,400],['mtg','Solitude','MH2',32,'nonfoil',2021.06,2500],['mtg','Endurance','MH2',158,'nonfoil',2021.06,2000],['mtg','Subtlety','MH2',67,'nonfoil',2021.06,1000],['mtg','Grief','MH2',87,'nonfoil',2021.06,600],['mtg','Fury','MH2',126,'nonfoil',2021.06,600],['mtg','Dauthi Voidwalker','MH2',100,'nonfoil',2021.06,900],['mtg','Sanctifier en-Vec','MH2',33,'nonfoil',2021.06,200],['mtg','Prismatic Ending','MH2',25,'nonfoil',2021.06,150],['mtg','Ignoble Hierarch','MH2',168,'nonfoil',2021.06,200],['mtg','Shardless Agent','MH2',292,'nonfoil',2021.06,150],['mtg','Kaldra Compleat','MH2',226,'nonfoil',2021.06,300],
+    ['pkm','Pikachu','BS',58,'nonholo',1999.01,800],['pkm','Pikachu','MEW',25,'nonholo',2023.09,50],['pkm','Pikachu','MEW',173,'illustration rare',2023.09,300],['pkm','Pikachu','SVP',27,'promo',2023.06,600],
+    ['pkm','Charizard','BS',4,'holo',1999.01,35000],['pkm','Charizard','MEW',6,'nonholo',2023.09,400],['pkm','Charizard ex','OBF',125,'nonholo',2023.08,1200],['pkm','Charizard ex','OBF',223,'special illustration rare',2023.08,18000],['pkm','Charizard ex','OBF',215,'full art',2023.08,4500],
+    ['pkm','Umbreon VMAX','EVS',95,'nonholo',2021.08,4000],['pkm','Umbreon VMAX','EVS',215,'alternate art',2021.08,70000],
+    ['pkm','Gardevoir ex','SVI',86,'nonholo',2023.03,500],['pkm','Gardevoir ex','SVI',245,'special illustration rare',2023.03,6000],
+    ['pkm','Mew ex','MEW',151,'nonholo',2023.09,600],['pkm','Mew ex','MEW',193,'full art',2023.09,2500],['pkm','Mew ex','MEW',205,'special illustration rare',2023.09,9000],
+    ['pkm',"Boss's Orders",'PAL',172,'nonholo',2023.06,120],['pkm',"Boss's Orders",'RCL',154,'nonholo',2020.05,150],['pkm',"Boss's Orders",'BRS',132,'nonholo',2022.02,80],['pkm',"Boss's Orders",'PAL',265,'special illustration rare',2023.06,3000],
+    ['pkm','Iono','PAL',185,'nonholo',2023.06,150],['pkm','Iono','PAL',254,'special illustration rare',2023.06,7000],
+    ['pkm','Bulbasaur','MEW',1,'nonholo',2023.09,30],['pkm','Squirtle','MEW',7,'nonholo',2023.09,40],['pkm','Mewtwo','MEW',150,'nonholo',2023.09,60],
+    ['op','Monkey.D.Luffy','OP01',3,'leader',2022.12,200],['op','Monkey.D.Luffy','OP01',24,'normal',2022.12,80],['op','Monkey.D.Luffy','OP02',62,'normal',2023.03,150],['op','Monkey.D.Luffy','OP05',119,'secret rare',2023.12,6000],['op','Monkey.D.Luffy','OP05',119,'manga art',2023.12,40000],['op','Monkey.D.Luffy','ST01',1,'leader',2022.12,100],
+    ['op','Roronoa Zoro','OP01',1,'leader',2022.12,300],['op','Roronoa Zoro','OP01',25,'normal',2022.12,100],['op','Roronoa Zoro','OP01',25,'parallel',2022.12,2500],['op','Roronoa Zoro','OP06',118,'secret rare',2024.03,3500],
+    ['op','Nami','OP01',16,'normal',2022.12,70],['op','Nami','OP03',40,'normal',2023.06,50],['op','Nami','OP03',40,'parallel',2023.06,4500],['op','Nami','ST01',7,'normal',2022.12,50],
+    ['op','Trafalgar Law','OP01',47,'normal',2022.12,150],['op','Trafalgar Law','OP01',47,'parallel',2022.12,3000],['op','Trafalgar Law','OP05',69,'normal',2023.12,200],
+    ['op','Shanks','OP01',120,'secret rare',2022.12,1200],['op','Shanks','OP01',120,'parallel',2022.12,12000],
+    ['op','Portgas.D.Ace','OP02',13,'normal',2023.03,120],['op','Portgas.D.Ace','OP02',13,'parallel',2023.03,4000],['op','Portgas.D.Ace','OP03',1,'leader',2023.06,200],
+    ['op','Kaido','OP01',61,'normal',2022.12,50],['op','Yamato','OP01',121,'secret rare',2022.12,1000],['op','Boa Hancock','OP01',78,'normal',2022.12,150],['op','Sanji','OP01',13,'normal',2022.12,80],['op','Usopp','OP01',17,'normal',2022.12,40],['op','Nico Robin','OP01',18,'normal',2022.12,60],
+    ['rift','Jinx, Loose Cannon','OGN',45,'normal',2025.10,400],['rift','Jinx, Loose Cannon','OGN',298,'alternate art',2025.10,3000],['rift','Jinx, Loose Cannon','SFD',55,'normal',2026.03,200],['rift','Ahri, Nine-Tailed','OGN',12,'normal',2025.10,300],['rift','Yasuo, Unforgiven','OGN',201,'normal',2025.10,250],['rift','Garen, Might of Demacia','OGN',101,'normal',2025.10,100],['rift','Lux, Lady of Luminosity','OGN',103,'normal',2025.10,150],['rift','Teemo, Swift Scout','OGN',150,'normal',2025.10,60],['rift','Volibear, Relentless Storm','OGN',240,'normal',2025.10,200],['rift','Annie, Dark Child','OGN',180,'normal',2025.10,100],
+  ];
+  const CAT = raw.map((r,i)=>({ id:'prt_'+String(i+1).padStart(3,'0'), game:r[0], name:r[1], set:r[2], num:r[3], finish:r[4], release:r[5], market:r[6] }));
+  const SETS = new Set(CAT.map(p=>p.set));
+  const byId = Object.fromEntries(CAT.map(p=>[p.id,p]));
+  const find = (name,set,num,finish) => CAT.find(p=>p.name===name&&p.set===set&&p.num===num&&(!finish||p.finish===finish));
+  const finishRank = f => /^(nonfoil|normal|nonholo|leader)$/.test(f) ? 0 : 1;
+  const printingLabel = p => p.game==='op' ? `${p.set}-${String(p.num).padStart(3,'0')}` : p.game==='rift' ? `${p.set}-${String(p.num).padStart(3,'0')}` : `${p.set} #${p.num}`;
+
+  // ---- fake stock: SKU rows the store holds (or held). Absent row = never held; price computed on read.
+  const inv = [];
+  const hold = (name,set,num,cond,lang,qty,extra={}) => { const p=find(name,set,num,extra.finish); inv.push({printingId:p.id,condition:cond,language:lang,onHand:qty,buy:extra.pin ?? computeBuy(p,cond,lang), pinned:extra.pin!=null}); };
+  function computeBuy(p,cond,lang){ const v=p.market*RULES.cond[cond]*(RULES.lang[lang]??.8)*RULES.buyPct; return Math.max(Math.round(v/RULES.roundTo)*RULES.roundTo, RULES.floor); }
+  hold('Lightning Bolt','M10',146,'NM','en',12,{pin:150}); hold('Lightning Bolt','M10',146,'LP','en',3);
+  hold('Counterspell','MH2',267,'NM','en',6); hold('Ragavan, Nimble Pilferer','MH2',138,'NM','en',2,{finish:'nonfoil'});
+  hold('Monkey.D.Luffy','OP01',3,'NM','en',4); hold('Monkey.D.Luffy','OP05',119,'NM','en',1,{finish:'secret rare'});
+  hold('Pikachu','MEW',25,'NM','en',20); hold('Charizard ex','OBF',125,'NM','en',5); hold('Roronoa Zoro','OP01',25,'LP','en',2,{finish:'normal'});
+  hold('Jinx, Loose Cannon','OGN',45,'NM','en',3); hold("Boss's Orders",'PAL',172,'NM','en',9); hold('Thoughtseize','THS',107,'NM','en',0);
+  hold('Sol Ring','C21',263,'NM','en',7); hold('Solitude','MH2',32,'NM','en',1); hold('Snapcaster Mage','UMA',71,'NM','en',2);
+  hold('Nami','OP01',16,'NM','en',6); hold('Nami','OP01',16,'NM','ja',1);
+  const skuRow = (pid,cond,lang) => inv.find(r=>r.printingId===pid&&r.condition===cond&&r.language===lang);
+  const heldSummary = pid => inv.filter(r=>r.printingId===pid&&r.onHand>0).map(r=>`${r.onHand} ${r.condition}${r.language!==STORE_LANG?' '+r.language:''}`).join(', ');
+  function buyPrice(pid,cond,lang){ const p=byId[pid]; const row=skuRow(pid,cond,lang); if(row) return {price:row.buy, pinned:row.pinned, source:row.pinned?'stored column (pinned)':'stored column'}; return {price:computeBuy(p,cond,lang), pinned:false, source:'computed on read — no SKU row'}; }
+
+  // ---- search: fold, narrowing grammar, boost
+  const fold = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.\-_/]/g,' ').replace(/['’,:!]/g,'').replace(/\s+/g,' ').trim();
+  function parseQuery(q){
+    let t=q.trim(), set=null, num=null;
+    const m=t.match(/#\s*(\d+)\s*$/); if(m){ num=parseInt(m[1],10); t=t.slice(0,m.index).trim(); }
+    const parts=t.split(/\s+/).filter(Boolean);
+    if(parts.length>1 && SETS.has(parts[parts.length-1].toUpperCase())){ set=parts.pop().toUpperCase(); }
+    return { text:parts.join(' '), set, num };
+  }
+  function search(query,lastSet){
+    const {text,set,num}=parseQuery(query); const f=fold(text);
+    if(!f && set==null && num==null) return [];
+    const pool=CAT.filter(p=>(set==null||p.set===set)&&(num==null||p.num===num));
+    let hits = f ? pool.filter(p=>fold(p.name)===f) : pool;
+    if(!hits.length && f) hits = pool.filter(p=>fold(p.name).replace(/ /g,'')===f.replace(/ /g,''));
+    if(!hits.length && f){ const toks=f.split(' '); hits=pool.filter(p=>{ const w=fold(p.name).split(' '); return toks.every(t=>w.some(x=>x.startsWith(t))); }); }
+    hits.sort((a,b)=>((b.set===lastSet)-(a.set===lastSet)) || a.name.localeCompare(b.name) || (b.release-a.release) || (a.num-b.num) || (finishRank(a.finish)-finishRank(b.finish)) || a.finish.localeCompare(b.finish));
+    return hits.slice(0,12);
+  }
+  // scheme "prefix": leading tokens set qty / condition / language before the name
+  function parsePrefix(q){
+    const out={qty:null,condition:null,language:null}; const parts=q.trim().split(/\s+/); let i=0;
+    for(;i<parts.length;i++){ const t=parts[i].toLowerCase();
+      if(/^\d{1,3}$/.test(t)&&out.qty==null){out.qty=parseInt(t,10);continue;}
+      if(CONDITIONS.includes(t.toUpperCase())&&!out.condition){out.condition=t.toUpperCase();continue;}
+      if((t==='ja'||t==='en')&&!out.language){out.language=t;continue;}
+      break; }
+    return {...out, text:parts.slice(i).join(' ')};
+  }
+
+  // ---- state + reducer
+  function initial(kind){ return { kind, session:{name:'',details:'',status:'open'}, reason: kind==='ingest'?'initial load':null, sticky:{condition:'NM',language:STORE_LANG}, stickyMode:'defaults', lines:[], nextId:1, lastSet:null, lastLineId:null, flash:null, seq:0, fix:[], nextFix:1, entries:0, commit:null, chunk:null }; }
+  const lineKey = l => `${l.printingId}|${l.condition}|${l.language}`;
+  const mergedMsg = l => `merged: ${byId[l.printingId].name} (${printingLabel(byId[l.printingId])}) ${l.condition}${l.language!==STORE_LANG?' '+l.language:''}, now ×${l.qty}`;
+  function settle(s, id, message){ // merge duplicates into `id`'s line, move it to top, flash
+    const me=s.lines.find(l=>l.id===id); if(!me) return s;
+    const dup=s.lines.find(l=>l.id!==id&&lineKey(l)===lineKey(me));
+    if(dup){ me.qty+=dup.qty; me.keys+=dup.keys; if(me.override==null&&dup.override!=null) me.override=dup.override; s.lines=s.lines.filter(l=>l.id!==dup.id); message=mergedMsg(me); }
+    else if(message==='merge') message=mergedMsg(me);
+    s.lines=[me,...s.lines.filter(l=>l.id!==id)]; s.lastLineId=id; s.seq++; s.flash=message?{lineId:id,message,seq:s.seq}:null; return s;
+  }
+  function reduce(s0,a){
+    const s=structuredClone(s0);
+    const last=()=>s.lines.find(l=>l.id===(a.id??s.lastLineId));
+    switch(a.type){
+      case 'pick': { const p=byId[a.printingId]; const condition=a.condition??s.sticky.condition, language=a.language??s.sticky.language, qty=a.qty??1;
+        const key=`${p.id}|${condition}|${language}`; s.entries++; s.lastSet=p.set;
+        const dup=s.lines.find(l=>lineKey(l)===key);
+        if(dup){ dup.qty+=qty; dup.keys+=(a.keys||0); return settle(s,dup.id,'merge'); }
+        const id=s.nextId++; s.lines.unshift({id,printingId:p.id,condition,language,qty,override:null,keys:a.keys||0}); s.lastLineId=id; s.seq++; s.flash=null;
+        if(s.stickyMode==='last'){ s.sticky={condition,language}; }
+        return s; }
+      case 'condition': { const l=last(); if(!l) return s; if(!CONDITIONS.includes(a.condition)) return s; l.condition=a.condition; l.keys+=(a.keys||0); if(s.stickyMode==='last') s.sticky.condition=a.condition; return settle(s,l.id,`${a.condition}`); }
+      case 'language': { const l=last(); if(!l) return s; l.language=a.language; l.keys+=(a.keys||0); if(s.stickyMode==='last') s.sticky.language=a.language; return settle(s,l.id,a.language); }
+      case 'qty': { const l=last(); if(!l) return s; l.qty=Math.max(1,Math.min(999,a.qty|0)); l.keys+=(a.keys||0); s.seq++; s.flash={lineId:l.id,message:`×${l.qty}`,seq:s.seq}; s.lastLineId=l.id; return s; }
+      case 'override': { const l=last(); if(!l) return s; l.override=a.price==null?null:Math.max(0,Math.round(a.price)); l.keys+=(a.keys||0); s.seq++; s.flash={lineId:l.id,message:a.price==null?'override removed':'this line only — never pins',seq:s.seq}; return s; }
+      case 'delete': { s.lines=s.lines.filter(l=>l.id!==a.id); if(s.lastLineId===a.id) s.lastLineId=s.lines[0]?.id??null; s.flash=null; return s; }
+      case 'sticky': { s.sticky={...s.sticky,...a.sticky}; return s; }
+      case 'stickyMode': { s.stickyMode=a.mode; if(a.mode==='defaults') s.sticky={condition:'NM',language:STORE_LANG}; return s; }
+      case 'session': { s.session={...s.session,...a.session}; return s; }
+      case 'reason': { s.reason=a.reason; return s; }
+      case 'import': { for(const r of a.rows){ const {text,set,num}=parseQuery(r.query); const hits=search(r.query,null);
+          const exact=hits.filter(p=>fold(p.name)===fold(text)&&(set==null||p.set===set)&&(num==null||p.num===num));
+          if(exact.length===1){ const p=exact[0]; const key=`${p.id}|${r.condition}|${r.language}`; const dup=s.lines.find(l=>lineKey(l)===key); if(dup) dup.qty+=r.qty; else s.lines.unshift({id:s.nextId++,printingId:p.id,condition:r.condition,language:r.language,qty:r.qty,override:null,keys:0,imported:true}); }
+          else s.fix.push({id:s.nextFix++,query:r.query,condition:r.condition,language:r.language,qty:r.qty,why: exact.length===0?'no Printing matches':`${exact.length} Printings match — not guessed`}); }
+        s.flash=null; return s; }
+      case 'fixPick': { const f=s.fix.find(x=>x.id===a.fixId); if(!f) return s; s.fix=s.fix.filter(x=>x.id!==a.fixId); const p=byId[a.printingId]; s.lastSet=p.set;
+        const key=`${p.id}|${f.condition}|${f.language}`; const dup=s.lines.find(l=>lineKey(l)===key); if(dup){ dup.qty+=f.qty; return settle(s,dup.id,'merge'); }
+        const id=s.nextId++; s.lines.unshift({id,printingId:p.id,condition:f.condition,language:f.language,qty:f.qty,override:null,keys:0}); s.lastLineId=id; s.seq++; s.flash={lineId:id,message:'fixed',seq:s.seq}; return s; }
+      case 'fixDrop': { s.fix=s.fix.filter(x=>x.id!==a.fixId); return s; }
+      case 'commit': { if(s.kind==='large_buy'){ if(!a.posRef) return s; s.session.status='committed'; s.commit={kind:'buy',origin:'large_buy',posRef:a.posRef,tender:a.tender||null,net:totals(s).buy,lines:s.lines.length,copies:totals(s).copies}; }
+        else { const chunks=Math.max(1,Math.ceil(s.lines.length/25)); s.session.status='committing'; s.chunk={done:0,total:chunks}; s.commit={kind:'adjustment',reason:s.reason,lines:s.lines.length,copies:totals(s).copies,unfixed:s.fix.length}; }
+        return s; }
+      case 'chunk': { if(!s.chunk) return s; s.chunk.done=Math.min(s.chunk.total,s.chunk.done+1); if(s.chunk.done>=s.chunk.total) s.session.status='committed'; return s; }
+      default: return s;
+    }
+  }
+  function linePrice(l){ const bp=buyPrice(l.printingId,l.condition,l.language); return {...bp, effective: l.override??bp.price}; }
+  function totals(s){ let buy=0,market=0,copies=0,keys=0; for(const l of s.lines){ const p=byId[l.printingId]; buy+=linePrice(l).effective*l.qty; market+=p.market*l.qty; copies+=l.qty; keys+=l.keys; } return {buy,market,copies,lines:s.lines.length,keys}; }
+
+  // ---- the 40-card pile (set-clustered, as #35 bets piles are)
+  const P=(name,set,num,cond='NM',qty=1,lang='en',finish)=>({name,set,num,cond,qty,lang,finish});
+  const PILE=[
+    P('Ragavan, Nimble Pilferer','MH2',138,'NM',1,'en','nonfoil'),P('Solitude','MH2',32),P('Endurance','MH2',158,'LP'),P('Subtlety','MH2',67),P('Grief','MH2',87,'NM',2),P('Fury','MH2',126),
+    P('Counterspell','MH2',267,'NM',3),P("Urza's Saga",'MH2',259),P('Dauthi Voidwalker','MH2',100),P('Esper Sentinel','MH2',12,'LP'),P('Prismatic Ending','MH2',25,'NM',4),P('Ignoble Hierarch','MH2',168),P('Kaldra Compleat','MH2',226,'MP'),P('Ragavan, Nimble Pilferer','MH2',138,'NM',1,'en','nonfoil'),
+    P('Lightning Bolt','M10',146),P('Lightning Bolt','STA',42),P('Jace, the Mind Sculptor','WWK',31,'LP'),P('Thoughtseize','THS',107),P('Snapcaster Mage','ISD',78),P('Force of Will','EMA',49,'HP'),
+    P('Monkey.D.Luffy','OP01',3),P('Roronoa Zoro','OP01',1),P('Nami','OP01',16,'NM',2),P('Trafalgar Law','OP01',47,'NM',1,'en','normal'),P('Trafalgar Law','OP01',47,'NM',1,'en','parallel'),P('Shanks','OP01',120,'NM',1,'en','secret rare'),P('Roronoa Zoro','OP01',25,'LP',1,'en','normal'),P('Sanji','OP01',13),P('Kaido','OP01',61,'NM',1,'ja'),P('Usopp','OP01',17),
+    P('Monkey.D.Luffy','OP05',119,'NM',1,'en','secret rare'),P('Monkey.D.Luffy','OP05',119,'LP',1,'en','manga art'),
+    P('Pikachu','MEW',25),P('Mew ex','MEW',151),P('Mew ex','MEW',193),P('Bulbasaur','MEW',1,'NM',2),P('Charizard','MEW',6),P('Squirtle','MEW',7,'NM',1,'ja'),
+    P('Jinx, Loose Cannon','OGN',45),P('Ahri, Nine-Tailed','OGN',12),
+  ].map(c=>({...c, printingId:find(c.name,c.set,c.num,c.finish).id}));
+
+  // ---- simulate: keystrokes to enter the pile under a hotkey scheme + sticky mode. Returns per-card key plans.
+  // scheme: 'bare' (#35 as written) | 'tab' | 'alt' | 'prefix'
+  function planCard(card, lastSet, sticky, scheme){
+    const p=byId[card.printingId]; const name=p.name;
+    const needCond = card.cond!==sticky.condition, needLang = card.lang!==sticky.language, needQty = card.qty>1;
+    // a realistic operator: type until every result is this card's name (or the target is on top);
+    // then narrow with the set code or #number if that puts it on top, else arrow down to it.
+    let best=null;
+    const cost=(q)=>{ const res=search(q,lastSet); const idx=res.findIndex(r=>r.id===p.id); return idx<0?null:{cost:q.length+idx,q,arrows:idx}; };
+    let q=null;
+    for(let L=1;L<=name.length;L++){ const pre=name.slice(0,L); if(pre.endsWith(' ')) continue; const res=search(pre,lastSet); if(!res.length) continue;
+      if(res[0].id===p.id || res.every(r=>r.name===p.name)){ q=pre; break; } }
+    if(q==null) q=name;
+    for(const c of [cost(q), cost(`${q} ${p.set}`), cost(`${q} #${p.num}`)]) if(c && (!best||c.cost<best.cost)) best=c;
+    if(!best) best={cost:name.length+1,q:name,arrows:0};
+    const keys=[]; let prefixText='';
+    if(scheme==='prefix'){ if(needQty) prefixText+=card.qty+' '; if(needCond) prefixText+=card.cond.toLowerCase()+' '; if(needLang) prefixText+=card.lang+' '; }
+    for(const ch of (prefixText+best.q)) keys.push({key:ch});
+    for(let i=0;i<best.arrows;i++) keys.push({key:'ArrowDown'});
+    keys.push({key:'Enter'});
+    const digits=String(card.qty).split('');
+    const condKey=Object.keys(COND_KEY).find(k=>COND_KEY[k]===card.cond), langKey=Object.keys(LANG_KEY).find(k=>LANG_KEY[k]===card.lang);
+    if(scheme==='tab' && (needCond||needLang||needQty)){ keys.push({key:'Tab'}); if(needCond) keys.push({key:condKey}); if(needLang) keys.push({key:langKey}); if(needQty) digits.forEach(d=>keys.push({key:d})); keys.push({key:'Enter'}); }
+    if(scheme==='alt'){ if(needCond) keys.push({key:condKey,altKey:true}); if(needLang) keys.push({key:langKey,altKey:true}); if(needQty) digits.forEach(d=>keys.push({key:d,altKey:true})); }
+    if(scheme==='bare'){ if(needCond) keys.push({key:condKey}); if(needLang) keys.push({key:langKey}); if(needQty) digits.forEach(d=>keys.push({key:d})); }
+    const misfire = scheme==='bare' && /^[nlmhdej0-9]/i.test(fold(name)); // this card's first letter would be eaten as a hotkey on the previous line
+    return {card, keys, typed:best.q, arrows:best.arrows, grading:keys.length-(prefixText.length+best.q.length+best.arrows+1), misfire};
+  }
+  function simulatePile(pile, scheme, stickyMode){
+    let lastSet=null, sticky={condition:'NM',language:STORE_LANG}; const plans=[];
+    for(const card of pile){ const plan=planCard(card,lastSet,sticky,scheme); plans.push(plan); lastSet=byId[card.printingId].set; if(stickyMode==='last') sticky={condition:card.cond,language:card.lang}; }
+    const total=plans.reduce((n,p)=>n+p.keys.length,0), copies=pile.reduce((n,c)=>n+c.qty,0);
+    const typed=plans.reduce((n,p)=>n+p.typed.length,0), arrows=plans.reduce((n,p)=>n+p.arrows,0), grading=plans.reduce((n,p)=>n+p.grading,0);
+    return {scheme,stickyMode,plans,total,copies,entries:pile.length,typed,arrows,grading,perEntry:total/pile.length,perCopy:total/copies,misfires: scheme==='bare'? plans.filter(p=>p.misfire).length:0};
+  }
+
+  return { CONDITIONS, COND_KEY, LANG_KEY, STORE_LANG, RULES, G, CAT, byId, inv, skuRow, heldSummary, buyPrice, computeBuy, printingLabel, fold, parseQuery, parsePrefix, search, initial, reduce, linePrice, totals, PILE, simulatePile, planCard };
+})();
+</script>
+
+<!-- ============================================================
+     PAGE — thin shell over the module. Throwaway.
+     ============================================================ -->
+<script>
+(() => {
+  const $=s=>document.querySelector(s);
+  const money=p=>'£'+(p/100).toFixed(2);
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  // ---- page state (not domain state)
+  let S = M.initial('large_buy');
+  const ui = { scheme:'bare', screen:'large_buy', query:'', hi:0, mode:'search', cellDigits:'', cellDigitAt:0, keys:0, pendingKeys:0, showCustomer:false, showInspector:false, walk:null, walkOpen:false, modal:null, playing:false, toastT:null };
+  const dispatch = a => { S = M.reduce(S,a); render(); };
+
+  // ---- key handling: one function, driven by real keydown AND by the walkthrough player
+  function hotkeyAction(key, keys){
+    const k=key.toLowerCase();
+    if(M.COND_KEY[k]) return {type:'condition',condition:M.COND_KEY[k],keys};
+    if(M.LANG_KEY[k]) return {type:'language',language:M.LANG_KEY[k],keys};
+    if(/^[0-9]$/.test(k)){ const now=Date.now(); const acc = now-ui.cellDigitAt<900 ? ui.cellDigits+k : k; ui.cellDigits=acc; ui.cellDigitAt=now; return {type:'qty',qty:parseInt(acc,10),keys}; }
+    return null;
+  }
+  function pickHighlighted(){
+    const q=ui.query; let condition, language, qty, text=q;
+    if(ui.scheme==='prefix'){ const p=M.parsePrefix(q); text=p.text; if(p.condition) condition=p.condition; if(p.language) language=p.language; if(p.qty) qty=p.qty; }
+    const res=M.search(text,S.lastSet); const r=res[ui.hi]; if(!r) return false;
+    const keys=ui.pendingKeys; ui.pendingKeys=0; ui.query=''; ui.hi=0;
+    dispatch({type:'pick',printingId:r.id,condition,language,qty,keys});
+    return true;
+  }
+  // returns true if the key was consumed (caller should preventDefault)
+  function handleKey(ev){
+    let key=ev.key; if(ev.altKey && ev.code){ const m=ev.code.match(/^(?:Key|Digit)(.)$/); if(m) key=m[1].toLowerCase(); }
+    if(S.session.status!=='open') return false;
+    if(ui.modal) return false;
+    ui.keys++;
+    if(ui.mode==='cell'){
+      if(key==='Enter'||key==='Escape'||key==='Tab'){ leaveCell(); return true; }
+      if(key==='Backspace'||key==='Delete'){ const id=ui.cellLine; leaveCell(); dispatch({type:'delete',id}); return true; }
+      if(key.toLowerCase()==='p'){ const inp=document.querySelector(`tr[data-id="${ui.cellLine}"] .price input`); if(inp){ inp.focus(); inp.select(); } return true; }
+      const a=hotkeyAction(key,1); if(a){ dispatch({...a,id:ui.cellLine}); return true; }
+      return true;
+    }
+    // search mode
+    if(ev.altKey && ui.scheme==='alt'){ const a=hotkeyAction(key,1); if(a&&S.lines.length){ dispatch(a); return true; } }
+    if(key==='Tab' && ui.scheme==='tab' && !ev.shiftKey){ if(S.lines.length){ enterCell(S.lastLineId); return true; } return false; }
+    if(key==='ArrowDown'){ const n=results().length; if(n){ ui.hi=(ui.hi+1)%n; renderResults(); } return true; }
+    if(key==='ArrowUp'){ const n=results().length; if(n){ ui.hi=(ui.hi-1+n)%n; renderResults(); } return true; }
+    if(key==='Enter'){ ui.pendingKeys++; pickHighlighted(); return true; }
+    if(key==='Escape'){ ui.query=''; ui.hi=0; ui.pendingKeys=0; syncSearch(); renderResults(); return true; }
+    if(ui.scheme==='bare' && ui.query==='' && S.lines.length){ const a=hotkeyAction(key,1); if(a){ dispatch(a); return true; } }
+    if(key.length===1){ ui.pendingKeys++; }
+    return false;
+  }
+  function typeChar(ch){ ui.query+=ch; ui.hi=0; syncSearch(); renderResults(); }
+  function enterCell(id){ ui.mode='cell'; ui.cellLine=id; ui.cellDigits=''; ui.cellDigitAt=0; render(); const row=document.querySelector(`tr[data-id="${id}"]`); row&&row.focus(); }
+  function leaveCell(){ ui.mode='search'; ui.cellLine=null; render(); focusSearch(); }
+  function focusSearch(){ const s=$('#search'); if(s&&document.activeElement!==s) s.focus(); }
+  function syncSearch(){ const s=$('#search'); if(s&&s.value!==ui.query) s.value=ui.query; }
+  function results(){ let text=ui.query; if(ui.scheme==='prefix') text=M.parsePrefix(text).text; return M.search(text,S.lastSet); }
+
+  // ---- rendering
+  const NAV=['Lookup','Queue','Customer Lists','Large Buy','Ingest','Inventory','Pinned Prices','History','Settings','System'];
+  function render(){
+    $('#nav').innerHTML=NAV.map(n=>`<a href="#" class="${(ui.screen==='large_buy'&&n==='Large Buy')||(ui.screen==='ingest'&&n==='Ingest')?'on':'dim'}" onclick="return false">${n}</a>`).join('');
+    const t=M.totals(S); const isBuy=S.kind==='large_buy';
+    const stat=S.session.status;
+    const perEntry = S.entries? (t.keys/S.entries).toFixed(1):'–', perCopy = t.copies? (t.keys/t.copies).toFixed(1):'–';
+    const head=`
+      <div class="head">
+        <div>
+          <h1>${isBuy?'Large Buy':'Ingest'} <span class="status ${stat}">${stat}</span></h1>
+          <div class="sub">${isBuy?'A customer\'s pile, one card at a time. Commits as one Buy.':'The store\'s own stock, no customer. Commits as one Adjustment with a Reason. Never priced.'}</div>
+          <div class="session">
+            ${!isBuy?`<select id="reason" ${stat!=='open'?'disabled':''}><option ${S.reason==='initial load'?'selected':''}>initial load</option><option ${S.reason==='found'?'selected':''}>found</option></select>`:''}
+            <input class="name" id="sname" placeholder="${isBuy?'Name — e.g. Dave\'s binder':'Name — e.g. back-room box 3'}" value="${esc(S.session.name)}">
+            <input class="details" id="sdetails" placeholder="Details (free text)" value="${esc(S.session.details)}">
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><label>Lines · cards</label><div class="v">${t.lines} · ${t.copies}</div></div>
+          <div class="stat"><label>Keys / entry · / card</label><div class="v small">${t.keys} · ${perEntry} · ${perCopy}</div></div>
+        </div>
+      </div>`;
+    const hintBy={
+      bare:`Type a name, <kbd>Enter</kbd> adds it. With the box <b>empty</b>, <kbd>N</kbd> <kbd>L</kbd> <kbd>M</kbd> <kbd>H</kbd> <kbd>D</kbd> grade the last line, digits set its quantity, <kbd>E</kbd>/<kbd>J</kbd> its language.`,
+      tab:`Type a name, <kbd>Enter</kbd> adds it. <kbd>Tab</kbd> jumps into the last line: <kbd>N</kbd> <kbd>L</kbd> <kbd>M</kbd> <kbd>H</kbd> <kbd>D</kbd> grade, digits set quantity, <kbd>E</kbd>/<kbd>J</kbd> language, <kbd>P</kbd> price, <kbd>⌫</kbd> delete, <kbd>Enter</kbd> back.`,
+      alt:`Type a name, <kbd>Enter</kbd> adds it. Hold <kbd>Alt</kbd> for the last line: <kbd>Alt</kbd>+<kbd>N</kbd>/<kbd>L</kbd>/<kbd>M</kbd>/<kbd>H</kbd>/<kbd>D</kbd> grade, <kbd>Alt</kbd>+digit quantity, <kbd>Alt</kbd>+<kbd>E</kbd>/<kbd>J</kbd> language.`,
+      prefix:`Grade <b>before</b> the name: <b>3 lp ja luffy</b> — quantity, condition, language, then the name. <kbd>Enter</kbd> adds it. Anything omitted takes the sticky values.`,
+    };
+    const searchBlock = stat==='open' ? `
+      <div class="searchwrap">
+        <div class="searchrow">
+          <input class="search" id="search" placeholder="${isBuy?'Card name — then Enter':'Card name — then Enter'}" autocomplete="off" spellcheck="false" value="${esc(ui.query)}">
+          <div class="sticky"><label>Sticky</label>
+            <select id="stCond">${M.CONDITIONS.map(c=>`<option ${S.sticky.condition===c?'selected':''}>${c}</option>`).join('')}</select>
+            <select id="stLang"><option ${S.sticky.language==='en'?'selected':''}>en</option><option ${S.sticky.language==='ja'?'selected':''}>ja</option></select>
+          </div>
+          ${!isBuy?`<button class="btn" id="btnImport">Import file</button>`:''}
+        </div>
+        <div class="hint">${hintBy[ui.scheme]}${ui.mode==='cell'?' &nbsp;·&nbsp; <b>editing the highlighted line</b>':''}</div>
+        <div class="results" id="results" hidden></div>
+      </div>`:'';
+    const rows = S.lines.map(l=>{
+      const p=M.byId[l.printingId]; const pr=M.linePrice(l); const isLast=l.id===S.lastLineId; const fl=S.flash&&S.flash.lineId===l.id;
+      return `<tr class="line ${isLast?'last':''} ${ui.mode==='cell'&&ui.cellLine===l.id?'cell':''} ${fl?'flash':''}" data-id="${l.id}" data-seq="${fl?S.flash.seq:''}" tabindex="-1">
+        <td><div class="thumb g-${p.game}">${p.set}<small>${p.num}</small></div></td>
+        <td class="card"><div class="n">${esc(p.name)}${fl&&S.flash.message?`<span class="merged">${esc(S.flash.message)}</span>`:''}</div><div class="p">${M.printingLabel(p)} · ${p.finish} · ${M.G[p.game]}</div></td>
+        <td><span class="pill ${l.condition}">${l.condition}</span></td>
+        <td><span class="tag">${l.language}</span></td>
+        <td class="num">${l.qty}</td>
+        <td class="num">${money(p.market)}</td>
+        ${isBuy?`<td class="num"><span class="price ${l.override!=null?'over':''}">${pr.pinned&&l.override==null?'<span class="pin" title="pinned Buy Price on this SKU">⚲</span>':''}${l.override!=null?`<span class="was">${money(pr.price)}</span><button class="revert" data-revert="${l.id}" title="back to the rule price">↺</button>`:''}<input data-price="${l.id}" value="${(pr.effective/100).toFixed(2)}" ${stat!=='open'?'disabled':''}></span></td>
+        <td class="num">${money(pr.effective*l.qty)}</td>`:''}
+        <td>${stat==='open'?`<button class="del" data-del="${l.id}" title="remove line">×</button>`:''}</td>
+      </tr>`; }).join('');
+    const table=`<div class="lines"><table>
+      <thead><tr><th></th><th>Card · Printing</th><th>Cond</th><th>Lang</th><th class="num">Qty</th><th class="num">Market</th>${isBuy?'<th class="num">Buy price</th><th class="num">Line</th>':''}<th></th></tr></thead>
+      <tbody>${rows||`<tr><td colspan="9" class="empty">${isBuy?'Nothing yet. Type the first card\'s name above.':'Nothing yet. Type a card name, or import a file.'}</td></tr>`}</tbody>
+      ${S.lines.length?`<tfoot><tr><td></td><td>${t.lines} lines · ${t.copies} cards</td><td></td><td></td><td class="num">${t.copies}</td><td class="num">${money(t.market)}</td>${isBuy?`<td></td><td class="num">${money(t.buy)}</td>`:''}<td></td></tr></tfoot>`:''}
+    </table></div>`;
+    const fix = !isBuy && S.fix.length ? `<div class="fix"><h3>Fix list<span>${S.fix.length} imported rows need a Printing — commit is allowed with these still open</span></h3>
+      ${S.fix.map(f=>`<div class="fixrow"><div><div class="q">${esc(f.query)}</div><div class="why">${esc(f.why)} · ${f.condition} ${f.language} ×${f.qty}</div></div>
+        <div class="fixpick"><input data-fix="${f.id}" placeholder="Pick the Printing — type to search"><div class="results" id="fixres-${f.id}" hidden></div></div>
+        <button class="btn quiet" data-fixdrop="${f.id}">Drop</button></div>`).join('')}</div>`:'';
+    let foot='';
+    if(stat==='open') foot=`<div class="foot">
+        <div class="totals">${isBuy?`<div class="t"><label>Buy total — we pay</label><div class="v">${money(t.buy)}</div></div>`:''}<div class="t market"><label>Market total (staff only)</label><div class="v">${money(t.market)}</div></div></div>
+        <div class="actions"><button class="btn quiet" id="btnAbandon">Abandon</button><button class="btn primary" id="btnCommit" ${S.lines.length?'':'disabled'}>${isBuy?'Commit Buy…':'Commit Ingest…'}</button></div></div>`;
+    else if(stat==='committing') foot=`<div class="foot"><div class="progress">Committing — chunk ${S.chunk.done} of ${S.chunk.total} written. Stock is not fully recorded until this finishes.</div></div>`;
+    else foot=`<div class="foot"><div>${isBuy?`<b>Buy committed.</b> origin <span class="mono">large_buy</span> · POS Reference <span class="mono">${esc(S.commit.posRef)}</span> · net <span class="mono">${money(S.commit.net)}</span> · tender <span class="mono">${S.commit.tender??'null'}</span> · ${S.commit.lines} lines, ${S.commit.copies} cards. SKU rows upserted; Buy Prices computed where none existed.`:`<b>Adjustment committed.</b> Reason <span class="mono">${S.commit.reason}</span> · ${S.commit.lines} lines, ${S.commit.copies} cards${S.commit.unfixed?` · <b>${S.commit.unfixed} unfixed rows stay on this session</b>`:''}. Nothing priced; Sell and Buy Prices come from the rules.`}</div>
+        <div class="actions"><button class="btn primary" id="btnNew">New ${isBuy?'Large Buy':'Ingest'}</button></div></div>`;
+    const customer = ui.showCustomer&&isBuy ? `<div class="customer"><h3>What the customer sees</h3><pre>${esc(customerSlip(t))}</pre></div>`:'';
+    const inspector = ui.showInspector ? `<div class="inspector"><h3>Under the hood — not on the real screen</h3>${S.lines.length?`<table><thead><tr><th>Line</th><th>SKU row?</th><th>Buy Price came from</th><th>Rule</th></tr></thead><tbody>${S.lines.map(l=>{const p=M.byId[l.printingId];const row=M.skuRow(l.printingId,l.condition,l.language);const pr=M.linePrice(l);return `<tr><td>${esc(p.name)} ${M.printingLabel(p)} ${l.condition} ${l.language}</td><td>${row?`yes — on hand ${row.onHand}${row.pinned?', Buy pinned':''}`:'<b>no — never held</b>'}</td><td>${pr.source}${l.override!=null?' → overridden on this line':''}</td><td class="mono">${money(p.market)} × ${M.RULES.cond[l.condition]} × ${M.RULES.lang[l.language]} × ${M.RULES.buyPct} → ${money(M.computeBuy(p,l.condition,l.language))}</td></tr>`}).join('')}</tbody></table>`:'<div class="empty">No lines.</div>'}<div class="hint">Session: kind <span class="mono">${S.kind}</span> · status <span class="mono">${S.session.status}</span> · lastSet <span class="mono">${S.lastSet??'–'}</span> · sticky <span class="mono">${S.sticky.condition} ${S.sticky.language}</span> (${S.stickyMode}) · lines ${S.lines.length} · fix ${S.fix.length}</div></div>`:'';
+    $('#main').innerHTML=head+searchBlock+table+fix+foot+customer+inspector;
+    wire(); renderResults(); renderRail();
+    if(ui.mode==='cell'){ const row=document.querySelector(`tr[data-id="${ui.cellLine}"]`); if(row) row.focus(); else { ui.mode='search'; } }
+    if(ui.mode==='search' && stat==='open' && !ui.modal && !document.activeElement?.matches?.('input.name,input.details,#reason,[data-fix],[data-price]')) focusSearch();
+  }
+  function customerSlip(t){ const lines=S.lines.map(l=>{const p=M.byId[l.printingId];const pr=M.linePrice(l);return `${String(l.qty).padStart(2)} × ${p.name} (${M.printingLabel(p)}) ${l.condition}${l.language!==M.STORE_LANG?' '+l.language:''}  ${money(pr.effective)}`;});
+    return `${S.session.name||'Your cards'}\n${t.copies} cards\n\n${lines.join('\n')}\n\nWe pay: ${money(t.buy)}`; }
+  function renderResults(){
+    const box=$('#results'); if(!box) return; const res=results();
+    if(!ui.query.trim()||ui.mode==='cell'){ box.hidden=true; return; }
+    box.hidden=false;
+    box.innerHTML = res.length ? res.map((p,i)=>`<div class="r ${i===ui.hi?'hi':''}" data-pick="${i}"><div class="thumb g-${p.game}">${p.set}<small>${p.num}</small></div>
+      <div><div class="n">${esc(p.name)}${p.set===S.lastSet?'<span class="boost">last set</span>':''}</div><div class="p"><b>${M.printingLabel(p)}</b> · ${p.finish} · ${M.G[p.game]}</div></div>
+      <div class="held">${M.heldSummary(p.id)?'held: '+M.heldSummary(p.id):''}</div><div class="mk">${money(p.market)}</div></div>`).join('')
+      : `<div class="none">No Printing matches. Try fewer letters, or <b>name SET</b> / <b>name #number</b>.</div>`;
+  }
+  function wire(){
+    const s=$('#search');
+    if(s){ s.addEventListener('input',e=>{ ui.query=e.target.value; ui.hi=0; renderResults(); });
+      s.addEventListener('keydown',e=>{ if(handleKey(e)) e.preventDefault(); }); }
+    $('#results')?.addEventListener('mousedown',e=>{ const r=e.target.closest('[data-pick]'); if(r){ ui.hi=+r.dataset.pick; ui.keys++; pickHighlighted(); e.preventDefault(); } });
+    $('#stCond')?.addEventListener('change',e=>dispatch({type:'sticky',sticky:{condition:e.target.value}}));
+    $('#stLang')?.addEventListener('change',e=>dispatch({type:'sticky',sticky:{language:e.target.value}}));
+    $('#sname')?.addEventListener('change',e=>dispatch({type:'session',session:{name:e.target.value}}));
+    $('#sdetails')?.addEventListener('change',e=>dispatch({type:'session',session:{details:e.target.value}}));
+    $('#reason')?.addEventListener('change',e=>dispatch({type:'reason',reason:e.target.value}));
+    document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ ui.keys++; dispatch({type:'delete',id:+b.dataset.del}); });
+    document.querySelectorAll('[data-revert]').forEach(b=>b.onclick=()=>{ ui.keys++; dispatch({type:'override',id:+b.dataset.revert,price:null,keys:1}); });
+    document.querySelectorAll('[data-price]').forEach(inp=>{
+      inp.onfocus=()=>inp.select();
+      inp.onkeydown=e=>{ ui.keys++; if(e.key==='Enter'){ ui.mode='search'; ui.cellLine=null; const v=Math.round(parseFloat(inp.value)*100); dispatch({type:'override',id:+inp.dataset.price,price:isNaN(v)?null:v,keys:String(inp.value).length+2}); focusSearch(); e.preventDefault(); } if(e.key==='Escape'){ render(); focusSearch(); e.preventDefault(); } e.stopPropagation(); };
+      inp.onblur=()=>{ const l=S.lines.find(x=>x.id===+inp.dataset.price); if(!l) return; const v=Math.round(parseFloat(inp.value)*100); if(!isNaN(v)&&v!==M.linePrice(l).effective) dispatch({type:'override',id:l.id,price:v,keys:2}); };
+    });
+    document.querySelectorAll('tr.line').forEach(tr=>{ tr.addEventListener('keydown',e=>{ if(ui.mode==='cell'&&e.target===tr){ if(handleKey(e)) e.preventDefault(); } }); tr.addEventListener('dblclick',()=>{ if(ui.scheme==='tab'||true) enterCell(+tr.dataset.id); }); });
+    document.querySelectorAll('[data-fix]').forEach(inp=>{
+      const box=$('#fixres-'+inp.dataset.fix); let hi=0;
+      const draw=()=>{ const res=M.search(inp.value,S.lastSet); box.hidden=!inp.value.trim(); box.innerHTML=res.length?res.map((p,i)=>`<div class="r ${i===hi?'hi':''}" data-fixpick="${p.id}"><div class="thumb g-${p.game}">${p.set}<small>${p.num}</small></div><div><div class="n">${esc(p.name)}</div><div class="p"><b>${M.printingLabel(p)}</b> · ${p.finish}</div></div><div></div><div class="mk">${money(p.market)}</div></div>`).join(''):'<div class="none">No match.</div>'; };
+      inp.oninput=()=>{hi=0;draw();};
+      inp.onkeydown=e=>{ const res=M.search(inp.value,S.lastSet); if(e.key==='ArrowDown'){hi=(hi+1)%Math.max(1,res.length);draw();e.preventDefault();} if(e.key==='ArrowUp'){hi=(hi-1+res.length)%Math.max(1,res.length);draw();e.preventDefault();} if(e.key==='Enter'&&res[hi]){ dispatch({type:'fixPick',fixId:+inp.dataset.fix,printingId:res[hi].id}); e.preventDefault(); } e.stopPropagation(); };
+      box.onmousedown=e=>{ const r=e.target.closest('[data-fixpick]'); if(r){ dispatch({type:'fixPick',fixId:+inp.dataset.fix,printingId:r.dataset.fixpick}); e.preventDefault(); } };
+    });
+    document.querySelectorAll('[data-fixdrop]').forEach(b=>b.onclick=()=>dispatch({type:'fixDrop',fixId:+b.dataset.fixdrop}));
+    $('#btnCommit')?.addEventListener('click',()=>{ ui.modal=S.kind==='large_buy'?'commitBuy':'commitIngest'; renderModal(); });
+    $('#btnAbandon')?.addEventListener('click',()=>{ resetSession(); toast('Session abandoned — kept, not deleted; nothing touched stock.'); });
+    $('#btnNew')?.addEventListener('click',()=>resetSession());
+    $('#btnImport')?.addEventListener('click',()=>{ ui.modal='import'; renderModal(); });
+  }
+  function resetSession(){ S=M.initial(ui.screen); S.stickyMode=segState.sticky; ui.query=''; ui.hi=0; ui.mode='search'; ui.pendingKeys=0; render(); }
+
+  // ---- modals
+  const IMPORT_ROWS=[ {query:'Lightning Bolt M10',condition:'NM',language:'en',qty:6},{query:'Counterspell MH2',condition:'NM',language:'en',qty:4},{query:'Sol Ring',condition:'NM',language:'en',qty:2},{query:'Pikachu',condition:'NM',language:'en',qty:3},{query:'Blastoise',condition:'LP',language:'en',qty:1},{query:'Monkey.D.Luffy OP05',condition:'NM',language:'en',qty:1},{query:'Iono PAL',condition:'NM',language:'en',qty:2},{query:'Elvish Mystic M14',condition:'MP',language:'en',qty:8} ];
+  function renderModal(){
+    let old=$('#modal'); old&&old.remove(); if(!ui.modal) return;
+    const d=document.createElement('div'); d.className='scrim'; d.id='modal';
+    if(ui.modal==='commitBuy'){ const t=M.totals(S); d.innerHTML=`<div class="modal"><h2>Commit Buy</h2><p>${t.lines} lines, ${t.copies} cards. We pay <b class="mono">${money(t.buy)}</b>. Take the payment through the POS first, then enter its reference.</p>
+      <label>POS Reference (required)</label><input id="mPos" placeholder="e.g. 48213"><div class="err" id="mErr"></div>
+      <label>Tender (optional)</label><select id="mTender"><option value="">—</option><option>cash</option><option>store credit</option><option>bank transfer</option></select>
+      <div class="row"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Commit ${money(t.buy)}</button></div></div>`; }
+    if(ui.modal==='commitIngest'){ const t=M.totals(S); d.innerHTML=`<div class="modal"><h2>Commit Ingest</h2><p>${t.lines} lines, ${t.copies} cards, as one Adjustment with Reason <b class="mono">${S.reason}</b>.${S.fix.length?` <b>${S.fix.length} rows in the fix list are not included</b> and stay on this session.`:''} Nothing is priced here.</p>
+      <div class="row"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Commit</button></div></div>`; }
+    if(ui.modal==='import'){ d.innerHTML=`<div class="modal"><h2>Import file</h2><p>CSV only. Map the columns every time; nothing is saved. A bare name that matches many Printings is never guessed — it goes to the fix list.</p>
+      <div class="csv">name,edition,cond,lang,qty
+Lightning Bolt,M10,NM,en,6
+Counterspell,MH2,NM,en,4
+Sol Ring,,NM,en,2
+Pikachu,,NM,en,3
+Blastoise,,LP,en,1
+Monkey.D.Luffy,OP05,NM,en,1
+Iono,PAL,NM,en,2
+Elvish Mystic,M14,MP,en,8</div>
+      <label>Column mapping</label><div class="map"><span class="h">name</span><select><option>name (required)</option></select><span class="h">edition</span><select><option>set code</option><option>—</option></select><span class="h">cond</span><select><option>condition</option><option>—</option></select><span class="h">lang</span><select><option>language</option><option>—</option></select><span class="h">qty</span><select><option>quantity</option><option>—</option></select></div>
+      <div class="row"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mOk">Run import (background job)</button></div></div>`; }
+    document.body.appendChild(d);
+    $('#mCancel').onclick=()=>{ ui.modal=null; renderModal(); focusSearch(); };
+    $('#mOk').onclick=()=>{
+      if(ui.modal==='commitBuy'){ const pos=$('#mPos').value.trim(); if(!pos){ $('#mErr').textContent='A POS Reference is required on every Buy.'; return; } ui.modal=null; renderModal(); dispatch({type:'commit',posRef:pos,tender:$('#mTender').value}); }
+      else if(ui.modal==='commitIngest'){ ui.modal=null; renderModal(); dispatch({type:'commit'}); const tick=()=>{ if(S.session.status==='committing'){ dispatch({type:'chunk'}); setTimeout(tick,500);} }; setTimeout(tick,500); }
+      else if(ui.modal==='import'){ ui.modal=null; renderModal(); toast('Import running as a background job…'); setTimeout(()=>{ dispatch({type:'import',rows:IMPORT_ROWS}); toast(`Import finished: ${S.lines.length} lines matched, <b>${S.fix.length} to fix</b>.`); },900); }
+    };
+    setTimeout(()=>{ $('#mPos')?.focus(); },0);
+  }
+  function toast(html){ const t=$('#toast'); t.innerHTML=`<div class="toast">${html}</div>`; clearTimeout(ui.toastT); ui.toastT=setTimeout(()=>t.innerHTML='',3200); }
+
+  // ---- prototype rail
+  const segState={screen:'large_buy',scheme:'bare',sticky:'defaults'};
+  const SCHEMES=[['bare','Bare (as #35 says)'],['tab','Tab into line'],['alt','Alt chords'],['prefix','Grade before name']];
+  function seg(id,items,cur,on){ $(id).innerHTML=items.map(([k,l])=>`<button class="${cur===k?'on':''}" data-k="${k}">${l}</button>`).join(''); $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>on(b.dataset.k)); }
+  function renderRail(){
+    seg('#segScreen',[['large_buy','Large Buy'],['ingest','Ingest']],segState.screen,k=>{ segState.screen=k; ui.screen=k; resetSession(); });
+    seg('#segScheme',SCHEMES,segState.scheme,k=>{ segState.scheme=k; ui.scheme=k; if(ui.mode==='cell') leaveCell(); else render(); });
+    seg('#segSticky',[['defaults','Store defaults'],['last','Last line']],segState.sticky,k=>{ segState.sticky=k; dispatch({type:'stickyMode',mode:k}); });
+    $('#tCustomer').className='toggle'+(ui.showCustomer?' on':''); $('#tInspector').className='toggle'+(ui.showInspector?' on':''); $('#tWalk').className='toggle'+(ui.walkOpen?' on':'');
+    $('#tWalk').textContent=ui.walkOpen?'Walkthroughs ▾':'Walkthroughs ▴'; $('#rail').classList.toggle('open',ui.walkOpen);
+    renderWalk();
+  }
+  $('#tCustomer').onclick=()=>{ ui.showCustomer=!ui.showCustomer; render(); };
+  $('#tInspector').onclick=()=>{ ui.showInspector=!ui.showInspector; render(); };
+  $('#tWalk').onclick=()=>{ ui.walkOpen=!ui.walkOpen; if(ui.walkOpen&&ui.walk==null) ui.walk=0; renderRail(); };
+  $('#tReset').onclick=()=>{ resetSession(); ui.keys=0; };
+
+  // ---- walkthrough player: feeds keys through handleKey / typeChar, exactly as a person would
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  async function play(keys,delay=70){
+    if(ui.playing) return; ui.playing=true; focusSearch();
+    for(const k of keys){ if(S.session.status!=='open') break;
+      const ev={key:k.key,altKey:!!k.altKey,shiftKey:false,preventDefault(){}} ;
+      const consumed=handleKey(ev);
+      if(!consumed && k.key.length===1 && !k.altKey && ui.mode==='search') typeChar(k.key);
+      await sleep(delay); }
+    ui.playing=false; render();
+  }
+  const T=s=>[...s].map(key=>({key}));
+  const K=(...ks)=>ks.map(k=>typeof k==='string'?{key:k}:k);
+  const A=k=>({key:k,altKey:true});
+  function need(scheme){ if(ui.scheme!==scheme){ segState.scheme=scheme; ui.scheme=scheme; } }
+  function needScreen(k){ if(ui.screen!==k){ segState.screen=k; ui.screen=k; resetSession(); } }
+  function fresh(){ resetSession(); ui.keys=0; }
+
+  const WALKS=[
+    { title:'1 · Entry speed', desc:`The realistic case is a pile of 40. #35's loop is: name → <b>Enter</b> → hotkeys on the last line. But the hotkeys and the next card's name share one keyboard. Watch what happens to "Luffy" after a card is added under the <b>Bare</b> scheme, then compare all four schemes on the same 40-card pile.`,
+      steps:[
+        {label:'Reset, Bare scheme',run:()=>{fresh();need('bare');render();}},
+        {label:'Type "ragavan", Enter',run:()=>play([...T('ragavan'),{key:'Enter'}])},
+        {label:'Now type "luffy" — watch the last line',run:()=>play([...T('luffy')],140)},
+        {label:'Escape · switch to Tab scheme · add Endurance as LP: "endur" Enter Tab L Enter',run:async()=>{ ui.query='';syncSearch();need('tab');render(); await play([...T('endur'),{key:'Enter'},{key:'Tab'},{key:'l'},{key:'Enter'}]); }},
+        {label:'Alt scheme: "grief" Enter, Alt+2',run:async()=>{need('alt');render(); await play([...T('grief'),{key:'Enter'},A('2')]);}},
+        {label:'Grade-before-name: "3 lp counterspell mh2" Enter',run:async()=>{need('prefix');render(); await play([...T('3 lp counterspell mh2'),{key:'Enter'}]);}},
+        {label:'Play the whole 40-card pile (current scheme)',run:async()=>{ const sim=M.simulatePile(M.PILE,ui.scheme,S.stickyMode); const keys=sim.plans.flatMap(p=>p.keys); await play(keys,45); toast(`Pile done: <b>${sim.total} keys</b> for ${sim.entries} entries, ${sim.copies} cards.`); }},
+        {label:'Compare schemes on the pile (table)',run:()=>{ ui.simTable=true; renderWalk(); }},
+      ]},
+    { title:'2 · Disambiguation', desc:`Results show set code, collector number, finish, thumbnail. <b>name SET</b> and <b>name #number</b> narrow. The last-picked set is boosted to the top. Luffy has six Printings across four sets; does the boost carry a set-sorted pile?`,
+      steps:[
+        {label:'Reset',run:()=>{fresh();need('tab');render();}},
+        {label:'Type "luffy" — six Printings, newest set first',run:()=>play(T('luffy'))},
+        {label:'↓ ↓ Enter — pick the OP01 leader',run:()=>play(K('ArrowDown','ArrowDown','Enter'))},
+        {label:'Type "luffy" again — OP01 now on top',run:()=>play(T('luffy'))},
+        {label:'Escape; "luffy op05" narrows to two',run:()=>play(K('Escape',...T('luffy op05')))},
+        {label:'Escape; "law #47" — same number, two finishes',run:()=>play(K('Escape',...T('law #47')))},
+        {label:'Escape; "ragavan #138" — nonfoil vs foil, same set and number',run:()=>play(K('Escape',...T('ragavan #138')))},
+      ]},
+    { title:'3 · Merge legibility', desc:`The same Printing + Condition + Language entered twice merges into one line. The list is newest-at-top; a merged line moves to the top and flashes. A different Condition is a new line. Is that enough, or does merging still surprise — especially when a grade change makes two lines collide?`,
+      steps:[
+        {label:'Reset',run:()=>{fresh();need('tab');render();}},
+        {label:'"lightning bolt m10" Enter',run:()=>play(K(...T('lightning bolt m10'),'Enter'))},
+        {label:'"solitude" Enter (something in between)',run:()=>play(K(...T('solitude'),'Enter'))},
+        {label:'"lightning bolt m10" Enter again — merges, jumps to top, ×2',run:()=>play(K(...T('lightning bolt m10'),'Enter'))},
+        {label:'"lightning bolt m10" Enter, then Tab L Enter — an LP line, separate',run:()=>play(K(...T('lightning bolt m10'),'Enter','Tab','l','Enter'))},
+        {label:'Tab N Enter — regrade the LP line to NM: it collides and merges into ×3',run:()=>play(K('Tab','n','Enter'))},
+      ]},
+    { title:'4 · Pricing in view', desc:`Rule-derived Buy Price and Market Price per line; running Buy total and Market total. Override is this line only and never pins. Buy Price here is Market × condition × language × 50%, rounded to 10p, floored at 10p (store defaults from #8).`,
+      steps:[
+        {label:'Reset',run:()=>{fresh();need('tab');render();}},
+        {label:'"ragavan" Enter — £45 market → £22.50 buy',run:()=>play(K(...T('ragavan'),'Enter'))},
+        {label:'Tab L Enter — LP: £19.10',run:()=>play(K('Tab','l','Enter'))},
+        {label:'Tab P — jump to the price, type 18, Enter',run:async()=>{ await play(K('Tab','p')); const inp=document.querySelector(`tr[data-id="${S.lastLineId}"] .price input`); if(inp){ inp.value='18'; inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); } }},
+        {label:'Show "Under the hood" — the override is on the line, the SKU is untouched',run:()=>{ui.showInspector=true;render();}},
+        {label:'↺ on the line reverts to the rule price',run:()=>{ document.querySelector('[data-revert]')?.click(); }},
+      ]},
+    { title:'5 · Never held', desc:`Delighted Halfling has never been in stock: no SKU row exists, so its Buy Price is computed on read. Lightning Bolt M10 is held, with a pinned Buy Price. Nothing on the screen should reveal the never-held distinction — the pin icon is the only difference, and that is a pin fact, not a held fact.`,
+      steps:[
+        {label:'Reset',run:()=>{fresh();need('tab');render();}},
+        {label:'"delighted" Enter — never held',run:()=>play(K(...T('delighted'),'Enter'))},
+        {label:'"lightning bolt m10" Enter — held ×12, Buy pinned at £1.50',run:()=>play(K(...T('lightning bolt m10'),'Enter'))},
+        {label:'"thoughtseize ths" Enter — a row exists at on-hand 0',run:()=>play(K(...T('thoughtseize ths'),'Enter'))},
+        {label:'Open "Under the hood" to see which is which',run:()=>{ui.showInspector=true;render();}},
+      ]},
+    { title:'6 · Running total and the customer', desc:`The Buy total is what we pay. The Market total is staff-only and never leaves the counter. What does the customer get told, and in what form? The customer slip below is one guess: plain text, no Market Price, no per-line rule detail.`,
+      steps:[
+        {label:'Reset, then play a short pile',run:async()=>{fresh();need('tab');render(); await play(K(...T('jace wwk'),'Enter','Tab','l','Enter',...T('force of will ema'),'Enter',...T('snapcaster uma'),'Enter','Tab','2','Enter'));}},
+        {label:'Show the customer slip',run:()=>{ui.showCustomer=true;render();}},
+        {label:'Commit — POS Reference required, net recorded',run:()=>{ $('#btnCommit')?.click(); }},
+      ]},
+    { title:'7 · Ingest variant', desc:`Same loop, no customer, no price column. A Reason at the top, an <b>Import file</b> button, and a fix list. Only what changes. Commit is allowed with rows still unfixed; they stay on the session.`,
+      steps:[
+        {label:'Switch to the Ingest screen',run:()=>{needScreen('ingest');need('tab');ui.keys=0;render();}},
+        {label:'"pikachu mew" Enter — no Buy column, Market still shown',run:()=>play(K(...T('pikachu mew'),'Enter'))},
+        {label:'Import file — mapping, then run',run:()=>{ $('#btnImport')?.click(); }},
+        {label:'Run the import (from the dialog)',run:()=>{ $('#mOk')?.click(); }},
+        {label:'Fix "Pikachu": type "pikachu mew" in its row and Enter',run:async()=>{ const inp=document.querySelector('[data-fix]'); if(!inp) return; inp.focus(); inp.value='pikachu mew'; inp.dispatchEvent(new Event('input')); await sleep(300); inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); }},
+        {label:'Commit with the rest still unfixed',run:()=>{ $('#btnCommit')?.click(); }},
+      ]},
+  ];
+  function renderWalk(){
+    const w=$('#walk'); if(!ui.walkOpen){ w.innerHTML=''; return; }
+    const cur=WALKS[ui.walk??0];
+    let sim='';
+    if(ui.simTable && (ui.walk??0)===0){
+      const rows=[]; for(const [k,l] of SCHEMES) for(const st of ['defaults','last']){ const r=M.simulatePile(M.PILE,k,st); rows.push({k,l,st,r}); }
+      const min=Math.min(...rows.map(x=>x.r.total));
+      sim=`<table class="simtable"><thead><tr><th>Scheme</th><th>Sticky</th><th>Keys</th><th>/ entry</th><th>/ card</th><th>typed</th><th>arrows</th><th>grading</th><th>note</th></tr></thead><tbody>${rows.map(x=>`<tr class="${x.r.total===min?'best':''}"><td>${x.l}</td><td>${x.st}</td><td class="n">${x.r.total}</td><td class="n">${x.r.perEntry.toFixed(1)}</td><td class="n">${x.r.perCopy.toFixed(1)}</td><td class="n">${x.r.typed}</td><td class="n">${x.r.arrows}</td><td class="n">${x.r.grading}</td><td>${x.k==='bare'?`<b>${x.r.misfires} of 40 names start with N/L/M/H/D/E/J or a digit — each would misfire on the previous line</b>`:x.k==='tab'?'Tab + keys + Enter per graded line':x.k==='alt'?'one chord per edit; Alt is Option on a Mac':'grade typed before the name; free when the sticky already matches'}</td></tr>`).join('')}</tbody></table>
+      <p class="wdesc" style="margin-top:8px">Pile: 40 entries, ${M.PILE.reduce((n,c)=>n+c.qty,0)} cards — 14 MH2, 6 other Magic, 10 OP01, 2 OP05, 6 MEW, 2 OGN; 8 non-NM, 5 with quantity, 2 Japanese, 1 duplicate entry. "typed" is the fewest letters that put the right Printing on top (set or #number added when needed); "arrows" are ↓ presses when it still isn't; "grading" is every key spent on condition, language and quantity.</p>`;
+    }
+    w.innerHTML=`<div class="tabs">${WALKS.map((x,i)=>`<button class="${i===(ui.walk??0)?'on':''}" data-w="${i}">${x.title}</button>`).join('')}</div>
+      <p class="wdesc">${cur.desc}</p><div class="steps">${cur.steps.map((s,i)=>`<button data-s="${i}" class="${(ui.walkDone||{})[ui.walk+':'+i]?'done':''}">${i+1}. ${s.label}</button>`).join('')}</div>${sim}`;
+    w.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ ui.walk=+b.dataset.w; ui.simTable=false; renderWalk(); });
+    w.querySelectorAll('[data-s]').forEach(b=>b.onclick=async()=>{ ui.walkDone=ui.walkDone||{}; ui.walkDone[ui.walk+':'+b.dataset.s]=true; await cur.steps[+b.dataset.s].run(); renderWalk(); });
+  }
+
+  // keyboard: cell-mode keys arrive on the focused row; also catch them at document level if focus wandered
+  document.addEventListener('keydown',e=>{ if(ui.mode==='cell' && !e.target.matches('input,select,textarea') && !e.target.matches('tr.line')){ if(handleKey(e)) e.preventDefault(); } });
+  document.addEventListener('click',e=>{ if(e.target.closest('.main') && !e.target.closest('input,select,button,.results,tr.line')) { if(ui.mode==='cell') leaveCell(); else focusSearch(); } });
+
+  render();
+})();
+</script>
