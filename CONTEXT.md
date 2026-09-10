@@ -88,4 +88,5 @@ _Avoid_: intake, stock load.
 
 **Buylist** — a list of cards the store specifically wants, at fixed prices. Defined here so the term is not used loosely for anything else. Out of scope for the MVP.
 
-**Customer List** — a list of cards a customer supplies, however it arrives: pasted text, an email, a photo. Staff resolve it into Printings and turn it into a Buy or a Sell. It is the customer's list, where a Buylist is the store's; it is not a Basket and not a Transaction, though it produces one ([#33](https://github.com/KeeprDigital/shop-keepr/issues/33)).
+**Customer List** — a list of cards a customer supplies, however it arrives: pasted text today, an email or a photo later. It is the customer's list, where a Buylist is the store's. A list is for one Game System and goes one way — a Buy or a Sell — decided before it is read; a customer who is selling some cards and wants others has two lists. Staff resolve each line to a Printing, or drop it, and a line that could be several Printings is never guessed at. A list is not a Basket and not a Transaction: it holds no stock and fixes no price while it waits, and it produces one Transaction when it is complete — a Sell directly, or a Large Buy where the cards are graded ([#33](https://github.com/KeeprDigital/shop-keepr/issues/33)).
+_Avoid_: pasted list, want list, buylist.
