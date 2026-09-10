@@ -8,7 +8,11 @@ The boundary that decides what belongs here at all is [ADR 0005](adr/0005-catalo
 
 ## Contract
 
-**Market Price per Printing, filterable by last-changed.** One rate per Printing. shop-keepr pulls only what changed since its watermark, on a cadence of its own, separate from the Catalogue sync. Not per-Condition and not per-Language — those are shop-keepr's policy ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21), [ADR 0005](adr/0005-catalogue-observes-shop-keepr-decides.md)).
+**Change delivery: one paged endpoint per Game System, walked by an opaque cursor.** Every record shop-keepr mirrors — Printings, sets, vocabularies — is reachable through a paged endpoint ordered by a cursor the Catalogue issues. The cursor is **opaque** (shop-keepr stores and returns it verbatim, never parses it), **monotonic**, and **exhaustive**: nothing with a change at or before a cursor is ever returned after it. Walking from cursor zero returns everything, which is how shop-keepr seeds and reconciles; walking from a stored cursor returns what changed since. The Catalogue may back the cursor with a timestamp and a tiebreak, or a commit sequence; shop-keepr does not care which. No snapshot artefact or Revision is consumed ([#14](https://github.com/KeeprDigital/shop-keepr/issues/14), [ADR 0009](adr/0009-catalogue-change-is-one-cursor-walk.md)).
+
+**Withdrawal arrives as a record, never as absence.** A Printing removed from the Catalogue is returned by the walk flagged `withdrawn`, with a change cursor like any other change. shop-keepr keeps the row and flags it; it never infers withdrawal from a record failing to appear ([ADR 0005](adr/0005-catalogue-observes-shop-keepr-decides.md) places lifecycle Catalogue-side).
+
+**Market Price per Printing, on the Printing record and on its own change walk.** One rate per Printing. The Printing record carries its current Market Price and the cursor at which the price last moved, so a new Printing arrives priced. A second walk, on the same cursor rules, returns only price movements, so shop-keepr can refresh prices on a cadence of its own without re-reading card facts ([#14](https://github.com/KeeprDigital/shop-keepr/issues/14)). Not per-Condition and not per-Language — those are shop-keepr's policy ([#21](https://github.com/KeeprDigital/shop-keepr/issues/21), [ADR 0005](adr/0005-catalogue-observes-shop-keepr-decides.md)).
 
 **Per-game Pricing Attributes, matchable by rule.** Attributes of a Printing that pricing rules key on — rarity most often, and whatever else a Game System prices by. They must be matchable per game without shop-keepr interpreting them ([#8](https://github.com/KeeprDigital/shop-keepr/issues/8), a schema input to [#15](https://github.com/KeeprDigital/shop-keepr/issues/15)).
 
@@ -22,7 +26,7 @@ The boundary that decides what belongs here at all is [ADR 0005](adr/0005-catalo
 
 **A generated OpenAPI document, served at a stable path in every environment.** Generated from the implementation rather than hand-maintained, so it cannot drift from what the API does. Served per environment so "which contract is staging running?" is answerable rather than assumed. shop-keepr commits a fetched copy, making contract change visible as a reviewable diff.
 
-**The document describes the bulk export payload as well as the routes.** Record shapes are part of the same OpenAPI document, not a separate artefact, so one committed file and one generator cover everything shop-keepr consumes. shop-keepr generates its types *and* its runtime validators from it and validates every pulled record against them ([#9](https://github.com/KeeprDigital/shop-keepr/issues/9)).
+**The document describes the walked records as well as the routes.** Record shapes are part of the same OpenAPI document, not a separate artefact, so one committed file and one generator cover everything shop-keepr consumes. shop-keepr generates its types *and* its runtime validators from it and validates every pulled record against them ([#9](https://github.com/KeeprDigital/shop-keepr/issues/9)).
 
 ## Access
 
