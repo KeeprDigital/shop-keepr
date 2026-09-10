@@ -48,7 +48,7 @@ A Sell arrives by one of three routes and is the same thing whichever way: the k
 
 Every Transaction records its **net**: the money that actually moved at the till, from the store's perspective. It is the number the POS receipt shows and the one audit reconciles against; it is fixed when the Transaction is recorded and never recalculated.
 
-**Trade** — a Buy and a Sell settled with one customer in one act, where the money that moves is the difference. A Trade is not a third kind of Transaction: it is a Buy and a Sell recorded together, each carrying the same net ([#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [ADR 0007](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0007-trade-is-a-linked-buy-and-sell.md)). Whether a counter draft becomes a Buy, a Sell or a Trade depends only on which sides have cards in them. Trading cards is dealing in credit: the part of the Buy that pays for the Sell, the **Covered** part, is always store credit, and whatever the customer's cards are worth beyond that is the **Remainder**, paid in a Tender staff choose ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)).
+**Trade** — a Buy and a Sell settled with one customer in one act, where the money that moves is the difference. A Trade is not a third kind of Transaction: it is a Buy and a Sell recorded together, each with its own Total and both carrying the same net, the difference ([#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [ADR 0007](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0007-trade-is-a-linked-buy-and-sell.md)). Whether a counter draft becomes a Buy, a Sell or a Trade depends only on which sides have cards in them. Trading cards is dealing in credit: the part of the Buy that pays for the Sell, the **Covered** part, is always store credit, and whatever the customer's cards are worth beyond that is the **Remainder**, paid in a Tender staff choose ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)). When the Sell is worth more than the cards, the customer pays the difference and shop-keepr does not record how ([#44](https://github.com/KeeprDigital/shop-keepr/issues/44)).
 
 **Large Buy** — a Buy too large for the counter, worked as a pile on its own screen: find each Printing, grade it, count it, next. It is a Buy in every other respect: it has a customer, prices per card, a POS Reference and a net. Buying stock from another dealer is a Large Buy, since money changed hands ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
 
@@ -85,7 +85,7 @@ _Avoid_: intake, stock load.
 
 ## Tender
 
-**Tender** — how a Buy is settled with the customer: **cash** or **store credit**. Every Buy records one Tender for the whole of it; there is no split Tender ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)). A Sell has no Tender: the POS takes the money. Store credit is only ever a Tender here, never a balance — shop-keepr keeps no customer and no credit ledger; the POS holds what a customer is owed.
+**Tender** — how a Buy is settled with the customer: **cash** or **store credit**. Every Buy records one Tender for the whole of it; there is no split Tender ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)). A Sell has no Tender, on any surface and in either direction of a Trade: the POS takes the money and shop-keepr does not record how ([#44](https://github.com/KeeprDigital/shop-keepr/issues/44)). Store credit is only ever a Tender here, never a balance — shop-keepr keeps no customer and no credit ledger; the POS holds what a customer is owed.
 _Avoid_: payment method, credit balance.
 
 **Default Tender** — the store setting that says which Tender every Buy Price is quoted in. A Buy starts in the Default Tender and staff may flip it.
@@ -93,12 +93,15 @@ _Avoid_: payment method, credit balance.
 **Tender Modifier** — the store setting that gives the other Tender's worth as a percentage of the Default Tender's: with cash the default, store credit pays that much more; with credit the default, cash pays that much less. It applies to a Buy's total, never to a line, so the price on every line stays the Default Tender price.
 _Avoid_: credit bonus, cash discount (each names only one direction).
 
-**Total Percentage** — a signed percentage staff apply to the whole of a Buy or a counter Sell, on top of whatever the lines say: "5% more for the lot", "10% off the lot". Typed per Transaction, never spread across lines, and recorded on the Transaction as it was applied.
+**Total Percentage** — a signed percentage staff apply to the whole of a Buy or a Sell they are closing themselves, on top of whatever the lines say: "5% more for the lot", "10% off the lot". Typed per Transaction, starting at zero with no store default, never spread across lines, and recorded on the Transaction as it was applied. Never on a kiosk Sell ([#44](https://github.com/KeeprDigital/shop-keepr/issues/44)).
 _Avoid_: adjustment (that is an Adjustment), discount, lot price.
+
+**Total** — what the cards in a Buy or a Sell were worth as settled: the lines, the Tender and the Total Percentage together. On a plain Buy or Sell it is also the money that moved; on a Trade each side has its own Total and the money that moved is the difference between them ([#44](https://github.com/KeeprDigital/shop-keepr/issues/44)).
+_Avoid_: subtotal, gross, line sum.
 
 **Covered** — on a Trade, the part of the Buy's value that pays for the Sell. Always store credit.
 
-**Remainder** — on a Trade, what the customer's cards are worth beyond the Sell. Paid in cash or store credit as staff choose, starting from the Default Tender; when the Sell is worth more than the cards there is no Remainder and the customer pays the difference.
+**Remainder** — on a Trade, what the customer's cards are worth beyond the Sell. Paid in cash or store credit as staff choose, starting from the Default Tender; when the Sell is worth more than the cards there is no Remainder and the customer pays the difference, which is never named and never recorded beyond the money that moved ([#44](https://github.com/KeeprDigital/shop-keepr/issues/44)).
 _Avoid_: balance, surplus, change.
 
 ## Other

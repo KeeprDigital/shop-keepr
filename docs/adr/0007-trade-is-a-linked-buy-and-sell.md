@@ -4,7 +4,7 @@ status: accepted
 
 # A Trade is a linked Buy and Sell, not a third Transaction kind
 
-When a customer hands cards over and takes cards away in one act, shop-keepr records a Buy and a Sell in one atomic write, both carrying the same `trade_id`, the same POS Reference and the same `net`. The ledger keeps exactly three kinds: Buy, Sell and Adjustment. Decided in [#11](https://github.com/KeeprDigital/shop-keepr/issues/11).
+When a customer hands cards over and takes cards away in one act, shop-keepr records a Buy and a Sell in one atomic write, both carrying the same `trade_id`, the same POS Reference and the same `net`, and each its own `total`. The ledger keeps exactly three kinds: Buy, Sell and Adjustment. Decided in [#11](https://github.com/KeeprDigital/shop-keepr/issues/11).
 
 ## Considered options
 
@@ -17,5 +17,7 @@ When a customer hands cards over and takes cards away in one act, shop-keepr rec
 **`trade_id` is a nullable column on the Transaction header.** Null for an ordinary Buy or Sell; the same value on both halves of a Trade. A Trade is one query on it.
 
 **Both halves carry the same `net`**, the money that moved at the till, which for a Trade is the difference between the two sides. It is a snapshot with the standing of a transacted price: immutable, the audit number beside the POS Reference, never used to derive anything. A partial reversal of one half is its own entry with its own net and does not touch the original.
+
+**Each half also carries its own `total`**, what its cards were worth as settled ([ADR 0010](./0010-tender-and-total-factors-on-the-total.md)); amended by [#44](https://github.com/KeeprDigital/shop-keepr/issues/44). Without it a Trade Buy's only money figure would be the difference, and what the store paid for the pile would be recoverable only by re-running the header's factors over the lines. `net` is stored rather than derived from the two totals because it is the receipt figure, written at the time; settings move and rounding drifts.
 
 **Which outcome a counter draft commits as is decided by its contents.** A draft has a sell side and a buy side; lines on one side make a Sell or a Buy, lines on both make a Trade. There is no "start a Trade" mode, and the Buy and Sell services are the only write paths, invoked together for a Trade.

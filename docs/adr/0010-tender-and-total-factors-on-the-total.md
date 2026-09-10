@@ -4,7 +4,7 @@ status: accepted
 
 # Tender and whole-Transaction factors act on the total and are snapshotted on the header
 
-A Buy's lines are always priced in the store's Default Tender. Settling in the other Tender, and any Total Percentage staff apply, are factors on the Transaction's **total**, never rewritten onto its lines, and the header records them as applied — `tender`, `tender_modifier_pct`, `total_pct`, and on a Trade `remainder_tender` — beside `net`. Decided in [#43](https://github.com/KeeprDigital/shop-keepr/issues/43), settling the shape [#27](https://github.com/KeeprDigital/shop-keepr/issues/27) found.
+A Buy's lines are always priced in the store's Default Tender. Settling in the other Tender, and any Total Percentage staff apply, are factors on the Transaction's **total**, never rewritten onto its lines, and the header records them as applied — `tender`, `tender_modifier_pct`, `total_pct`, and on a Trade `remainder_tender` — beside `total` and `net`. Decided in [#43](https://github.com/KeeprDigital/shop-keepr/issues/43), settling the shape [#27](https://github.com/KeeprDigital/shop-keepr/issues/27) found.
 
 ## Considered options
 
@@ -18,10 +18,19 @@ A Buy's lines are always priced in the store's Default Tender. Settling in the o
 
 ## Consequences
 
-**`net` is a computed snapshot, not a sum.** `round(Σ transacted × tender factor × (1 + total_pct))`, rounded once, last, by the side's rounding rule from the pipeline. Anyone summing lines to check a Buy will be off by the factors; the header says by how much and why.
+**`total` is a computed snapshot, not a sum.** `round(Σ transacted × tender factor × (1 + total_pct))`, rounded once, last, by the side's rounding rule from the pipeline, signed from the store's perspective. Anyone summing lines to check a Buy will be off by the factors; the header says by how much and why. For a plain Buy or Sell `net = total`. *(Amended by [#44](https://github.com/KeeprDigital/shop-keepr/issues/44): this formula originally named `net`; on a Trade the two diverge, see below.)*
 
 **A line never learns which Tender paid for it.** Reporting that wants "what did we pay in cash for this card" must apply the header's factor; that is the price of lines that read the same whatever pile they were in.
 
-**A Trade Buy with a cash Remainder is one Buy with two effective tenders.** Its `net` is `−K × (1 − S/C)` (K and C the pile's cash and credit values, S the Sell total). A partial reversal is a compensating entry with its own net, per [ADR 0001](./0001-append-only-ledger.md); no finer rule is given until one is needed.
+**On a Trade, `net` is the difference and is the same on both halves** ([ADR 0007](./0007-trade-is-a-linked-buy-and-sell.md)); each half keeps its own `total`. Each side's factors and rounding apply to that side first; the split is arithmetic on the results. With C the Buy `total` (credit, always, on a Trade Buy), K the pile's cash value and S the Sell `total`, from the store's perspective:
+
+| Case | `remainder_tender` | `net` on both halves |
+|---|---|---|
+| Customer pays (S > C) | null | `+(S − C)`, however the POS took it |
+| Store owes, credit | `credit` | `−(C − S)` |
+| Store owes, cash | `cash` | `−K × (1 − S/C)` |
+| Even | null | `0` |
+
+**A Trade Buy with a cash Remainder is one Buy with two effective tenders.** A partial reversal is a compensating entry with its own `total` and `net`, per [ADR 0001](./0001-append-only-ledger.md); no finer rule is given until one is needed.
 
 **The counter Sell gains a Total Percentage**, reversing [#31](https://github.com/KeeprDigital/shop-keepr/issues/31)'s "no total-level discount" on the grounds it named for revisiting: it was asked for, by symmetry with the Buy.
