@@ -158,6 +158,7 @@
   .scope .sn{font-weight:600}
   .scope .sn small{display:block;font-weight:400;color:var(--muted);font-size:12px}
   .scope.inh .ed{opacity:.55;pointer-events:none}
+  .seg button:disabled{color:var(--faint);cursor:not-allowed}
   .rail{position:sticky;top:14px}
   .scopecols{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr)) !important}
   .sub{margin-bottom:10px}
@@ -235,7 +236,7 @@ const KEYS = [
   {key:'language',   label:'Language',     desc:'Per Language on the store\'s list: a multiplier and a flat amount.', sides:['sell','buy'], step:'language'},
   {key:'stockBands', label:'Stock Bands',  desc:'By copies we already hold of the SKU (on-hand before the buy; Holds ignored): a multiplier and a flat amount per band.', sides:['buy'], step:'stock'},
   {key:'qtyBands',   label:'Quantity Bands', desc:'By copies of the SKU on one line of the buy: a multiplier and a flat amount per band. One price per line.', sides:['buy'], step:'quantity'},
-  {key:'rows',       label:'Attributes',   desc:'Per Pricing Attribute value (rarity, finish): a multiplier, a flat amount and a Floor, for Sell and for Buy. Every matching row applies; the highest Floor wins.', gameOnly:true, step:'modifiers'},
+  {key:'rows',       label:'Attributes',   desc:'Per Pricing Attribute value (rarity, finish): a multiplier, a flat amount and a Floor. Every matching row applies; the highest Floor wins. Pricing Attributes belong to a Game System, so there is no store default.', gameOnly:true, step:'modifiers'},
   {key:'floor',      label:'Floor', buyLabel:'Bulk Price', desc:'The lowest the store sells at / the lowest the store ever pays. Attribute Floors may sit above it.', sides:['sell','buy'], step:'floor'},
   {key:'rounding',   label:'Rounding',     desc:'Increment and direction. Runs before the Floor by default.', sides:['sell','buy'], step:'round'},
   {key:'tender',     label:'Tender',       desc:'Default Tender every Buy Price is quoted in, and the Tender Modifier for the other one. Applies to a Buy\'s total, never a line.', sides:['buy'], storeOnly:true, step:null},
@@ -245,8 +246,8 @@ const K = Object.fromEntries(KEYS.map(k=>[k.key,k]));
 const keyLabel = (key, side) => (side==='buy' && K[key].buyLabel) || K[key].label;
 // Setting-first groups: what one list entry opens. A group is a set of keys; inheritance stays per key.
 const GROUPS = {
-  sell:[{id:'pct',label:'Percentage',keys:['valueBands']},{id:'condlang',label:'Condition & Language',keys:['condition','language']},{id:'bottom',label:'Floor & Rounding',keys:['floor','rounding']},{id:'order',label:'Calculation order',keys:['steps']}],
-  buy: [{id:'pct',label:'Percentage',keys:['valueBands']},{id:'condlang',label:'Condition & Language',keys:['condition','language']},{id:'stockqty',label:'Stock & Quantity',keys:['stockBands','qtyBands']},{id:'bottom',label:'Bulk Price & Rounding',keys:['floor','rounding']},{id:'tender',label:'Tender',keys:['tender']},{id:'order',label:'Calculation order',keys:['steps']}],
+  sell:[{id:'pct',label:'Percentage',keys:['valueBands']},{id:'condlang',label:'Condition & Language',keys:['condition','language']},{id:'attrs',label:'Attributes',keys:['rows']},{id:'bottom',label:'Floor & Rounding',keys:['floor','rounding']},{id:'order',label:'Calculation order',keys:['steps']}],
+  buy: [{id:'pct',label:'Percentage',keys:['valueBands']},{id:'condlang',label:'Condition & Language',keys:['condition','language']},{id:'stockqty',label:'Stock & Quantity',keys:['stockBands','qtyBands']},{id:'attrs',label:'Attributes',keys:['rows']},{id:'bottom',label:'Bulk Price & Rounding',keys:['floor','rounding']},{id:'tender',label:'Tender',keys:['tender']},{id:'order',label:'Calculation order',keys:['steps']}],
 };
 
 const aff = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k,{k:v,f:0}]));
@@ -393,6 +394,20 @@ function rowsEditor(scope){
     <div style="display:flex;gap:6px;align-items:center;margin-top:6px"><select class="f" id="rowval-${scope}">${Object.entries(g.attrs).flatMap(([a,vs])=>vs.map(v=>`<option data-attr="${a}" value="${esc(v)}">${a}: ${esc(v)}</option>`)).join('')}</select>
     <button class="btn tiny" data-act="rowadd" data-scope="${scope}">+ row</button></div></div>`;
 }
+function rowsEditorSide(scope,side){
+  const g=G[scope]; const rows=draft[scope].rows||[]; const path=`${scope}.rows`;
+  const neutral = r => (r.k??1)===1 && !r.mod && r.floor==null;
+  const shown = rows.map((r,i)=>[r,i]);
+  return `<div class="ed"><table class="t"><tr><th>Attribute</th><th>Value</th><th class="r">Multiplier</th><th class="r">Flat</th><th class="r">Floor</th><th></th></tr>
+    ${shown.map(([r,i])=>`<tr class="${neutral(r[side])?'muted':''}"><td class="muted">${r.attr}</td><td>${esc(r.value)}</td>
+      <td class="r"><span class="aff"><span class="u">×</span>${num(`${path}.${i}.${side}.k`,'float',r[side].k??1,'n')}</span></td>
+      <td class="r"><span class="aff"><span class="u">±£</span>${num(`${path}.${i}.${side}.mod`,'money',r[side].mod||0)}</span></td>
+      <td class="r"><span class="aff"><span class="u">£</span><input class="f" data-path="${path}.${i}.${side}.floor" data-type="money-null" value="${r[side].floor==null?'':m(r[side].floor)}" placeholder="—"></span></td>
+      <td><button class="btn tiny" data-act="rowclr" data-scope="${scope}" data-side="${side}" data-i="${i}" title="Clear this side; the row goes when both sides are neutral">×</button></td></tr>`).join('')}
+    ${rows.length?'':'<tr><td colspan="6" class="muted">No attribute rows yet.</td></tr>'}</table>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px"><select class="f" id="rowval-${scope}">${Object.entries(g.attrs).flatMap(([a,vs])=>vs.map(v=>`<option data-attr="${a}" value="${esc(v)}">${a}: ${esc(v)}</option>`)).join('')}</select>
+    <button class="btn tiny" data-act="rowadd" data-scope="${scope}">+ row</button></div></div>`;
+}
 function editorFor(scope,side,key){
   switch(key){ case 'valueBands': case 'stockBands': case 'qtyBands': return bandsEditor(scope,side,key);
     case 'condition': case 'language': return mapEditor(scope,side,key);
@@ -516,18 +531,25 @@ function variantB(){
 function variantC(){
   const {side,group,game,q} = ui.c;
   const scopesFor = keys => keys.some(k=>K[k].storeOnly) ? ['store'] : SCOPES;
-  const itemsFor = (side,keys) => keys.flatMap(k => scopesFor([k]).map(s=>({scope:s,side,key:k})));
+  const itemsFor = (side,keys) => keys.flatMap(k => k==='rows' ? GAMES.map(g=>({scope:g.id,side:'rows',key:'rows'})) : scopesFor([k]).map(s=>({scope:s,side,key:k})));
   const list = (title, side) => `<h4>${title}</h4>${GROUPS[side].filter(g=>!q||g.label.toLowerCase().includes(q.toLowerCase())).map(g=>
       `<button class="${ui.c.side===side&&ui.c.group===g.id?'on':''}" data-act="csel" data-side="${side}" data-group="${g.id}"><span>${g.label}</span>${dirtyDot(itemsFor(side,g.keys))}</button>`).join('')}`;
   const rowsItems = GAMES.map(g=>({scope:g.id,side:'rows',key:'rows'}));
   const left = `<div class="clist"><input class="f" placeholder="Find a setting…" data-act-input="cq" value="${esc(q)}">
-    ${list('Sell','sell')}${list('Buy','buy')}
-    <h4>Per Game System</h4><button class="${ui.c.side==='rows'?'on':''}" data-act="csel" data-side="rows" data-group="rows"><span>Attributes</span>${dirtyDot(rowsItems)}</button></div>`;
+    ${list('Sell','sell')}${list('Buy','buy')}</div>`;
   let mid, hl;
-  if (side==='rows'){
-    hl=['modifiers','floor'];
-    mid = `<div class="card"><div class="ch"><div><h2>Attributes${dirtyDot(rowsItems)}</h2><div class="desc">${K.rows.desc}</div></div>${saveBtn(rowsItems)}</div>
-      <div class="seg sm" style="margin-bottom:10px">${GAMES.map(g=>`<button class="${g.id===game?'on':''}" data-act="cgame" data-game="${g.id}">${g.short}</button>`).join('')}</div><div style="overflow-x:auto">${rowsEditor(game)}</div></div>`;
+  if (group==='attrs'){
+    hl=['modifiers','floor']; const items=rowsItems; const L=ui.c.layout;
+    const layoutSeg = `<div class="seg sm" title="Prototype control: how the scopes are arranged">${[['stack','Stacked'],['tabs','Tabs'],['cols','Columns']].map(([k,l])=>`<button class="${L===k?'on':''}" data-act="clayout" data-l="${k}">${l}</button>`).join('')}</div>`;
+    const own = gid => (draft[gid].rows||[]).some(r=>(r[side].k??1)!==1||r[side].mod||r[side].floor!=null);
+    const head = gid => `<div class="sn">${G[gid].short}<small>${own(gid)?`${(draft[gid].rows||[]).length} row${(draft[gid].rows||[]).length===1?'':'s'}`:'no rows on this side'}</small></div>`;
+    const storeNote = `<div class="sn">Store defaults<small>no default here</small></div><p class="note" style="margin:6px 0 0">Pricing Attributes belong to a Game System: Magic has mythics, Pokémon has illustration rares. Nothing to inherit.</p>`;
+    let body;
+    if (L==='tabs'){ const sc = GAMES.some(g=>g.id===ui.c.scope) ? ui.c.scope : 'mtg';
+      body = `<div class="seg" style="margin-bottom:10px"><button disabled title="No store default for attributes">Store defaults</button>${GAMES.map(g=>`<button class="${g.id===sc?'on':''}" data-act="cscope" data-scope="${g.id}">${g.short}${own(g.id)?' <span class="badge ov" style="margin-left:4px">own</span>':''}</button>`).join('')}</div><div class="field">${rowsEditorSide(sc,side)}</div>`; }
+    else if (L==='stack') body = `<div class="scope inh">${storeNote}<div></div></div>` + GAMES.map(g=>`<div class="scope">${head(g.id)}<div style="overflow-x:auto">${rowsEditorSide(g.id,side)}</div></div>`).join('');
+    else body = `<div class="scopecols" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr)) !important"><div class="scopecol inh">${storeNote}</div>${GAMES.map(g=>`<div class="scopecol">${head(g.id)}${rowsEditorSide(g.id,side)}</div>`).join('')}</div>`;
+    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · Attributes${dirtyDot(items)}</h2><div class="desc">${K.rows.desc}</div></div><div style="display:flex;gap:8px;align-items:center">${layoutSeg}${saveBtn(items)}</div></div>${body}</div>`;
   } else {
     const grp = GROUPS[side].find(g=>g.id===group) || GROUPS[side][0]; const keys=grp.keys; const scopes=scopesFor(keys); const items=itemsFor(side,keys);
     hl = keys.map(k=>K[k].step).filter(Boolean);
@@ -596,7 +618,7 @@ function render(){
 function softRefresh(){ // after a value edit: update dirty dots, save buttons, summaries, calculator. Never replace the element being clicked.
   document.querySelectorAll('[data-dot]').forEach(el=>el.classList.toggle('hide', !anyDirty(parseItems(el.dataset.dot))));
   document.querySelectorAll('[data-dirtyfor]').forEach(el=>el.classList.toggle('clean', !anyDirty(parseItems(el.dataset.dirtyfor))));
-  const out=document.getElementById('calc-out'); if (out){ const tmp=document.createElement('div'); tmp.innerHTML=calcHtml({vert:true, hl: ui.variant==='C'?(ui.c.side==='rows'?['modifiers','floor']:(GROUPS[ui.c.side].find(g=>g.id===ui.c.group)||GROUPS[ui.c.side][0]).keys.map(k=>K[k].step).filter(Boolean)):null}); out.innerHTML=tmp.querySelector('#calc-out').innerHTML; }
+  const out=document.getElementById('calc-out'); if (out){ const tmp=document.createElement('div'); tmp.innerHTML=calcHtml({vert:true, hl: ui.variant==='C'?((GROUPS[ui.c.side].find(g=>g.id===ui.c.group)||GROUPS[ui.c.side][0]).keys.flatMap(k=>k==='rows'?['modifiers','floor']:[K[k].step]).filter(Boolean)):null}); out.innerHTML=tmp.querySelector('#calc-out').innerHTML; }
   if (ui.variant==='B' && !document.querySelector('[data-savebar]') && diffKeys(saved,draft,allItems()).length) setTimeout(render,250);
   checkTask();
 }
@@ -619,6 +641,7 @@ document.addEventListener('click', e=>{
   else if (a==='stepreset'){ setAt(draft,d.scope,d.side,'steps',[...DEFAULT_STEPS[d.side]]); }
   else if (a==='rowadd'){ const vs=document.getElementById('rowval-'+d.scope); const opt=vs.selectedOptions[0]; const value=opt.value, at=opt.dataset.attr; draft[d.scope].rows.push({attr:at,value,sell:{k:1,mod:0,floor:null},buy:{k:1,mod:0,floor:null}}); }
   else if (a==='rowrm'){ draft[d.scope].rows.splice(+d.i,1); }
+  else if (a==='rowclr'){ const r=draft[d.scope].rows[+d.i]; r[d.side]={k:1,mod:0,floor:null}; const n=x=>(x.k??1)===1&&!x.mod&&x.floor==null; if (n(r.sell)&&n(r.buy)) draft[d.scope].rows.splice(+d.i,1); }
   else if (a==='save'){ const items=parseItems(d.items); const changes=diffKeys(saved,draft,items); if (!changes.length) return toast('Nothing to save'); ui.modal={kind:'save',changes,sweep:sweep(draft,changes)}; }
   else if (a==='saveconfirm'){ const md=ui.modal; for (const c of md.changes) setAt(saved,c.scope,c.side,c.key,clone(getAt(draft,c.scope,c.side,c.key))); ui.modal=null; startReprice(md.sweep); render(); return toast(md.sweep.skus?`Saved · repricing ~${md.sweep.skus.toLocaleString()} SKUs`:'Saved'); }
   else if (a==='discard'){ for (const i of parseItems(d.items)) setAt(draft,i.scope,i.side,i.key,clone(getAt(saved,i.scope,i.side,i.key))); }
