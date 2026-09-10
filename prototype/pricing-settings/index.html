@@ -233,6 +233,7 @@ const KEYS = [
   {key:'stockBands', label:'Stock Bands',             desc:'By copies we already hold of the SKU (on-hand before the buy; Holds ignored).', sides:['buy'], step:'stock'},
   {key:'qtyBands',   label:'Quantity Bands',          desc:'By copies of the SKU on one line of the buy. One price per line.', sides:['buy'], step:'quantity'},
   {key:'rows',       label:'Modifiers & Floors by attribute', desc:'Per Pricing Attribute value (rarity, finish). Every matching Modifier applies; the highest Floor wins.', gameOnly:true, step:'modifiers'},
+  {key:'modifier',   label:'Modifier',                desc:'A flat amount added to every price on this side (negative takes it off), before any per-attribute Modifier. Same step as those.', sides:['sell','buy'], step:'modifiers'},
   {key:'floor',      label:'Floor', buyLabel:'Bulk Price', desc:'The lowest the store sells at / the lowest the store ever pays. Attribute floors may sit above it.', sides:['sell','buy'], step:'floor'},
   {key:'rounding',   label:'Rounding',                desc:'Increment and direction. Runs before the Floor by default.', sides:['sell','buy'], step:'round'},
   {key:'tender',     label:'Tender',                  desc:'Default Tender every Buy Price is quoted in, and the Tender Modifier for the other one. Applies to a Buy\'s total, never a line.', sides:['buy'], storeOnly:true, step:null},
@@ -244,9 +245,9 @@ const keyLabel = (key, side) => (side==='buy' && K[key].buyLabel) || K[key].labe
 function seed(){
   const store = {
     sell:{ valueBands:[{from:0,pct:100},{from:1000,pct:105},{from:5000,pct:110}], condition:{NM:1,LP:.85,MP:.7,HP:.5,DMG:.3},
-           language:{en:1,ja:.9,de:.8,fr:.8,it:.8}, rounding:{inc:10,dir:'up'}, floor:25, steps:[...DEFAULT_STEPS.sell] },
+           language:{en:1,ja:.9,de:.8,fr:.8,it:.8}, modifier:0, rounding:{inc:10,dir:'up'}, floor:25, steps:[...DEFAULT_STEPS.sell] },
     buy: { valueBands:[{from:0,pct:50},{from:500,pct:60},{from:2000,pct:65}], condition:{NM:1,LP:.8,MP:.6,HP:.4,DMG:.2},
-           language:{en:1,ja:.8,de:.7,fr:.7,it:.7}, rounding:{inc:5,dir:'down'}, floor:5,
+           language:{en:1,ja:.8,de:.7,fr:.7,it:.7}, modifier:0, rounding:{inc:5,dir:'down'}, floor:5,
            stockBands:[{from:0,mult:1},{from:4,mult:.75},{from:8,mult:.5}], qtyBands:[{from:1,mult:1},{from:4,mult:.9}],
            tender:{def:'cash',mod:25}, steps:[...DEFAULT_STEPS.buy] },
   };
@@ -271,6 +272,7 @@ function res(S,scope,side,key){ if (scope!=='store' && S[scope][side][key]!==und
 const m = p => (p/100).toFixed(2);
 const gbp = p => '£'+m(p);
 const usd = p => '$'+m(p);
+const sgn = p => (p<0?'−':'+')+gbp(Math.abs(p));
 
 function evaluate(S, side, q){ // q: {game, cond, lang, marketUsd, attrs:{rarity,finish}, onHand, qty}
   const R = k => res(S,q.game,side,k).v;
@@ -288,7 +290,7 @@ function evaluate(S, side, q){ // q: {game, cond, lang, marketUsd, attrs:{rarity
       tr.push({step:st,note:(rowPct!=null?'attribute row':`band ${gbp(b.from)}+`)+` → ${pct}%`,v:p,before}); }
     else if (st==='stock'){ if (side!=='buy') continue; const bands=R('stockBands'); const b=[...bands].reverse().find(b=>q.onHand>=b.from)||bands[0]; p=Math.round(p*b.mult); tr.push({step:st,note:`hold ${q.onHand} → band ${b.from}+ × ${b.mult}`,v:p,before}); }
     else if (st==='quantity'){ if (side!=='buy') continue; const bands=R('qtyBands'); const b=[...bands].reverse().find(b=>q.qty>=b.from)||bands[0]; p=Math.round(p*b.mult); tr.push({step:st,note:`buying ${q.qty} → band ${b.from}+ × ${b.mult}`,v:p,before}); }
-    else if (st==='modifiers'){ const ms=rows.filter(r=>r[side].mod); const sum=ms.reduce((n,r)=>n+r[side].mod,0); p+=sum; tr.push({step:st,note:ms.length?ms.map(r=>`${r.value} ${sum>=0?'+':''}${gbp(r[side].mod)}`).join(', '):'no matching row',v:p,before}); }
+    else if (st==='modifiers'){ const base=R('modifier')||0; const ms=rows.filter(r=>r[side].mod); const sum=base+ms.reduce((n,r)=>n+r[side].mod,0); p+=sum; const parts=[...(base?[`flat ${sgn(base)}`]:[]), ...ms.map(r=>`${r.value} ${sgn(r[side].mod)}`)]; tr.push({step:st,note:parts.length?parts.join(', '):'none',v:p,before}); }
     else if (st==='round'){ const {inc,dir}=R('rounding'); const f=dir==='up'?Math.ceil:dir==='down'?Math.floor:Math.round; p=f(p/inc)*inc; tr.push({step:st,note:`${inc}p, ${dir}`,v:p,before}); }
     else if (st==='floor'){ const base=R('floor'); const rf=rows.map(r=>r[side].floor).filter(x=>x!=null); const f=Math.max(base,...rf);
       const who = rf.length&&f>base ? rows.find(r=>r[side].floor===f).value : (side==='buy'?'Bulk Price':'Floor'); if (p<f){ p=f; tr.push({step:st,note:`raised to ${who} ${gbp(f)}`,v:p,before}); } else tr.push({step:st,note:`above ${who} ${gbp(f)}`,v:p,before}); }
@@ -350,6 +352,7 @@ function mapEditor(scope,side,key){
   const map = getAt(draft,scope,side,key) ?? getAt(draft,'store',side,key); const path=P(scope,side,key);
   return `<div class="ed maprow">${Object.keys(map).map(k=>`<label>${k}<span class="aff">×${num(path+'.'+k,'float',map[k])}</span></label>`).join('')}</div>`;
 }
+function signedMoneyEditor(scope,side,key){ const v=getAt(draft,scope,side,key)??getAt(draft,'store',side,key); return `<div class="ed"><span class="aff">£${num(P(scope,side,key),'money',v)}</span> <span class="note" style="display:inline;margin-left:8px">${v===0?'no flat change':v>0?`adds ${gbp(v)} to every ${side==='sell'?'Sell':'Buy'} Price`:`takes ${gbp(-v)} off every ${side==='sell'?'Sell':'Buy'} Price`}</span></div>`; }
 function moneyEditor(scope,side,key){ const v=getAt(draft,scope,side,key)??getAt(draft,'store',side,key); return `<div class="ed"><span class="aff">£${num(P(scope,side,key),'money',v)}</span></div>`; }
 function roundingEditor(scope,side,key){
   const r=getAt(draft,scope,side,key)??getAt(draft,'store',side,key); const path=P(scope,side,key);
@@ -384,7 +387,7 @@ function rowsEditor(scope){
 function editorFor(scope,side,key){
   switch(key){ case 'valueBands': case 'stockBands': case 'qtyBands': return bandsEditor(scope,side,key);
     case 'condition': case 'language': return mapEditor(scope,side,key);
-    case 'floor': return moneyEditor(scope,side,key); case 'rounding': return roundingEditor(scope,side,key);
+    case 'floor': return moneyEditor(scope,side,key); case 'modifier': return signedMoneyEditor(scope,side,key); case 'rounding': return roundingEditor(scope,side,key);
     case 'tender': return tenderEditor(); case 'steps': return stepsEditor(scope,side); case 'rows': return rowsEditor(scope); }
 }
 // A field = editor wrapped with the inheritance chrome (greyed + Override, or Revert).
@@ -404,7 +407,7 @@ function summary(scope,side,key){ // compact one-line summary for B cells and C 
     case 'valueBands': return v.map(b=>`${gbp(b.from)}+ ${b.pct}%`).join(' · ');
     case 'stockBands': case 'qtyBands': return v.map(b=>`${b.from}+ ×${b.mult}`).join(' · ');
     case 'condition': case 'language': return Object.entries(v).map(([k,x])=>`${k} ${x}`).join(' · ');
-    case 'floor': return gbp(v); case 'rounding': return `${v.inc}p ${v.dir}`;
+    case 'floor': return gbp(v); case 'modifier': return v?sgn(v):'none'; case 'rounding': return `${v.inc}p ${v.dir}`;
     case 'tender': return `${v.def} · other ${v.def==='cash'?'+':'−'}${v.mod}%`;
     case 'steps': { const d = JSON.stringify(v)===JSON.stringify(DEFAULT_STEPS[side]); return d?'default':(v.indexOf('floor')<v.indexOf('round')?'custom — floor before round':'custom'); }
     case 'rows': { const rows=draft[scope].rows||[]; return rows.length? rows.map(r=>r.value).join(' · ') : 'none'; }
@@ -461,6 +464,7 @@ function variantA(){
        <div class="col"><h3>Buy</h3><div class="small muted" style="margin-bottom:4px">By copies we hold</div>${field(s,'buy','stockBands')}<div class="small muted" style="margin:8px 0 4px">By copies in this buy</div>${field(s,'buy','qtyBands')}</div></div>`)}
     ${store ? `<section class="card"><div class="ch"><div><h2>Modifiers & Floors by attribute</h2><div class="desc">${K.rows.desc}</div></div></div><p class="muted small" style="margin:0">Pricing Attributes belong to a Game System. Pick one above to add rows.</p></section>`
             : sec('Modifiers & Floors by attribute', K.rows.desc+' Money in £.', [{scope:s,side:'rows',key:'rows'}], `<div class="field">${rowsEditor(s)}</div>`)}
+    ${sec('Modifier (flat)', K.modifier.desc+' Per-attribute Modifiers are in the section above.', it('modifier'), two('modifier'))}
     ${sec('Floors', K.floor.desc, it('floor'), `<div class="cols"><div class="col"><h3>Sell Floor</h3>${field(s,'sell','floor')}</div><div class="col"><h3>Bulk Price <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(Buy Floor)</span></h3>${field(s,'buy','floor')}</div></div>`)}
     ${sec('Rounding', K.rounding.desc, it('rounding'), two('rounding'))}
     ${store ? sec('Tender', K.tender.desc, it('tender',['buy']), `<div class="cols"><div class="col"><h3>Sell</h3><div class="field" style="color:var(--faint)">A Sell records no Tender.</div></div><div class="col"><h3>Buy</h3><div class="field">${tenderEditor()}</div></div></div>`)
@@ -482,7 +486,7 @@ function variantB(){
     const dsd = isDirty(scope, key==='rows'?'rows':side, key);
     return `<td class="cell ${inh?'inh':''} ${on?'sel':''} ${dsd?'dirty':''}" data-act="bsel" data-scope="${scope}" data-key="${key}" title="${inh?'Inherited from Store defaults — click to override':'Click to edit'}">${esc(summary(scope,side,key))}</td>`;
   };
-  const groups = [['Price', ['valueBands','condition','language']], ...(side==='buy'?[['Stock', ['stockBands','qtyBands']]]:[]), ['Attributes', ['rows']], ['Bottom', ['floor','rounding']], ...(side==='buy'?[['Tender', ['tender']]]:[]), ['Advanced', ['steps']]];
+  const groups = [['Price', ['valueBands','condition','language']], ...(side==='buy'?[['Stock', ['stockBands','qtyBands']]]:[]), ['Attributes', ['rows']], ['Bottom', ['modifier','floor','rounding']], ...(side==='buy'?[['Tender', ['tender']]]:[]), ['Advanced', ['steps']]];
   const row = key => `<tr><td class="lab">${keyLabel(key,side)}<div class="d">${key==='rows'?'Modifiers · Floors':''}</div></td>${SCOPES.map(sc=>cell(sc,key)).join('')}</tr>`;
   const table = `<div class="sheetwrap"><table class="sheet"><thead><tr><th>${side==='sell'?'Sell':'Buy'} setting</th>${SCOPES.map(s=>`<th class="${s==='store'?'store':''}">${scopeName(s)}${s!=='store'?`<div class="small muted" style="font-weight:400">${G[s].skus.toLocaleString()} stocked SKUs</div>`:'<div class="small muted" style="font-weight:400">inherited when blank</div>'}</th>`).join('')}</tr></thead>
     <tbody>${groups.map(([g,keys])=>`<tr class="grp"><td colspan="6">${g}</td></tr>${keys.map(row).join('')}`).join('')}</tbody></table></div>`;
@@ -507,8 +511,8 @@ function variantC(){
       const items = k==='rows' ? GAMES.map(g=>({scope:g.id,side:'rows',key:'rows'})) : SCOPES.filter(s=>!(K[k].storeOnly&&s!=='store')).map(s=>({scope:s,side,key:k}));
       return `<button class="${ui.c.side===side&&ui.c.key===k?'on':''}" data-act="csel" data-side="${side}" data-key="${k}"><span>${keyLabel(k,side)}</span>${dirtyDot(items)}</button>`;}).join('')}`;
   const left = `<div class="clist"><input class="f" placeholder="Find a setting…" data-act-input="cq" value="${esc(q)}">
-    ${list('Sell', 'sell', ['valueBands','condition','language','floor','rounding','steps'])}
-    ${list('Buy', 'buy', ['valueBands','condition','language','stockBands','qtyBands','floor','rounding','tender','steps'])}
+    ${list('Sell', 'sell', ['valueBands','condition','language','modifier','floor','rounding','steps'])}
+    ${list('Buy', 'buy', ['valueBands','condition','language','stockBands','qtyBands','modifier','floor','rounding','tender','steps'])}
     ${list('Per Game System', 'rows', ['rows'])}</div>`;
   let mid, items;
   if (key==='rows'){
@@ -535,7 +539,7 @@ function variantC(){
           ${inh?`<div class="muted small" style="margin:6px 0">${esc(summary(x,side,key))}</div><button class="btn tiny" data-act="override" data-scope="${x}" data-side="${side}" data-key="${key}">Override</button>`
                :`${editorFor(x,side,key)}${x!=='store'?`<div class="rev"><button class="btn link small" data-act="revert" data-scope="${x}" data-side="${side}" data-key="${key}">Revert</button></div>`:''}`}</div>`;}).join('')}</div>`;
     }
-    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}</div></div><div style="display:flex;gap:8px;align-items:center">${scopes.length>1?layoutSeg:''}${saveBtn(items)}</div></div>${body}</div>`;
+    mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}${key==='modifier'||key==='floor'?` Per-attribute ${key==='modifier'?'Modifiers':'Floors'} (rarity, finish) live under <button class="btn link" data-act="csel" data-side="rows" data-key="rows">Modifiers &amp; Floors by attribute</button>.`:''}</div></div><div style="display:flex;gap:8px;align-items:center">${scopes.length>1?layoutSeg:''}${saveBtn(items)}</div></div>${body}</div>`;
   }
   const hl = key==='rows' ? 'modifiers' : K[key].step;
   const c=ui.calc; const cq={game:c.game,cond:c.cond,lang:c.lang,marketUsd:c.marketUsd,attrs:{rarity:c.rarity,finish:c.finish},onHand:c.onHand,qty:c.qty};
