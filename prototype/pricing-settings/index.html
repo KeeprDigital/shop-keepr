@@ -27,7 +27,7 @@
   }
   *{box-sizing:border-box}
   html{color-scheme:light}
-  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);padding:0 0 110px}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);padding:0}
   button,input,select{font:inherit;color:inherit}
   button{cursor:pointer}
   h1,h2,h3{margin:0}
@@ -142,12 +142,12 @@
   .sheetlayout{display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start}
   .sheetlayout.nodrawer{grid-template-columns:1fr}
   .drawer{position:sticky;top:14px}
-  .savebar{position:fixed;left:200px;right:16px;bottom:56px;background:var(--ink);color:#fff;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  .savebar{position:fixed;left:200px;right:16px;bottom:16px;background:var(--ink);color:#fff;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.25)}
   .savebar .btn{border-color:#555}
   .savebar .btn.primary{background:var(--accent);border-color:var(--accent)}
 
   /* variant C */
-  .clayout{display:grid;grid-template-columns:230px 1fr 320px;gap:16px;align-items:start}
+  .clayout{display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start}
   .clist{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;position:sticky;top:14px}
   .clist input.f{width:100%;text-align:left;font-family:var(--sans);margin-bottom:8px}
   .clist h4{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 8px 4px;font-weight:600}
@@ -159,7 +159,7 @@
   .scope .sn small{display:block;font-weight:400;color:var(--muted);font-size:12px}
   .scope.inh .ed{opacity:.55;pointer-events:none}
   .rail{position:sticky;top:14px}
-  .scopecols{display:grid;gap:8px}
+  .scopecols{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr)) !important}
   .scopecol{border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;min-width:0;overflow-x:auto}
   .scopecol.inh{background:var(--inh);border-style:dashed}
   .scopecol .sn{font-weight:600;margin-bottom:6px}
@@ -168,8 +168,17 @@
   .scopecol table.t td,.scopecol table.t th{padding-right:4px}
   .scopecol .maprow{gap:4px 8px}
 
+  .dock{position:sticky;bottom:0;margin:18px -28px -28px;background:#fff;border-top:2px solid var(--ink);box-shadow:0 -8px 24px rgba(0,0,0,.08);z-index:30}
+  .dockbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 28px;cursor:pointer;user-select:none}
+  .dockbar:hover{background:var(--accent-tint)}
+  .dockbody{padding:4px 28px 18px;max-height:52vh;overflow:auto;border-top:1px solid var(--line)}
+  .shell.sim{margin:0 auto;outline:2px dashed var(--warn);outline-offset:-2px}
+  .shell.narrow{grid-template-columns:1fr}
+  .shell.narrow .side{display:none}
+  .shell.narrow .clayout{grid-template-columns:1fr}
+  .shell.narrow .clist{position:static}
   /* switcher + probe + modal */
-  .pill{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:10px;font-size:13px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:var(--mono)}
+  .pill{position:fixed;left:50%;top:10px;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;align-items:center;gap:10px;font-size:13px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:var(--mono)}
   .pill button{background:#333;color:#fff;border:0;border-radius:999px;width:28px;height:28px;font-size:14px}
   .pill b{font-weight:500;letter-spacing:.02em}
   .probe{position:fixed;left:14px;bottom:14px;width:300px;background:#fff;border:2px solid #111;border-radius:10px;padding:10px 12px;font-size:12px;z-index:65;box-shadow:0 6px 24px rgba(0,0,0,.25)}
@@ -313,10 +322,11 @@ const ui = {
   variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
   tab:'pricing', scope:'store', advOpen:false, toast:null, modal:null, reprice:null,
   b:{side:'sell', sel:null, drawer:null},            // B: selected cell {scope,side,key}; drawer 'cell'|'calc'
-  c:{side:'buy', key:'valueBands', game:'mtg', q:'', layout:'tabs', scope:'store'}, // C: selected setting; layout = stack|tabs|cols
+  c:{side:'buy', key:'valueBands', game:'mtg', q:'', layout:'cols', scope:'store', calcOpen:false}, // C: selected setting; layout = stack|tabs|cols; calculator in a bottom dock
+  simw:0, // probe: simulated screen width (0 = full)
   calc:{game:'mtg', cond:'NM', lang:'en', marketUsd:1000, rarity:'rare', finish:'nonfoil', onHand:0, qty:1},
 };
-const calcVisible = () => ui.variant==='C' || (ui.variant==='A' && ui.advOpen) || (ui.variant==='B' && ui.b.drawer==='calc');
+const calcVisible = () => (ui.variant==='C' && ui.c.calcOpen) || (ui.variant==='A' && ui.advOpen) || (ui.variant==='B' && ui.b.drawer==='calc');
 const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const isDirty = (scope,side,key) => JSON.stringify(getAt(saved,scope,side,key)) !== JSON.stringify(getAt(draft,scope,side,key));
 const anyDirty = items => items.some(i=>isDirty(i.scope,i.side,i.key));
@@ -420,7 +430,8 @@ function calcHtml(opts={}){
 const NAV = ['Lookup','Queue','Customer Lists','Large Buy','Ingest','Inventory','Pinned Prices','History','Settings','System'];
 function shell(inner){
   const rp = ui.reprice;
-  return `<div class="shell"><aside class="side"><div class="brand">shop-keepr<small>staff</small></div><nav class="nav">${NAV.map(n=>`<a href="#" class="${n==='Settings'?'on':'dim'}">${n}</a>`).join('')}</nav>
+  const narrow = ui.simw && ui.simw<=900;
+  return `<div class="shell ${ui.simw?'sim':''} ${narrow?'narrow':''}" style="${ui.simw?`width:${ui.simw}px`:''}"><aside class="side"><div class="brand">shop-keepr<small>staff</small></div><nav class="nav">${NAV.map(n=>`<a href="#" class="${n==='Settings'?'on':'dim'}">${n}</a>`).join('')}</nav>
     <div class="sidefoot" id="sidefoot">${rp?`Repricing ${rp.label} <span class="mono">${rp.done.toLocaleString()}/${rp.total.toLocaleString()}</span><div class="bar"><i style="width:${Math.round(100*rp.done/rp.total)}%"></i></div>`:'<span class="faint">Prices up to date</span>'}</div></aside>
     <main class="main"><div class="head"><div><h1>Settings</h1></div></div>
     <div class="tabs">${['general','game systems','kiosks','pricing'].map(t=>`<button class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</div>
@@ -527,8 +538,11 @@ function variantC(){
     mid = `<div class="card"><div class="ch"><div><h2>${side==='sell'?'Sell':'Buy'} · ${keyLabel(key,side)}${dirtyDot(items)}</h2><div class="desc">${K[key].desc}</div></div><div style="display:flex;gap:8px;align-items:center">${scopes.length>1?layoutSeg:''}${saveBtn(items)}</div></div>${body}</div>`;
   }
   const hl = key==='rows' ? 'modifiers' : K[key].step;
-  const right = `<div class="card rail"><div class="ch"><h2>Try a price</h2><span class="small muted">live</span></div>${K[key].step===null?'<p class="note" style="margin:0 0 8px">Tender acts on a Buy\'s total; no step to show.</p>':''}${calcHtml({vert:true, hl})}</div>`;
-  return `<div class="clayout">${left}<div>${mid}</div>${right}</div>`;
+  const c=ui.calc; const cq={game:c.game,cond:c.cond,lang:c.lang,marketUsd:c.marketUsd,attrs:{rarity:c.rarity,finish:c.finish},onHand:c.onHand,qty:c.qty};
+  const gist = `${G[c.game].short} ${esc(c.rarity)} ${esc(c.finish)} · ${c.cond} ${c.lang} · market ${usd(c.marketUsd)} · hold ${c.onHand}, buying ${c.qty} → Sell <b class="mono">${gbp(evaluate(draft,'sell',cq).price)}</b> · Buy <b class="mono">${gbp(evaluate(draft,'buy',cq).price)}</b>`;
+  const dock = `<div class="dock ${ui.c.calcOpen?'open':''}"><div class="dockbar" data-act="cdock"><span><b>Try a price</b> <span class="muted small" style="margin-left:10px">${gist}</span></span><span class="muted small">${ui.c.calcOpen?'▾ hide':'▴ open'}</span></div>
+    ${ui.c.calcOpen?`<div class="dockbody">${K[key].step===null?'<p class="note" style="margin:0 0 8px">Tender acts on a Buy\'s total; no step to show.</p>':''}${calcHtml({hl})}</div>`:''}</div>`;
+  return `<div class="clayout">${left}<div>${mid}</div></div>${dock}`;
 }
 
 /* ---------- switcher, probe, modal ---------- */
@@ -547,6 +561,7 @@ function probeHtml(){
   return `<div class="probe ${probe.min?'min':''}"><h5><span>Probe · ${ui.variant}</span><button class="btn tiny" data-act="pmin">${probe.min?'+':'–'}</button></h5><div class="body">
     ${a?`<div><b>${esc(a.title)}</b></div><div class="cnt"><span id="p-c">0 clicks</span><span id="p-k">0 keys</span><span id="p-s">0 scroll</span><span id="p-t">0″</span></div><button class="btn tiny" data-act="pabandon">Abandon</button>`
        :`<select data-act-input="ptask">${TASKS.map(t=>`<option value="${t.id}" ${t.id===probe.task?'selected':''}>${t.id} · ${esc(t.title)}</option>`).join('')}</select><button class="btn primary tiny" data-act="pstart">Start task (resets settings)</button>`}
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px"><span class="muted">Screen</span><div class="seg sm">${[[0,'full'],[1280,'1280'],[1024,'1024'],[800,'800']].map(([w,l])=>`<button class="${ui.simw===w?'on':''}" data-act="simw" data-w="${w}">${l}</button>`).join('')}</div></div>
     <table><tr><th>task</th><th>A</th><th>B</th><th>C</th></tr>${rows}</table><div class="faint" style="margin-top:4px">c clicks · k keys · s scroll (×100px) · ″ seconds</div></div></div>`;
 }
 function modalHtml(){
@@ -603,9 +618,11 @@ document.addEventListener('click', e=>{
   else if (a==='csel'){ ui.c.side=d.side; ui.c.key=d.key; }
   else if (a==='cgame'){ ui.c.game=d.game; }
   else if (a==='clayout'){ ui.c.layout=d.l; }
+  else if (a==='cdock'){ ui.c.calcOpen=!ui.c.calcOpen; }
+  else if (a==='simw'){ ui.simw=+d.w; }
   else if (a==='cscope'){ ui.c.scope=d.scope; }
   else if (a==='var'){ const ks=Object.keys(VARIANTS); ui.variant=ks[(ks.indexOf(ui.variant)+ +d.d+ks.length)%ks.length]; history.replaceState(null,'',`?variant=${ui.variant}`); }
-  else if (a==='pstart'){ saved=seed(); draft=clone(saved); ui.scope='store'; ui.advOpen=false; ui.b={side:'sell',sel:null,drawer:null}; ui.c={side:'buy',key:'valueBands',game:'mtg',q:'',layout:ui.c.layout,scope:'store'}; ui.calc={game:'mtg',cond:'NM',lang:'en',marketUsd:1000,rarity:'rare',finish:'nonfoil',onHand:0,qty:1}; probe.active={...TASKS.find(t=>t.id===probe.task), clicks:0, keys:0, scroll:0, t0:Date.now(), variant:ui.variant}; }
+  else if (a==='pstart'){ saved=seed(); draft=clone(saved); ui.scope='store'; ui.advOpen=false; ui.b={side:'sell',sel:null,drawer:null}; ui.c={side:'buy',key:'valueBands',game:'mtg',q:'',layout:ui.c.layout,scope:'store',calcOpen:false}; ui.calc={game:'mtg',cond:'NM',lang:'en',marketUsd:1000,rarity:'rare',finish:'nonfoil',onHand:0,qty:1}; probe.active={...TASKS.find(t=>t.id===probe.task), clicks:0, keys:0, scroll:0, t0:Date.now(), variant:ui.variant}; }
   else if (a==='pabandon'){ probe.active=null; }
   else if (a==='pmin'){ probe.min=!probe.min; }
   else return;
@@ -615,7 +632,7 @@ document.addEventListener('toggle', e=>{ if (e.target.id==='adv' && e.target.ope
 document.addEventListener('change', e=>{
   const el=e.target;
   if (el.dataset.path){ const [scope,side,key]=el.dataset.path.split('.'); if (key!=='rows') ensureOwn(scope,side,key); setPath(draft, el.dataset.path, parseVal(el.dataset.type, el.value)); softRefresh(); }
-  else if (el.dataset.calc){ const k=el.dataset.calc; ui.calc[k]= el.dataset.type ? parseVal(el.dataset.type, el.value) : el.value; if (k==='game'){ ui.calc.rarity=G[ui.calc.game].attrs.rarity[0]; ui.calc.finish=G[ui.calc.game].attrs.finish[0]; render(); } else softRefresh(); }
+  else if (el.dataset.calc){ const k=el.dataset.calc; const prev=ui.calc[k]; ui.calc[k]= el.dataset.type ? parseVal(el.dataset.type, el.value) : el.value; if (k==='game' && prev!==ui.calc.game){ ui.calc.rarity=G[ui.calc.game].attrs.rarity[0]; ui.calc.finish=G[ui.calc.game].attrs.finish[0]; render(); } else softRefresh(); }
   else if (el.dataset.actInput==='ptask'){ probe.task=el.value; }
 });
 document.addEventListener('input', e=>{ if (e.target.dataset.actInput==='cq'){ ui.c.q=e.target.value; const v=e.target.value; render(); const i=document.querySelector('[data-act-input="cq"]'); if (i){ i.focus(); i.setSelectionRange(v.length,v.length);} } });
