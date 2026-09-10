@@ -48,7 +48,7 @@ A Sell arrives by one of three routes and is the same thing whichever way: the k
 
 Every Transaction records its **net**: the money that actually moved at the till, from the store's perspective. It is the number the POS receipt shows and the one audit reconciles against; it is fixed when the Transaction is recorded and never recalculated.
 
-**Trade** — a Buy and a Sell settled with one customer in one act, where the money that moves is the difference. A Trade is not a third kind of Transaction: it is a Buy and a Sell recorded together, each carrying the same net ([#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [ADR 0007](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0007-trade-is-a-linked-buy-and-sell.md)). Whether a counter draft becomes a Buy, a Sell or a Trade depends only on which sides have cards in them.
+**Trade** — a Buy and a Sell settled with one customer in one act, where the money that moves is the difference. A Trade is not a third kind of Transaction: it is a Buy and a Sell recorded together, each carrying the same net ([#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [ADR 0007](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0007-trade-is-a-linked-buy-and-sell.md)). Whether a counter draft becomes a Buy, a Sell or a Trade depends only on which sides have cards in them. Trading cards is dealing in credit: the part of the Buy that pays for the Sell, the **Covered** part, is always store credit, and whatever the customer's cards are worth beyond that is the **Remainder**, paid in a Tender staff choose ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)).
 
 **Large Buy** — a Buy too large for the counter, worked as a pile on its own screen: find each Printing, grade it, count it, next. It is a Buy in every other respect: it has a customer, prices per card, a POS Reference and a net. Buying stock from another dealer is a Large Buy, since money changed hands ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
 
@@ -71,7 +71,7 @@ _Avoid_: intake, stock load.
 
 **Sell Price** — what the store asks for a SKU. Derived from the Printing's Market Price by the store's **Pricing Rules**, and overridable by a Pinned Price. This is the only price a kiosk customer ever sees.
 
-**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by the store's **Pricing Rules**, independently of the Sell Price and with its own settings throughout. Quoted for any Printing, including ones the store has never held.
+**Buy Price** — what the store pays for a SKU. Derived from the Printing's Market Price by the store's **Pricing Rules**, independently of the Sell Price and with its own settings throughout. Quoted for any Printing, including ones the store has never held. Always quoted in the store's **Default Tender**; the other Tender is never a price on a line, only a factor on a Buy's total.
 
 **Pricing Rules** — the store's own rules for turning a Market Price into a Sell Price and a Buy Price. They are the store's commercial policy, not a property of any card: the store decides what a Lightly Played copy is worth to it, what it pays for a rare, and what it will never sell below. Rules may be set per Game System, and any rule a Game System does not set falls back to the store's defaults ([#8](https://github.com/KeeprDigital/shop-keepr/issues/8), [ADR 0004](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0004-configurable-pricing-pipeline.md)).
 
@@ -82,6 +82,24 @@ _Avoid_: intake, stock load.
 **Floor** — the lowest price the store will accept, below which a calculated price is replaced rather than adjusted. Set per Game System and per Pricing Attribute value; where several apply, the highest holds, since each is a promise not to go lower.
 
 **Pinned Price** — a price a person has fixed by hand, which the Pricing Rules leave alone however far the Market Price moves. Sell and Buy are pinned independently, and a pin attaches to a SKU: it is a statement about a card in a given Condition and Language, not about the Printing. It records who pinned it and when. A pin is a decision, not a state: it stands until someone clears it, and staff are alerted about pins that may have gone stale — never by changing the price.
+
+## Tender
+
+**Tender** — how a Buy is settled with the customer: **cash** or **store credit**. Every Buy records one Tender for the whole of it; there is no split Tender ([#43](https://github.com/KeeprDigital/shop-keepr/issues/43)). A Sell has no Tender: the POS takes the money. Store credit is only ever a Tender here, never a balance — shop-keepr keeps no customer and no credit ledger; the POS holds what a customer is owed.
+_Avoid_: payment method, credit balance.
+
+**Default Tender** — the store setting that says which Tender every Buy Price is quoted in. A Buy starts in the Default Tender and staff may flip it.
+
+**Tender Modifier** — the store setting that gives the other Tender's worth as a percentage of the Default Tender's: with cash the default, store credit pays that much more; with credit the default, cash pays that much less. It applies to a Buy's total, never to a line, so the price on every line stays the Default Tender price.
+_Avoid_: credit bonus, cash discount (each names only one direction).
+
+**Total Percentage** — a signed percentage staff apply to the whole of a Buy or a counter Sell, on top of whatever the lines say: "5% more for the lot", "10% off the lot". Typed per Transaction, never spread across lines, and recorded on the Transaction as it was applied.
+_Avoid_: adjustment (that is an Adjustment), discount, lot price.
+
+**Covered** — on a Trade, the part of the Buy's value that pays for the Sell. Always store credit.
+
+**Remainder** — on a Trade, what the customer's cards are worth beyond the Sell. Paid in cash or store credit as staff choose, starting from the Default Tender; when the Sell is worth more than the cards there is no Remainder and the customer pays the difference.
+_Avoid_: balance, surplus, change.
 
 ## Other
 
