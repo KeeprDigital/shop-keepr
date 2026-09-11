@@ -501,7 +501,7 @@ const M = (() => {
   function addSell(pid,cond,lang){ if(!cond){ const r=M.heldRows(pid).filter(r=>r.onHand>0); if(!r.length){ toast('None held — nothing to Sell'); return; } const nm=r.find(x=>x.condition==='NM'&&x.language===M.STORE_LANG)||r[0]; cond=nm.condition; lang=nm.language; }
     dispatch({type:'add',side:'sell',printingId:pid,condition:cond,language:lang}); toast(`Sell · ${esc(M.byId[pid].name)} ${cond} — on the ${esc(ui.name)}`); }
   function addBuy(pid){ dispatch({type:'add',side:'buy',printingId:pid,condition:ui.buyPick.condition,language:ui.buyPick.language}); toast(`Buy · ${esc(M.byId[pid].name)} ${ui.buyPick.condition} — on the ${esc(ui.name)}`); }
-  function focusSearch(){ const i=$('#lsearch'); if(i&&document.activeElement!==i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } }
+  function focusSearch(){ const i=$('#lsearch'); if(i&&document.activeElement!==i){ i.focus({preventScroll:true}); i.setSelectionRange(i.value.length,i.value.length); } }
 
   // ---- the two-sided page
   function renderTxn(){
