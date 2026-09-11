@@ -45,7 +45,7 @@ Every Store has a **default Language** for its region, so staff set a language o
 The perspective matters and inverts at the kiosk: a customer buying a card produces a **Sell**. A Transaction with an entry of each type is a **Trade** ([#46](https://github.com/KeeprDigital/shop-keepr/issues/46)).
 _Avoid_: cart, draft, ticket (the Transaction being built at the counter is still a Transaction, just not yet committed).
 
-A Sell arrives by one of three routes and is the same thing whichever way: the kiosk (a fulfilled **Basket**), the **counter**, or a **Customer List**. A Buy arrives at the counter, as a **Large Buy**, or from a Customer List. At the counter, **lookup** comes first — *do we have this card, and how many* — and selling or buying is an action taken from what lookup found, adding the card to the sell side or the buy side of the Transaction being built, which is committed once ([#31](https://github.com/KeeprDigital/shop-keepr/issues/31), [#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [#46](https://github.com/KeeprDigital/shop-keepr/issues/46)). What was sold or bought is recorded at the price it was actually transacted for, alongside the price the store was asking or offering; there is no separate notion of a discount.
+A Sell arrives by one of three routes and is the same thing whichever way: the kiosk (a fulfilled **Basket**), the **counter**, or a **Customer List**. A Buy arrives at the counter, as a **Large Buy**, or from a Customer List. At the counter, **lookup** comes first — _do we have this card, and how many_ — and selling or buying is an action taken from what lookup found, adding the card to the sell side or the buy side of the Transaction being built, which is committed once ([#31](https://github.com/KeeprDigital/shop-keepr/issues/31), [#11](https://github.com/KeeprDigital/shop-keepr/issues/11), [#46](https://github.com/KeeprDigital/shop-keepr/issues/46)). What was sold or bought is recorded at the price it was actually transacted for, alongside the price the store was asking or offering; there is no separate notion of a discount.
 
 Every Transaction records its **net**: the money that actually moved at the till, from the store's perspective. It is the number the POS receipt shows and the one audit reconciles against; it is fixed when the Transaction is recorded and never recalculated.
 
@@ -53,18 +53,27 @@ Every Transaction records its **net**: the money that actually moved at the till
 
 **Large Buy** — a Buy too large for the counter, worked as a pile on its own screen: find each Printing, grade it, count it, next. It is a Buy in every other respect: it has a customer, prices per card, a POS Reference and a net. Buying stock from another dealer is a Large Buy, since money changed hands ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
 
-**Ingest** — loading the store's *own* stock, with no customer: the initial load of existing inventory, and afterwards any cards that arrive without a sale, such as a box found in the back room. Worked as a pile the same way a Large Buy is, but recorded as an **Adjustment** with a Reason and never priced. Cards can be typed in one at a time or imported from a file ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
+**Ingest** — loading the store's _own_ stock, with no customer: the initial load of existing inventory, and afterwards any cards that arrive without a sale, such as a box found in the back room. Worked as a pile the same way a Large Buy is, but recorded as an **Adjustment** with a Reason and never priced. Cards can be typed in one at a time or imported from a file ([#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
 _Avoid_: intake, stock load.
 
 **Adjustment** — a change to stock that is not a Transaction: a miscount, damage, shrinkage, cards found, or an **Ingest**. An Adjustment requires a **Reason** and is deliberately kept separate from buying and selling, so that stock changes with no customer can never be mistaken for trade.
 
+**Reason** — why stock changed with no customer, chosen from a fixed list and never typed: a miscount, damage, shrinkage, cards found, a condition regrade, an initial load. Required on every Adjustment and on every Reversal; a line staff remove from a submitted Basket carries one too ([#7](https://github.com/KeeprDigital/shop-keepr/issues/7), [#10](https://github.com/KeeprDigital/shop-keepr/issues/10), [#35](https://github.com/KeeprDigital/shop-keepr/issues/35)).
+
+**Reversal** — the undoing of a Buy, a Sell or an Adjustment that was recorded wrongly: a new entry of the same type with the opposite quantities and its own Reason, pointing at the one it reverses. Nothing recorded is ever edited or deleted, and a Reversal may cover part of an entry, such as two of four cards returned ([ADR 0001](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0001-append-only-ledger.md)). Staff see it as _undo_; the word is for code and specs.
+_Avoid_: void, edit, delete.
+
 ## The kiosk
 
-**Basket** — a customer's selection at the kiosk. Mutable while they shop: SKUs added and removed, quantities changed, a different Printing of the same Card chosen. A Basket is private to the kiosk until the customer **submits** it, at which point it joins the staff queue and receives a **Basket Number**; a customer cannot change it after that. A Basket is not itself a Transaction; on fulfilment it produces a **Sell** for whatever lines remain, since staff may **remove** a line they cannot sell. A Basket is `open`, `submitted`, `fulfilled`, `cancelled` or `expired`; staff may **revive** an expired Basket for a short while after ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)).
+**Basket** — a customer's selection at the kiosk. Mutable while they shop: SKUs added and removed, quantities changed, a different Printing of the same Card chosen. A Basket is private to the kiosk until the customer **submits** it, at which point it joins the staff queue and receives a **Basket Number**; a customer cannot change it after that. A Basket is not itself a Transaction; when staff **Complete** it, it produces a **Sell** for whatever lines remain, since staff may **remove** a line they cannot sell, giving a Reason. A Basket is `open`, `submitted`, `fulfilled`, `cancelled` or `expired`; staff may **revive** an expired Basket for a short while after ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)).
 
 **Basket Number** — the short number a customer quotes at the counter, issued when a Basket is submitted. Unique among the store's live Baskets and reused after; deliberately not sequential, so it says nothing about how busy the shop is. It is a handle for people, not an identity for the system.
 
+**Queue** — the submitted Baskets waiting for staff at the counter. A Basket leaves the Queue when staff Complete or cancel it, or when it expires ([#26](https://github.com/KeeprDigital/shop-keepr/issues/26)).
+
 **Hold** — a reservation against a SKU, created when that SKU is added to a Basket and released when the line is removed or the Basket ends. A Hold has no clock of its own: **the Basket carries the expiry, and every Hold in it expires together** ([ADR 0006](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0006-basket-owns-the-hold-clock.md)). The period is a store setting, reset by the customer's activity and never extended by hand. Available quantity is on-hand minus active Holds.
+
+**Available** — how many copies of a SKU the kiosk may still put in a Basket: **on hand** (what the ledger says the store physically holds) minus active Holds. Worked out whenever it is asked for, never recorded ([#4](https://github.com/KeeprDigital/shop-keepr/issues/4), [ADR 0001](https://github.com/KeeprDigital/shop-keepr/blob/main/docs/adr/0001-append-only-ledger.md)).
 
 ## Prices
 
@@ -114,7 +123,7 @@ _Avoid_: balance, surplus, change.
 
 ## Other
 
-**Store** — the business shop-keepr runs for. One today; every record is scoped to a Store. A Store has settings of its own: its trading currency and default **Language**, its Hold expiry period, and its Pricing Rules in full.
+**Store** — the business shop-keepr runs for. One today; every record is scoped to a Store. A Store has settings of its own: its trading currency and the exchange rate it converts Market Prices at, its default **Language**, its Hold expiry period, which Game Systems its kiosk shows, and its Pricing Rules in full.
 
 **POS Reference** — the external point-of-sale system's own identifier for a sale, attached to a Transaction. **Every Buy and every Sell carries one**; it is the only thread between cards moving here and money moving through the till ([#10](https://github.com/KeeprDigital/shop-keepr/issues/10)). shop-keepr does not integrate with the POS and treats this as an opaque string. Adjustments never have one.
 
