@@ -34,3 +34,7 @@ playwright/.cache
 
 # Agent worktrees
 .claude/worktrees/
+
+# Wrangler local state and generated binding types
+.wrangler
+worker-configuration.d.ts
