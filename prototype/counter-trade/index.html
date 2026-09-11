@@ -1,0 +1,731 @@
+<meta charset="utf-8">
+<title>Counter Draft as a Trade</title>
+<!--
+  PROTOTYPE — throwaway. shop-keepr issue #46: "Does the two-sided counter draft on Lookup read at a glance when it becomes a Trade?"
+  One file, no build, no server. Open it in a browser. Everything is in memory; reload wipes it.
+  Three variants of the draft panel on the existing Lookup page, switchable via ?variant=A|B|C and the bottom rail.
+  The domain module (fake Catalogue mirror, stock, pricing, draft reducer, Trade arithmetic per #43/#44) is the first <script>; the page is a shell over it.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#F1F3F2; --panel:#FFFFFF; --ink:#1B1F1D; --muted:#64706B; --line:#D9DEDB; --line-strong:#B9C2BD;
+    --accent:#0F6E56; --accent-ink:#FFFFFF; --accent-tint:#E3F1EC; --accent-tint-2:#C8E6DA;
+    --buy:#7A4B0E; --buy-tint:#F6EBD9; --buy-tint-2:#EBD4AE;
+    --warn:#9A5B00; --warn-tint:#FFF3DC; --danger:#A32D2D; --danger-tint:#FBE7E7;
+    --rail:#151A18; --rail-ink:#E9EEEB;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);padding:0 0 150px 0}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  kbd{font:12px var(--mono);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#fff;color:var(--ink);white-space:nowrap}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--accent)}
+  .muted{color:var(--muted)}
+  .pin{font-size:11px;color:var(--accent);margin-left:3px}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  /* ---------- shell ---------- */
+  .shell{display:grid;grid-template-columns:184px minmax(0,1fr) var(--draft-w,440px);min-height:100vh}
+  .shell.wide{--draft-w:720px}
+  .shell.collapsed{--draft-w:0px}
+  .side{background:#FAFBFA;border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh}
+  .brand{font-weight:600;letter-spacing:.02em;padding:4px 8px 16px}
+  .brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  .nav a{display:block;padding:6px 8px;border-radius:6px;color:var(--ink);text-decoration:none;font-size:13px}
+  .nav a.on{background:var(--accent-tint);color:var(--accent);font-weight:600}
+  .nav a.dim{color:var(--muted)}
+  .main{padding:22px 24px 28px;min-width:0}
+  .draft{background:var(--panel);border-left:1px solid var(--line);position:sticky;top:0;height:100vh;overflow-y:auto;min-width:0}
+  .shell.collapsed .draft{display:none}
+  @media (max-width:1180px){.shell{grid-template-columns:184px minmax(0,1fr)}.draft{grid-column:2;position:static;height:auto;border-left:0;border-top:1px solid var(--line)}}
+  @media (max-width:760px){.shell{grid-template-columns:1fr}.side{display:none}.main{padding:16px}.draft{grid-column:1}}
+
+  /* ---------- lookup ---------- */
+  .head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .head h1{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+  .games{display:flex;gap:4px;flex-wrap:wrap}
+  .games button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 11px;font-size:13px}
+  .games button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .lsearch{width:100%;font-size:17px;padding:10px 14px;border:2px solid var(--line-strong);border-radius:8px;background:#fff;outline:none;margin-bottom:6px}
+  .lsearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+  .hint{color:var(--muted);font-size:12px;margin:0 0 14px;min-height:18px}
+  .hint b{color:var(--ink);font-weight:500}
+  .cardgrp{background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+  .cardgrp h2{font-size:14px;font-weight:600;margin:0;padding:8px 12px;background:#FAFBFA;border-bottom:1px solid var(--line)}
+  .prt{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+  .prt:first-of-type{border-top:0}
+  .prt .lbl{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .prt .lbl b{color:var(--ink);font-weight:500}
+  .prt .prices{display:flex;gap:14px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .prt .prices span small{color:var(--muted);font-family:var(--sans);font-size:11px;margin-right:4px}
+  .skus{padding:0 12px 8px 56px;display:grid;gap:4px}
+  .sku{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+  .sku b{color:var(--ink);font-weight:500;font-family:var(--mono)}
+  .sku .zero{color:var(--danger)}
+  .sku .held{color:var(--warn)}
+  .act{display:flex;gap:4px}
+  .act button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 9px;font-size:12px}
+  .act button.sell{color:var(--accent);border-color:var(--accent-tint-2)}
+  .act button.buy{color:var(--buy);border-color:var(--buy-tint-2)}
+  .act button.dim{color:var(--muted)}
+  .act button:hover{background:#F4F6F5}
+  .thumb{width:34px;height:46px;border-radius:4px;display:grid;place-items:center;color:#fff;font:600 9px/1.1 var(--mono);text-align:center;flex:none}
+  .g-mtg{background:#7A5A2D}.g-pkm{background:#B08A12}.g-op{background:#A5352C}.g-rift{background:#3F5490}
+  .none{padding:18px 12px;color:var(--muted)}
+
+  /* ---------- draft panel ---------- */
+  .dhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:5}
+  .dhead h2{font-size:15px;font-weight:600;margin:0}
+  .dhead .kind{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .kind.trade{background:#EAE4F4;color:#4B3A7A}.kind.sell{background:var(--accent-tint);color:var(--accent)}.kind.buy{background:var(--buy-tint);color:var(--buy)}.kind.empty{background:#EEF0EF;color:var(--muted)}
+  .dhead button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 9px;font-size:12px}
+  .dbody{padding:12px 16px 24px;display:grid;gap:12px}
+  .dsearchwrap{position:relative}
+  .dsearchrow{display:flex;gap:6px;align-items:stretch}
+  .dsearch{flex:1;font-size:15px;padding:8px 11px;border:2px solid var(--line-strong);border-radius:8px;background:#fff;outline:none;min-width:0}
+  .dsearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:#fff;flex:none}
+  .seg button{border:0;background:transparent;padding:6px 10px;font-size:12px;font-weight:500;color:var(--muted)}
+  .seg button.on{background:var(--ink);color:#fff}
+  .seg.sellbuy button.on.sell{background:var(--accent)}
+  .seg.sellbuy button.on.buy{background:var(--buy)}
+  .seg.small button{padding:3px 8px;font-size:12px}
+  .seg .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;margin-left:4px;font-weight:400;opacity:.9}
+  .seg button:disabled{cursor:default;opacity:.55}
+  .dhint{color:var(--muted);font-size:11.5px;min-height:16px}
+  .dhint b{color:var(--ink);font-weight:500}
+  .results{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--line-strong);border-radius:8px;box-shadow:0 10px 30px rgba(20,30,25,.14);margin-top:4px;overflow:hidden;max-height:340px;overflow-y:auto}
+  .r{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
+  .r:first-child{border-top:0}
+  .r.hi{background:var(--accent-tint)}
+  .r .n{font-weight:500}
+  .r .p{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .r .p b{color:var(--ink);font-weight:500}
+  .r .mk{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;text-align:right;color:var(--muted)}
+  .r .mk b{color:var(--ink);font-weight:500}
+
+  .sideblk{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .sideblk.sell{border-color:var(--accent-tint-2)}
+  .sideblk.buy{border-color:var(--buy-tint-2)}
+  .sideblk.active{box-shadow:0 0 0 2px var(--accent-tint)}
+  .sideblk.buy.active{box-shadow:0 0 0 2px var(--buy-tint)}
+  .sh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .sideblk.sell .sh{background:var(--accent-tint);color:var(--accent)}
+  .sideblk.buy .sh{background:var(--buy-tint);color:var(--buy)}
+  .sh small{font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;opacity:.85}
+  .sh .tot{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;letter-spacing:0;text-transform:none}
+  .sideblk.empty .sh{background:#F4F6F5;color:var(--muted)}
+  .lines{overflow-x:auto}
+  table.ln{width:100%;border-collapse:collapse}
+  .ln th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);font-weight:500}
+  .ln td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
+  .ln tr:last-child td{border-bottom:0}
+  .ln td.num,.ln th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ln td.k{font-family:var(--mono);font-size:12px;white-space:nowrap}
+  .ln tr.on{background:#FFFBEA;outline:2px solid var(--warn);outline-offset:-2px}
+  .ln tr:focus{outline:2px solid var(--warn);outline-offset:-2px}
+  .ln .nm{font-weight:500}
+  .ln .lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .ln .was{color:var(--muted);text-decoration:line-through;font-size:11px;margin-right:4px}
+  .ln .rev{cursor:pointer;color:var(--accent);font-size:11px}
+  .ln .warn{color:var(--warn);font-size:11px;display:block}
+  .ln .block{color:var(--danger);font-size:11px;display:block}
+  .ln .block a{color:var(--danger)}
+  .ln input.pr{width:64px;font-family:var(--mono);text-align:right;border:1px solid var(--warn);border-radius:4px;padding:1px 4px}
+  .ln .merged{color:var(--accent);font-size:11px;display:block}
+  .sctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 10px;border-top:1px solid var(--line);background:#FBFCFB;font-size:12px}
+  .sctl label{color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+  .sctl input.pct{width:54px;font-family:var(--mono);text-align:right;border:1px solid var(--line-strong);border-radius:6px;padding:3px 6px;background:#fff}
+  .sctl input.pct.set{border-color:var(--warn);background:var(--warn-tint)}
+  .sctl .tot{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:500;white-space:nowrap}
+  .sctl .tot small{font-family:var(--sans);font-weight:400;color:var(--muted);font-size:11px}
+  .lock{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--line-strong);border-radius:8px;padding:3px 8px;color:var(--muted);font-size:12px;background:#fff}
+  .lock b{color:var(--ink);font-weight:500}
+  .emptyline{padding:8px 10px;color:var(--muted);font-size:12px}
+
+  /* ---------- outcome, per variant ---------- */
+  .outcome{border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;background:#FAFBFA;display:grid;gap:8px}
+  .figs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .fig label{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .fig .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:500;white-space:nowrap}
+  .fig .v small{font-family:var(--sans);font-size:11px;color:var(--muted);font-weight:400;margin-left:3px}
+  .fig.net .v{color:var(--ink)}
+  .split{font-size:13.5px;line-height:1.6;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+  .split b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+  .split .dot{color:var(--muted)}
+  .bignet{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+  .bignet .who{font-size:13px;color:var(--muted)}
+  .bignet .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:28px;font-weight:500;line-height:1.1}
+  .bignet .amt.owe{color:var(--buy)}.bignet .amt.pay{color:var(--accent)}.bignet .amt.even{color:var(--muted)}
+  .bignet .how{font-size:12px;color:var(--muted)}
+  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line-strong);background:#fff}
+  .bar div{display:flex;align-items:center;padding:0 8px;font-size:11.5px;white-space:nowrap;overflow:hidden;min-width:0}
+  .bar .cov{background:var(--accent-tint-2);color:var(--accent)}
+  .bar .rem{background:var(--buy-tint-2);color:var(--buy)}
+  .bar .due{background:var(--danger-tint);color:var(--danger)}
+  .barleg{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);gap:8px;flex-wrap:wrap}
+  .barleg b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+  .scale{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:10px;padding:6px 0 0}
+  .pan{border:1px solid var(--line-strong);border-radius:6px;padding:6px 10px;background:#fff;text-align:center}
+  .pan label{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pan .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:18px;font-weight:500}
+  .pan.buy{border-color:var(--buy-tint-2)}.pan.sell{border-color:var(--accent-tint-2)}
+  .pan.heavy{transform:translateY(8px)}
+  .fulcrum{font-size:22px;color:var(--muted);line-height:1;padding-bottom:4px}
+  .fulcrum.l{transform:rotate(-8deg)}.fulcrum.r{transform:rotate(8deg)}
+  .q{font-size:13.5px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+  .q b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+  .commitrow{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+  .commitrow button.primary{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:600}
+  .commitrow button.primary:disabled{background:#B9C2BD;cursor:not-allowed}
+  .commitrow .why{font-size:11.5px;color:var(--danger);margin-right:auto}
+  .hdrs{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:8px;overflow:auto}
+  .hdrs table{border-collapse:collapse;width:100%;min-width:520px}
+  .hdrs th,.hdrs td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  .hdrs th{color:var(--muted);font-weight:500;background:#FAFBFA}
+  .hdrs tr:last-child td{border-bottom:0}
+  .hdrs td.null{color:var(--muted)}
+  .cbar{position:fixed;right:16px;top:16px;z-index:6;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:8px 14px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.2);display:none}
+  .shell.collapsed ~ .cbar{display:block}
+
+  /* ---------- modal / toast ---------- */
+  .mask{position:fixed;inset:0;background:rgba(20,30,25,.35);display:grid;place-items:center;z-index:50}
+  .modal{background:#fff;border-radius:10px;padding:18px 20px;width:min(560px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.25);display:grid;gap:12px}
+  .modal h3{margin:0;font-size:16px}
+  .modal input.pos{font-family:var(--mono);border:1px solid var(--line-strong);border-radius:6px;padding:7px 9px;width:100%}
+  .modal .row{display:flex;gap:8px;justify-content:flex-end}
+  .modal .row button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px}
+  .modal .row button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .modal .row button.primary:disabled{background:#B9C2BD;border-color:#B9C2BD}
+  #toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:60;pointer-events:none}
+  .toast{background:var(--ink);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:90vw}
+
+  /* ---------- prototype rail ---------- */
+  #rail{position:fixed;left:0;right:0;bottom:0;background:var(--rail);color:var(--rail-ink);z-index:40;padding:8px 14px;box-shadow:0 -6px 20px rgba(0,0,0,.25);font-size:12px}
+  .railrow{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+  .railrow+.railrow{margin-top:6px}
+  .rg{display:flex;align-items:center;gap:6px}
+  .rg>label{color:#9AA6A0;letter-spacing:.06em;text-transform:uppercase;font-size:10.5px}
+  .rseg{display:inline-flex;border:1px solid #3A423F;border-radius:6px;overflow:hidden}
+  .rseg button{border:0;background:transparent;color:#C9D1CD;padding:4px 9px;font-size:12px}
+  .rseg button.on{background:#E9EEEB;color:var(--rail)}
+  .rbtn{border:1px solid #3A423F;background:transparent;color:#C9D1CD;border-radius:6px;padding:4px 9px;font-size:12px}
+  .rbtn.on{background:#E9EEEB;color:var(--rail)}
+  .rail-say{color:#E9EEEB;min-height:18px;flex:1 1 320px}
+  .rail-say b{color:#FFD980;font-weight:500}
+  .rail-title{color:#9AA6A0;font-size:11px}
+  .rail-title code{color:#E9EEEB}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="shell" id="shell">
+  <aside class="side">
+    <div class="brand">shop-keepr<small>staff</small></div>
+    <nav class="nav">
+      <a class="on" href="#">Lookup</a><a class="dim" href="#">Queue</a><a class="dim" href="#">Customer Lists</a><a class="dim" href="#">Large Buy</a><a class="dim" href="#">Ingest</a><a class="dim" href="#">Inventory</a><a class="dim" href="#">Pinned Prices</a><a class="dim" href="#">History</a><a class="dim" href="#">Settings</a><a class="dim" href="#">System</a>
+    </nav>
+  </aside>
+  <main class="main" id="main"></main>
+  <aside class="draft" id="draft"></aside>
+</div>
+<button class="cbar" id="cbar"></button>
+<div id="modal"></div>
+<div id="toast"></div>
+<div id="rail"></div>
+
+<script>
+const M = (() => {
+  const CONDITIONS = ['NM','LP','MP','HP','DMG'];
+  const COND_KEY = { n:'NM', l:'LP', m:'MP', h:'HP', d:'DMG' };
+  const LANG_KEY = { e:'en', j:'ja' };
+  const STORE_LANG = 'en';
+  // Store settings (#8, #43). Default Tender and Tender Modifier are store-level, Buy side; the rail can flip Default Tender.
+  const STORE = { defaultTender:'cash', tenderModifierPct:25, buyPct:.5, sellPct:1, cond:{NM:1,LP:.85,MP:.7,HP:.5,DMG:.3}, lang:{en:1,ja:.9}, roundBuy:10, roundSell:10, floorBuy:10, floorSell:50 };
+
+  // ---- fake Catalogue mirror (same rows as the #27 / #28 prototypes): [game, name, set, num, finish, release, market pence]
+  const G = { mtg:'Magic', pkm:'Pokémon', op:'One Piece', rift:'Riftbound' };
+  const raw = [
+    ['mtg','Lightning Bolt','LEA',161,'nonfoil',1993.08,32000],['mtg','Lightning Bolt','M10',146,'nonfoil',2009.07,240],['mtg','Lightning Bolt','STA',42,'etched foil',2021.04,650],['mtg','Lightning Bolt','CLB',187,'nonfoil',2022.06,120],
+    ['mtg','Counterspell','ICE',64,'nonfoil',1995.06,180],['mtg','Counterspell','MH2',267,'nonfoil',2021.06,110],['mtg','Counterspell','CMM',81,'nonfoil',2023.08,90],
+    ['mtg','Sol Ring','C21',263,'nonfoil',2021.04,150],['mtg','Sol Ring','CMM',395,'nonfoil',2023.08,120],['mtg','Sol Ring','LTC',284,'nonfoil',2023.06,210],
+    ['mtg','Jace, the Mind Sculptor','WWK',31,'nonfoil',2010.02,5500],['mtg','Jace, the Mind Sculptor','EMA',57,'nonfoil',2016.06,3000],['mtg','Jace, the Mind Sculptor','2XM',56,'nonfoil',2020.08,2500],
+    ['mtg','Ragavan, Nimble Pilferer','MH2',138,'nonfoil',2021.06,4500],['mtg','Ragavan, Nimble Pilferer','MH2',138,'foil',2021.06,6500],['mtg','Ragavan, Nimble Pilferer','MH2',383,'extended art',2021.06,7000],['mtg','Ragavan, Nimble Pilferer','MH2',421,'sketch',2021.06,6000],
+    ['mtg','Thoughtseize','LRW',145,'nonfoil',2007.10,1400],['mtg','Thoughtseize','THS',107,'nonfoil',2013.09,1100],['mtg','Thoughtseize','2XM',109,'nonfoil',2020.08,900],
+    ['mtg','Snapcaster Mage','ISD',78,'nonfoil',2011.09,1800],['mtg','Snapcaster Mage','MM3',56,'nonfoil',2017.03,1400],['mtg','Snapcaster Mage','UMA',71,'nonfoil',2018.12,1300],
+    ['mtg','Force of Will','ALL',25,'nonfoil',1996.06,7000],['mtg','Force of Will','EMA',49,'nonfoil',2016.06,5500],['mtg','Force of Will','2XM',60,'nonfoil',2020.08,4500],
+    ['mtg','Delighted Halfling','LTR',158,'nonfoil',2023.06,600],['mtg','The One Ring','LTR',246,'nonfoil',2023.06,4000],['mtg','The One Ring','LTR',380,'extended art',2023.06,5500],
+    ['mtg','Fatal Push','AER',57,'nonfoil',2017.01,200],['mtg','Fatal Push','KLR',79,'nonfoil',2020.11,150],
+    ['mtg','Elvish Mystic','M14',169,'nonfoil',2013.07,40],['mtg','Elvish Mystic','M15',175,'nonfoil',2014.07,40],
+    ['mtg',"Urza's Saga",'MH2',259,'nonfoil',2021.06,3000],['mtg','Esper Sentinel','MH2',12,'nonfoil',2021.06,400],['mtg','Solitude','MH2',32,'nonfoil',2021.06,2500],['mtg','Endurance','MH2',158,'nonfoil',2021.06,2000],['mtg','Subtlety','MH2',67,'nonfoil',2021.06,1000],['mtg','Grief','MH2',87,'nonfoil',2021.06,600],['mtg','Fury','MH2',126,'nonfoil',2021.06,600],['mtg','Dauthi Voidwalker','MH2',100,'nonfoil',2021.06,900],['mtg','Sanctifier en-Vec','MH2',33,'nonfoil',2021.06,200],['mtg','Prismatic Ending','MH2',25,'nonfoil',2021.06,150],['mtg','Ignoble Hierarch','MH2',168,'nonfoil',2021.06,200],['mtg','Shardless Agent','MH2',292,'nonfoil',2021.06,150],['mtg','Kaldra Compleat','MH2',226,'nonfoil',2021.06,300],
+    ['pkm','Pikachu','BS',58,'nonholo',1999.01,800],['pkm','Pikachu','MEW',25,'nonholo',2023.09,50],['pkm','Pikachu','MEW',173,'illustration rare',2023.09,300],['pkm','Pikachu','SVP',27,'promo',2023.06,600],
+    ['pkm','Charizard','BS',4,'holo',1999.01,35000],['pkm','Charizard','MEW',6,'nonholo',2023.09,400],['pkm','Charizard ex','OBF',125,'nonholo',2023.08,1200],['pkm','Charizard ex','OBF',223,'special illustration rare',2023.08,18000],['pkm','Charizard ex','OBF',215,'full art',2023.08,4500],
+    ['pkm','Umbreon VMAX','EVS',95,'nonholo',2021.08,4000],['pkm','Umbreon VMAX','EVS',215,'alternate art',2021.08,70000],
+    ['pkm','Gardevoir ex','SVI',86,'nonholo',2023.03,500],['pkm','Gardevoir ex','SVI',245,'special illustration rare',2023.03,6000],
+    ['pkm','Mew ex','MEW',151,'nonholo',2023.09,600],['pkm','Mew ex','MEW',193,'full art',2023.09,2500],['pkm','Mew ex','MEW',205,'special illustration rare',2023.09,9000],
+    ['pkm',"Boss's Orders",'PAL',172,'nonholo',2023.06,120],['pkm',"Boss's Orders",'RCL',154,'nonholo',2020.05,150],['pkm',"Boss's Orders",'BRS',132,'nonholo',2022.02,80],['pkm',"Boss's Orders",'PAL',265,'special illustration rare',2023.06,3000],
+    ['pkm','Iono','PAL',185,'nonholo',2023.06,150],['pkm','Iono','PAL',254,'special illustration rare',2023.06,7000],
+    ['pkm','Bulbasaur','MEW',1,'nonholo',2023.09,30],['pkm','Squirtle','MEW',7,'nonholo',2023.09,40],['pkm','Mewtwo','MEW',150,'nonholo',2023.09,60],
+    ['op','Monkey.D.Luffy','OP01',3,'leader',2022.12,200],['op','Monkey.D.Luffy','OP01',24,'normal',2022.12,80],['op','Monkey.D.Luffy','OP02',62,'normal',2023.03,150],['op','Monkey.D.Luffy','OP05',119,'secret rare',2023.12,6000],['op','Monkey.D.Luffy','OP05',119,'manga art',2023.12,40000],['op','Monkey.D.Luffy','ST01',1,'leader',2022.12,100],
+    ['op','Roronoa Zoro','OP01',1,'leader',2022.12,300],['op','Roronoa Zoro','OP01',25,'normal',2022.12,100],['op','Roronoa Zoro','OP01',25,'parallel',2022.12,2500],['op','Roronoa Zoro','OP06',118,'secret rare',2024.03,3500],
+    ['op','Nami','OP01',16,'normal',2022.12,70],['op','Nami','OP03',40,'normal',2023.06,50],['op','Nami','OP03',40,'parallel',2023.06,4500],['op','Nami','ST01',7,'normal',2022.12,50],
+    ['op','Trafalgar Law','OP01',47,'normal',2022.12,150],['op','Trafalgar Law','OP01',47,'parallel',2022.12,3000],['op','Trafalgar Law','OP05',69,'normal',2023.12,200],
+    ['op','Shanks','OP01',120,'secret rare',2022.12,1200],['op','Shanks','OP01',120,'parallel',2022.12,12000],
+    ['op','Portgas.D.Ace','OP02',13,'normal',2023.03,120],['op','Portgas.D.Ace','OP02',13,'parallel',2023.03,4000],['op','Portgas.D.Ace','OP03',1,'leader',2023.06,200],
+    ['op','Kaido','OP01',61,'normal',2022.12,50],['op','Yamato','OP01',121,'secret rare',2022.12,1000],['op','Boa Hancock','OP01',78,'normal',2022.12,150],['op','Sanji','OP01',13,'normal',2022.12,80],['op','Usopp','OP01',17,'normal',2022.12,40],['op','Nico Robin','OP01',18,'normal',2022.12,60],
+    ['rift','Jinx, Loose Cannon','OGN',45,'normal',2025.10,400],['rift','Jinx, Loose Cannon','OGN',298,'alternate art',2025.10,3000],['rift','Jinx, Loose Cannon','SFD',55,'normal',2026.03,200],['rift','Ahri, Nine-Tailed','OGN',12,'normal',2025.10,300],['rift','Yasuo, Unforgiven','OGN',201,'normal',2025.10,250],['rift','Garen, Might of Demacia','OGN',101,'normal',2025.10,100],['rift','Lux, Lady of Luminosity','OGN',103,'normal',2025.10,150],['rift','Teemo, Swift Scout','OGN',150,'normal',2025.10,60],['rift','Volibear, Relentless Storm','OGN',240,'normal',2025.10,200],['rift','Annie, Dark Child','OGN',180,'normal',2025.10,100],
+  ];
+  const CAT = raw.map((r,i)=>({ id:'prt_'+String(i+1).padStart(3,'0'), game:r[0], name:r[1], set:r[2], num:r[3], finish:r[4], release:r[5], market:r[6] }));
+  const SETS = new Set(CAT.map(p=>p.set));
+  const byId = Object.fromEntries(CAT.map(p=>[p.id,p]));
+  const find = (name,set,num,finish) => CAT.find(p=>p.name===name&&p.set===set&&p.num===num&&(!finish||p.finish===finish));
+  const finishRank = f => /^(nonfoil|normal|nonholo|leader)$/.test(f) ? 0 : 1;
+  const printingLabel = p => (p.game==='op'||p.game==='rift') ? `${p.set}-${String(p.num).padStart(3,'0')}` : `${p.set} #${p.num}`;
+
+  // ---- pricing rules (#8): both prices from Market Price; Buy rounds to 10p with a floor, Sell likewise
+  const rnd = (v,to) => Math.round(v/to)*to;
+  function computeBuy(p,cond,lang){ return Math.max(rnd(p.market*STORE.cond[cond]*(STORE.lang[lang]??.8)*STORE.buyPct, STORE.roundBuy), STORE.floorBuy); }
+  function computeSell(p,cond,lang){ return Math.max(rnd(p.market*STORE.cond[cond]*(STORE.lang[lang]??.8)*STORE.sellPct, STORE.roundSell), STORE.floorSell); }
+
+  // ---- fake stock: SKU rows the store holds (or held). Absent row = never held; price computed on read. `held` = active kiosk Holds.
+  const inv = [];
+  const hold = (name,set,num,cond,lang,qty,x={}) => { const p=find(name,set,num,x.finish); inv.push({printingId:p.id,condition:cond,language:lang,onHand:qty,held:x.held||0,heldBy:x.heldBy||null,buy:x.pinBuy ?? computeBuy(p,cond,lang),sell:x.pinSell ?? computeSell(p,cond,lang),pinBuy:x.pinBuy!=null,pinSell:x.pinSell!=null}); };
+  hold('Lightning Bolt','M10',146,'NM','en',12,{pinBuy:150}); hold('Lightning Bolt','M10',146,'LP','en',3);
+  hold('Counterspell','MH2',267,'NM','en',6); hold('Ragavan, Nimble Pilferer','MH2',138,'NM','en',2,{finish:'nonfoil'});
+  hold('Monkey.D.Luffy','OP01',3,'NM','en',4); hold('Monkey.D.Luffy','OP05',119,'NM','en',1,{finish:'secret rare'});
+  hold('Pikachu','MEW',25,'NM','en',20); hold('Charizard ex','OBF',125,'NM','en',5,{held:1,heldBy:'4821'}); hold('Roronoa Zoro','OP01',25,'LP','en',2,{finish:'normal'});
+  hold('Jinx, Loose Cannon','OGN',45,'NM','en',3); hold("Boss's Orders",'PAL',172,'NM','en',9); hold('Thoughtseize','THS',107,'NM','en',0);
+  hold('Sol Ring','C21',263,'NM','en',7); hold('Solitude','MH2',32,'NM','en',1); hold('Snapcaster Mage','UMA',71,'NM','en',2,{pinSell:2000});
+  hold('Nami','OP01',16,'NM','en',6); hold('Nami','OP01',16,'NM','ja',1);
+  const skuRow = (pid,cond,lang) => inv.find(r=>r.printingId===pid&&r.condition===cond&&r.language===lang);
+  const heldRows = pid => inv.filter(r=>r.printingId===pid);
+  const heldSummary = pid => inv.filter(r=>r.printingId===pid&&r.onHand>0).map(r=>`${r.onHand} ${r.condition}${r.language!==STORE_LANG?' '+r.language:''}`).join(', ');
+  function buyPrice(pid,cond,lang){ const p=byId[pid]; const row=skuRow(pid,cond,lang); if(row) return {price:row.buy, pinned:row.pinBuy}; return {price:computeBuy(p,cond,lang), pinned:false}; }
+  function sellPrice(pid,cond,lang){ const p=byId[pid]; const row=skuRow(pid,cond,lang); if(row) return {price:row.sell, pinned:row.pinSell}; return {price:computeSell(p,cond,lang), pinned:false}; }
+
+  // ---- search: fold, `name SET` / `name #n` narrowing (#27), game-scoped
+  const fold = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.\-_/]/g,' ').replace(/['’,:!]/g,'').replace(/\s+/g,' ').trim();
+  function parseQuery(q){
+    let t=q.trim(), set=null, num=null;
+    const m=t.match(/#\s*(\d+)\s*$/); if(m){ num=parseInt(m[1],10); t=t.slice(0,m.index).trim(); }
+    const parts=t.split(/\s+/).filter(Boolean);
+    if(parts.length>1 && SETS.has(parts[parts.length-1].toUpperCase())){ set=parts.pop().toUpperCase(); }
+    return { text:parts.join(' '), set, num };
+  }
+  function search(query,game){
+    const {text,set,num}=parseQuery(query); const f=fold(text);
+    if(!f && set==null && num==null) return [];
+    const pool=CAT.filter(p=>p.game===game&&(set==null||p.set===set)&&(num==null||p.num===num));
+    let hits = f ? pool.filter(p=>fold(p.name)===f) : pool;
+    if(!hits.length && f) hits = pool.filter(p=>fold(p.name).replace(/ /g,'')===f.replace(/ /g,''));
+    if(!hits.length && f){ const toks=f.split(' '); hits=pool.filter(p=>{ const w=fold(p.name).split(' '); return toks.every(t=>w.some(x=>x.startsWith(t))); }); }
+    hits.sort((a,b)=>a.name.localeCompare(b.name) || (b.release-a.release) || (a.num-b.num) || (finishRank(a.finish)-finishRank(b.finish)) || a.finish.localeCompare(b.finish));
+    return hits.slice(0,12);
+  }
+
+  // ---- the draft: one draft, two sides (#11). Commit yields a Sell, a Buy or a Trade by which sides have lines.
+  function initial(){ return { sell:{lines:[],pct:0}, buy:{lines:[],pct:0,tender:STORE.defaultTender}, remainderTender:STORE.defaultTender, lastSide:null, nextId:1, flash:null, seq:0 }; }
+  const clone = s => JSON.parse(JSON.stringify(s));
+  function pickSellSku(pid){ // Sell picks among SKUs held: NM/en first, else the first held, else NM/en (blocked: none held)
+    const rows=heldRows(pid).filter(r=>r.onHand>0); const nm=rows.find(r=>r.condition==='NM'&&r.language===STORE_LANG);
+    const r=nm||rows[0]; return r?{condition:r.condition,language:r.language}:{condition:'NM',language:STORE_LANG};
+  }
+  function reduce(s0,a){
+    const s=clone(s0); s.flash=null; s.seq++;
+    const side = a.side ? s[a.side] : null;
+    const byIdL = id => { for(const k of ['sell','buy']){ const l=s[k].lines.find(l=>l.id===id); if(l) return {l,side:s[k],k}; } return null; };
+    switch(a.type){
+      case 'add': {
+        const sku = a.side==='sell' ? (a.condition?{condition:a.condition,language:a.language||STORE_LANG}:pickSellSku(a.printingId)) : {condition:a.condition||'NM',language:a.language||STORE_LANG};
+        const dup = side.lines.find(l=>l.printingId===a.printingId&&l.condition===sku.condition&&l.language===sku.language);
+        if(dup){ dup.qty+=1; side.lines=[dup,...side.lines.filter(l=>l!==dup)]; s.flash={id:dup.id,msg:`merged · now ×${dup.qty}`}; }
+        else { side.lines.unshift({id:s.nextId++, printingId:a.printingId, ...sku, qty:1, override:null}); }
+        s.lastSide=a.side; return s; }
+      case 'cond': { const f=byIdL(a.id); if(!f) return s; const l=f.l; if(l.condition===a.condition) return s;
+        const dup=f.side.lines.find(x=>x!==l&&x.printingId===l.printingId&&x.condition===a.condition&&x.language===l.language);
+        if(dup){ dup.qty+=l.qty; f.side.lines=f.side.lines.filter(x=>x!==l); f.side.lines=[dup,...f.side.lines.filter(x=>x!==dup)]; s.flash={id:dup.id,msg:`merged · now ×${dup.qty}`}; s.movedTo=dup.id; }
+        else { l.condition=a.condition; l.override=null; } return s; }
+      case 'lang': { const f=byIdL(a.id); if(!f) return s; const l=f.l; if(l.language===a.language) return s;
+        const dup=f.side.lines.find(x=>x!==l&&x.printingId===l.printingId&&x.condition===l.condition&&x.language===a.language);
+        if(dup){ dup.qty+=l.qty; f.side.lines=f.side.lines.filter(x=>x!==l); f.side.lines=[dup,...f.side.lines.filter(x=>x!==dup)]; s.flash={id:dup.id,msg:`merged · now ×${dup.qty}`}; s.movedTo=dup.id; }
+        else { l.language=a.language; l.override=null; } return s; }
+      case 'qty': { const f=byIdL(a.id); if(f) f.l.qty=Math.max(1,Math.min(999,a.qty|0)); return s; }
+      case 'price': { const f=byIdL(a.id); if(f) f.l.override=a.pence==null?null:Math.max(0,Math.round(a.pence)); return s; }
+      case 'remove': { for(const k of ['sell','buy']) s[k].lines=s[k].lines.filter(l=>l.id!==a.id); return s; }
+      case 'pct': { side.pct=Math.max(-100,Math.min(100,a.pct|0)); return s; }
+      case 'tender': { s.buy.tender=a.tender; return s; }
+      case 'remainderTender': { s.remainderTender=a.tender; return s; }
+      case 'lastSide': { s.lastSide=a.side; return s; }
+      case 'reset': { return initial(); }
+    }
+    return s;
+  }
+
+  // ---- line pricing and validity
+  function linePrice(side,l){ const bp = side==='sell' ? sellPrice(l.printingId,l.condition,l.language) : buyPrice(l.printingId,l.condition,l.language); return {...bp, effective: l.override ?? bp.price}; }
+  function lineStock(l){ const r=skuRow(l.printingId,l.condition,l.language); return { onHand:r?r.onHand:0, held:r?r.held:0, heldBy:r?r.heldBy:null, available:r?Math.max(0,r.onHand-r.held):0 }; }
+  function lineIssue(side,l){ if(side!=='sell') return null; const st=lineStock(l);
+    if(st.onHand===0) return {kind:'block', msg:'none held — record a found Adjustment first'};
+    if(l.qty>st.onHand) return {kind:'block', msg:`only ${st.onHand} on hand`};
+    if(l.qty>st.available) return {kind:'warn', msg:`${st.held} held by Basket ${st.heldBy} — the card in hand wins`};
+    return null; }
+
+  // ---- Trade arithmetic (#43 §4, §7; #44 §3). Money in pence, store's perspective.
+  function calc(s){
+    const sum = side => s[side].lines.reduce((a,l)=>a+linePrice(side,l).effective*l.qty,0);
+    const sellRaw=sum('sell'), buyRaw=sum('buy');
+    const m=STORE.tenderModifierPct/100, def=STORE.defaultTender;
+    const factor = t => t===def ? 1 : (def==='cash' ? 1+m : 1-m);         // the other tender as a factor on the total, never a line
+    const modPct = t => t===def ? 0 : (def==='cash' ? +STORE.tenderModifierPct : -STORE.tenderModifierPct);
+    const S = rnd(sellRaw*(1+s.sell.pct/100), STORE.roundSell);           // Sell total, rounded once, last, by the Sell rule
+    const K = rnd(buyRaw*factor('cash')*(1+s.buy.pct/100), STORE.roundBuy); // pile's cash value
+    const C = rnd(buyRaw*factor('credit')*(1+s.buy.pct/100), STORE.roundBuy); // pile's credit value
+    const hasSell=s.sell.lines.length>0, hasBuy=s.buy.lines.length>0;
+    const kind = hasSell&&hasBuy ? 'trade' : hasSell ? 'sell' : hasBuy ? 'buy' : null;
+    const issues=[...s.sell.lines.map(l=>lineIssue('sell',l)),...s.buy.lines.map(l=>lineIssue('buy',l))].filter(Boolean);
+    const blocked=issues.some(i=>i.kind==='block');
+    const out={kind,S,K,C,sellRaw,buyRaw,blocked,issues,sell:null,buy:null,trade:null};
+    if(kind==='sell'){ out.sell={kind:'sell',origin:'counter',total_pct:s.sell.pct,total:+S,net:+S,trade_id:null}; }
+    if(kind==='buy'){ const t=s.buy.tender, total=t==='cash'?K:C; out.buy={kind:'buy',origin:'counter',tender:t,tender_modifier_pct:modPct(t),total_pct:s.buy.pct,remainder_tender:null,total:-total,net:-total,trade_id:null}; }
+    if(kind==='trade'){
+      const tr={ buyTotal:C, sellTotal:S, covered:Math.min(S,C), direction: S>C?'customer_pays': C>S?'store_owes':'even', customerPays:0, remainderCredit:0, remainderCash:0, remainderTender:null, net:0 };
+      if(S>C){ tr.customerPays=S-C; tr.net=+(S-C); }
+      else if(C>S){ tr.remainderCredit=C-S; tr.remainderCash=Math.round(K*(1-S/C)); tr.remainderTender=s.remainderTender; tr.net = s.remainderTender==='credit' ? -(C-S) : -tr.remainderCash; }
+      out.trade=tr;
+      out.buy={kind:'buy',origin:'counter',tender:'credit',tender_modifier_pct:modPct('credit'),total_pct:s.buy.pct,remainder_tender:tr.remainderTender,total:-C,net:tr.net,trade_id:'trd_…'};
+      out.sell={kind:'sell',origin:'counter',total_pct:s.sell.pct,total:+S,net:tr.net,trade_id:'trd_…'};
+    }
+    return out;
+  }
+  return { CONDITIONS, COND_KEY, LANG_KEY, STORE_LANG, STORE, G, CAT, byId, find, printingLabel, inv, skuRow, heldRows, heldSummary, buyPrice, sellPrice, search, initial, reduce, linePrice, lineStock, lineIssue, calc };
+})();
+</script>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const money = p => { const n=Math.abs(p)/100; return (p<0?'−':'')+'£'+(Number.isInteger(n)?n:n.toFixed(2)); };
+  const money2 = p => (p<0?'−':'')+'£'+(Math.abs(p)/100).toFixed(2);
+  const VARIANTS = { A:'Sides, then the split', B:'Money that moves, first', C:'Two columns, a balance' };
+
+  // ---- state
+  let S = M.initial();
+  const params = new URLSearchParams(location.search);
+  const ui = { variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A', arrows:'side', game:'mtg', lquery:'', dquery:'', hi:0, side:'sell', mode:'search', cell:null, digits:'', digitAt:0, priceEdit:null, collapsed:false, hood:false, modal:null, say:'', walk:null };
+  const dispatch = a => { S=M.reduce(S,a); render(); };
+
+  // ---- rendering
+  function render(){ renderMain(); renderDraft(); renderRail(); renderModal(); $('#shell').className='shell'+(ui.variant==='C'?' wide':'')+(ui.collapsed?' collapsed':''); const c=M.calc(S); $('#cbar').textContent = `Draft (${S.sell.lines.length+S.buy.lines.length} lines${c.kind?' · '+kindLabel(c.kind):''}${c.kind?' · net '+money(netOf(c)):''}) — open`; }
+  const kindLabel = k => ({trade:'Trade',sell:'Sell',buy:'Buy'})[k]||'empty';
+  const netOf = c => c.kind==='trade'?c.trade.net:c.kind==='sell'?c.sell.net:c.kind==='buy'?c.buy.net:0;
+  const thumb = p => `<div class="thumb g-${p.game}">${esc(p.set)}<small>${p.num}</small></div>`;
+
+  function renderMain(){
+    const hits = M.search(ui.lquery, ui.game);
+    const groups = []; for(const p of hits){ let g=groups.find(x=>x.name===p.name); if(!g){ g={name:p.name,prts:[]}; groups.push(g);} g.prts.push(p); }
+    $('#main').innerHTML = `
+      <div class="head"><h1>Lookup</h1><div class="games">${Object.entries(M.G).map(([k,v])=>`<button class="${ui.game===k?'on':''}" data-game="${k}">${v}</button>`).join('')}</div></div>
+      <input class="lsearch" id="lsearch" placeholder="Card name · name SET · name #n   (press / to focus)" value="${esc(ui.lquery)}" autocomplete="off">
+      <p class="hint">${ui.lquery ? `<b>${hits.length}</b> Printings in ${M.G[ui.game]}. In-stock filter off: found-but-none-held reads as <i>found, none held</i>.` : `Do we have X, how many? Search ${M.G[ui.game]}. <b>Buy</b> on any Printing, <b>Sell</b> on a SKU held.`}</p>
+      ${!ui.lquery ? '' : !groups.length ? `<div class="none">Nothing in ${M.G[ui.game]} matches “${esc(ui.lquery)}”.</div>` : groups.map(g=>`
+        <section class="cardgrp"><h2>${esc(g.name)}</h2>
+          ${g.prts.map(p=>{ const rows=M.heldRows(p.id); const bp=M.buyPrice(p.id,'NM',M.STORE_LANG); return `
+            <div class="prt">${thumb(p)}
+              <div><div class="lbl"><b>${M.printingLabel(p)}</b> · ${esc(p.finish)}</div><div class="lbl">${rows.some(r=>r.onHand>0)?`held: ${M.heldSummary(p.id)}`:'none held'}</div></div>
+              <div class="prices"><span><small>Market</small>${money2(p.market)}</span><span><small>Buy NM</small>${money2(bp.price)}${bp.pinned?'<span class="pin">⌖</span>':''}</span><div class="act"><button class="buy" data-buy="${p.id}">Buy</button><button class="dim">Adjust</button><button class="dim">Pin</button></div></div>
+            </div>
+            ${rows.length?`<div class="skus">${rows.map(r=>`<div class="sku"><span><b>${r.condition}</b> · ${r.language} · on-hand <b class="${r.onHand===0?'zero':''}">${r.onHand}</b> · available <b>${Math.max(0,r.onHand-r.held)}</b>${r.held?` <span class="held">(${r.held} held by Basket ${r.heldBy})</span>`:''} · Sell <b>${money2(r.sell)}</b>${r.pinSell?'<span class="pin">⌖</span>':''} · Buy <b>${money2(r.buy)}</b>${r.pinBuy?'<span class="pin">⌖</span>':''}</span><div class="act"><button class="sell" data-sell="${p.id}" data-cond="${r.condition}" data-lang="${r.language}">Sell</button></div></div>`).join('')}</div>`:''}`; }).join('')}
+        </section>`).join('')}`;
+    const inp=$('#lsearch'); inp.oninput=e=>{ ui.lquery=e.target.value; renderMain(); const i=$('#lsearch'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); };
+    $('#main').querySelectorAll('[data-game]').forEach(b=>b.onclick=()=>{ ui.game=b.dataset.game; render(); });
+    $('#main').querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{ dispatch({type:'add',side:'buy',printingId:b.dataset.buy}); ui.side='buy'; toast('Added to the Buy side'); render(); });
+    $('#main').querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{ dispatch({type:'add',side:'sell',printingId:b.dataset.sell,condition:b.dataset.cond,language:b.dataset.lang}); ui.side='sell'; toast('Added to the Sell side'); render(); });
+  }
+
+  // ---- draft panel
+  function renderDraft(){
+    const c = M.calc(S);
+    const body = ui.variant==='A' ? variantA(c) : ui.variant==='B' ? variantB(c) : variantC(c);
+    $('#draft').innerHTML = `
+      <div class="dhead"><h2>Draft<span class="kind ${c.kind||'empty'}">${kindLabel(c.kind)}</span></h2><div><button id="hood" title="what would be written">${ui.hood?'hide':'show'} headers</button> <button id="collapse">collapse</button></div></div>
+      <div class="dbody">
+        ${searchRow(c)}
+        ${body}
+        ${ui.hood ? headersTable(c) : ''}
+        <div class="commitrow">${c.blocked?`<span class="why">a Sell line is blocked — fix it first</span>`:''}<button class="primary" id="commit" ${!c.kind||c.blocked?'disabled':''}>Commit ${kindLabel(c.kind)}…</button></div>
+      </div>`;
+    wireDraft(c);
+  }
+  function searchRow(c){
+    const hits = ui.dquery ? M.search(ui.dquery, ui.game) : [];
+    return `<div class="dsearchwrap">
+      <div class="dsearchrow"><input class="dsearch" id="dsearch" placeholder="Add a card to the ${ui.side==='sell'?'Sell':'Buy'} side · ${M.G[ui.game]}" value="${esc(ui.dquery)}" autocomplete="off">
+        <div class="seg sellbuy"><button class="${ui.side==='sell'?'on sell':''}" data-side="sell">Sell</button><button class="${ui.side==='buy'?'on buy':''}" data-side="buy">Buy</button></div></div>
+      <div class="dhint">${ui.mode==='cell' ? `In a line: <kbd>N</kbd><kbd>L</kbd><kbd>M</kbd><kbd>H</kbd><kbd>D</kbd> condition · digits qty · <kbd>E</kbd><kbd>J</kbd> language · <kbd>P</kbd> price · <kbd>⌫</kbd> delete · <kbd>↑</kbd><kbd>↓</kbd> rows${ui.arrows==='cross'?' (across sides)':' (this side)'} · <kbd>Enter</kbd>/<kbd>Esc</kbd> back to search` : ui.dquery ? `<kbd>Enter</kbd> adds to <b>${ui.side==='sell'?'Sell':'Buy'}</b> · <kbd>Shift</kbd>+<kbd>Enter</kbd> to the other side · <kbd>Tab</kbd> into the last-touched side` : `Same search as Lookup, inline (#11). <kbd>Tab</kbd> enters the newest line of the ${S.lastSide?`last-touched side (<b>${S.lastSide}</b>)`:'last-touched side'}.`}</div>
+      ${hits.length ? `<div class="results">${hits.map((p,i)=>{ const held=M.heldSummary(p.id); const bp=M.buyPrice(p.id,'NM',M.STORE_LANG); const sp=held?M.sellPrice(p.id, ...(()=>{const r=M.heldRows(p.id).find(r=>r.onHand>0); return [r.condition,r.language];})()):null; return `
+        <div class="r ${i===ui.hi?'hi':''}" data-i="${i}"><div><div class="n">${esc(p.name)}</div><div class="p"><b>${M.printingLabel(p)}</b> · ${esc(p.finish)} · ${held?`held ${held}`:'none held'}</div></div><div class="mk">${sp?`Sell <b>${money2(sp.price)}</b><br>`:''}Buy <b>${money2(bp.price)}</b></div></div>`; }).join('')}</div>` : (ui.dquery && ui.mode==='search' ? `<div class="results"><div class="r"><span class="muted">Nothing in ${M.G[ui.game]} matches.</span></div></div>` : '')}
+    </div>`;
+  }
+  // one side: header, lines, controls. opts.tender: 'toggle' | 'locked' | 'replace' | 'hidden'
+  function sideBlock(side,c,opts={}){
+    const st=S[side], lines=st.lines, isSell=side==='sell';
+    const total = isSell ? c.S : (c.kind==='trade' ? c.C : (st.tender==='cash'?c.K:c.C));
+    const tenderWord = isSell ? '' : (c.kind==='trade' ? 'credit' : st.tender);
+    if(!lines.length) return `<section class="sideblk ${side} empty"><div class="sh"><span>${isSell?'Sell':'Buy'} <small>· empty</small></span><small>${isSell?'cards the customer takes':'cards the customer brings'}</small></div></section>`;
+    const rows = lines.map(l=>{ const p=M.byId[l.printingId]; const pr=M.linePrice(side,l); const iss=M.lineIssue(side,l); const on=ui.mode==='cell'&&ui.cell===l.id; const fl=S.flash&&S.flash.id===l.id;
+      const priceCell = ui.priceEdit===l.id ? `<input class="pr" id="pr_${l.id}" value="${(pr.effective/100).toFixed(2)}">` : `${l.override!=null?`<span class="was">${money2(pr.price)}</span>`:''}${money2(pr.effective)}${pr.pinned&&l.override==null?'<span class="pin">⌖</span>':''}${l.override!=null?` <span class="rev" data-rev="${l.id}" title="revert to the rule price">↺</span>`:''}`;
+      return `<tr data-id="${l.id}" data-side="${side}" tabindex="-1" class="${on?'on':''}"><td><span class="nm">${esc(p.name)}</span><br><span class="lbl">${M.printingLabel(p)} · ${esc(p.finish)}</span>${fl?`<span class="merged">${esc(S.flash.msg)}</span>`:''}${iss?`<span class="${iss.kind}">${iss.kind==='block'?iss.msg.replace('found Adjustment','<a href="#">found Adjustment</a>'):iss.msg}</span>`:''}</td><td class="k">${l.condition}</td><td class="k">${l.language}</td><td class="num">${l.qty}</td><td class="num">${priceCell}</td><td class="num">${money2(pr.effective*l.qty)}</td></tr>`; }).join('');
+    const pctInput = `<label>Total % <input class="pct ${st.pct?'set':''}" id="pct_${side}" value="${st.pct>0?'+'+st.pct:st.pct}"></label>`;
+    let tenderCtl='';
+    if(!isSell){
+      const mod=M.STORE.tenderModifierPct, def=M.STORE.defaultTender, other=def==='cash'?'credit':'cash';
+      const toggle = `<div class="seg small"><button class="${st.tender==='cash'?'on':''}" data-tender="cash">cash${def==='credit'?`<span class="amt">−${mod}%</span>`:''}</button><button class="${st.tender==='credit'?'on':''}" data-tender="credit">credit${def==='cash'?`<span class="amt">+${mod}%</span>`:''}</button></div>`;
+      if(opts.tender==='toggle') tenderCtl=toggle;
+      else if(opts.tender==='locked') tenderCtl=`<div class="seg small"><button disabled>cash</button><button class="on" disabled>credit</button></div><span class="muted">credit on a Trade</span>`;
+      else if(opts.tender==='replace') tenderCtl = c.trade.direction==='store_owes' ? `<label>Remainder in ${remainderSeg(c)}</label>` : `<span class="lock"><b>credit</b> · Trade</span>`;
+      else if(opts.tender==='hidden') tenderCtl='';
+    }
+    return `<section class="sideblk ${side} ${ui.mode==='cell'&&S.lastSide===side?'active':''}">
+      <div class="sh"><span>${isSell?'Sell':'Buy'} <small>· ${lines.length} line${lines.length===1?'':'s'}</small></span><span class="tot">${money2(total)}${tenderWord?` <small>${tenderWord}</small>`:''}</span></div>
+      <div class="lines"><table class="ln"><thead><tr><th>Card</th><th>Cond</th><th>Lang</th><th class="num">Qty</th><th class="num">${isSell?'Sell':'Buy'}</th><th class="num">Line</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="sctl">${tenderCtl}${pctInput}<span class="tot">${money2(total)}<small> ${isSell?'Sell total':'Buy total'}${tenderWord?' · '+tenderWord:''}${st.pct?` · ${st.pct>0?'+':''}${st.pct}%`:''}</small></span></div>
+    </section>`;
+  }
+  const remainderSeg = c => `<div class="seg small"><button class="${c.trade.remainderTender==='credit'?'on':''}" data-rt="credit">credit<span class="amt">${money(c.trade.remainderCredit)}</span></button><button class="${c.trade.remainderTender==='cash'?'on':''}" data-rt="cash">cash<span class="amt">${money(c.trade.remainderCash)}</span></button></div>`;
+
+  // Variant A — sides first (Sell above Buy), then a footer of three figures and the split sentence in glossary words.
+  // Probe 2: the Remainder toggle REPLACES the Buy's tender toggle while the draft is a Trade.
+  function variantA(c){
+    let foot='';
+    if(c.kind==='trade'){ const t=c.trade;
+      const split = t.direction==='store_owes' ? `<b>${money(t.covered)}</b> covered <span class="dot">·</span> remainder <b>${money(t.remainderTender==='credit'?t.remainderCredit:t.remainderCash)}</b> ${t.remainderTender} <span class="muted">(${t.remainderTender==='credit'?`cash ${money(t.remainderCash)}`:`credit ${money(t.remainderCredit)}`})</span>`
+                  : t.direction==='customer_pays' ? `<b>${money(t.covered)}</b> covered <span class="dot">·</span> customer pays <b>${money(t.customerPays)}</b>`
+                  : `<b>${money(t.covered)}</b> covered <span class="dot">·</span> even`;
+      foot = `<div class="outcome"><div class="figs"><div class="fig"><label>Sell</label><div class="v">${money(t.sellTotal)}</div></div><div class="fig"><label>Buy</label><div class="v">${money(t.buyTotal)}<small>credit</small></div></div><div class="fig net"><label>Net</label><div class="v">${money(t.net)}</div></div></div><div class="split">${split}</div></div>`;
+    } else if(c.kind){ const h=c.kind==='sell'?c.sell:c.buy; foot=`<div class="outcome"><div class="figs"><div class="fig"><label>${kindLabel(c.kind)} total</label><div class="v">${money(Math.abs(h.total))}${h.tender?`<small>${h.tender}</small>`:''}</div></div><div class="fig net"><label>Net</label><div class="v">${money(h.net)}</div></div></div></div>`; }
+    return sideBlock('sell',c) + sideBlock('buy',c,{tender: c.kind==='trade'?'replace':'toggle'}) + foot;
+  }
+  // Variant B — the money that moves at the top, in words, with the tender choice on that figure; a bar shows the pile split in plain words.
+  // Probe 2: the Buy's tender toggle stays BESIDE, locked at credit while a Trade.
+  function variantB(c){
+    let top='';
+    if(c.kind==='trade'){ const t=c.trade; const W=Math.max(t.buyTotal,t.sellTotal)||1; const pc=v=>Math.max(0,Math.round(v/W*100));
+      const netLine = t.direction==='store_owes' ? `<div class="bignet"><span class="who">Store owes the customer</span><span class="amt owe">${money(t.remainderTender==='credit'?t.remainderCredit:t.remainderCash)}</span>${remainderSeg(c)}</div>`
+                    : t.direction==='customer_pays' ? `<div class="bignet"><span class="who">Customer pays</span><span class="amt pay">${money(t.customerPays)}</span><div class="seg small"><button disabled>at the POS</button></div><span class="how">however the POS takes it</span></div>`
+                    : `<div class="bignet"><span class="who">Even</span><span class="amt even">£0</span><span class="how">their cards pay for the sale exactly</span></div>`;
+      const bar = t.direction==='customer_pays' ? `<div class="bar"><div class="cov" style="width:${pc(t.buyTotal)}%">their cards ${money(t.buyTotal)}</div><div class="due" style="width:${pc(t.customerPays)}%">still to pay ${money(t.customerPays)}</div></div><div class="barleg"><span>Sale <b>${money(t.sellTotal)}</b></span><span>Their cards <b>${money(t.buyTotal)}</b> credit</span></div>`
+                : `<div class="bar"><div class="cov" style="width:${pc(t.covered)}%">pays for the sale ${money(t.covered)}</div>${t.remainderCredit?`<div class="rem" style="width:${pc(t.remainderCredit)}%">left over ${money(t.remainderCredit)}</div>`:''}</div><div class="barleg"><span>Their cards <b>${money(t.buyTotal)}</b> credit${t.remainderCredit?` · left over <b>${money(t.remainderCredit)}</b> credit or <b>${money(t.remainderCash)}</b> cash`:''}</span><span>Sale <b>${money(t.sellTotal)}</b></span></div>`;
+      top = `<div class="outcome">${netLine}${bar}</div>`;
+    } else if(c.kind){ const h=c.kind==='sell'?c.sell:c.buy; top=`<div class="outcome"><div class="bignet"><span class="who">${c.kind==='sell'?'Customer pays':'Store pays'}</span><span class="amt ${c.kind==='sell'?'pay':'owe'}">${money(Math.abs(h.net))}</span>${h.tender?`<span class="how">${h.tender}</span>`:'<span class="how">at the POS</span>'}</div></div>`; }
+    else top=`<div class="outcome"><div class="bignet"><span class="who">Nothing yet</span><span class="amt even">£0</span><span class="how">add cards from Lookup or the search above</span></div></div>`;
+    return top + sideBlock('buy',c,{tender: c.kind==='trade'?'locked':'toggle'}) + sideBlock('sell',c);
+  }
+  // Variant C — two columns, cards in / cards out, and a balance beneath that asks the tender as a question carrying both figures.
+  // Probe 2: the Buy's tender toggle is HIDDEN while a Trade.
+  function variantC(c){
+    let bal='';
+    if(c.kind==='trade'){ const t=c.trade; const heavy=t.direction==='store_owes'?'l':t.direction==='customer_pays'?'r':'';
+      const line = t.direction==='store_owes' ? `<div class="q">Their cards are worth <b>${money(t.remainderCredit)}</b> more than the sale <span class="muted">(${money(t.covered)} of them covers it).</span> Pay the difference as ${remainderSeg(c)}</div>`
+                 : t.direction==='customer_pays' ? `<div class="q">The sale is worth <b>${money(t.customerPays)}</b> more than their cards <span class="muted">(all ${money(t.covered)} of them count against it).</span> Customer pays <b>${money(t.customerPays)}</b> at the POS.</div>`
+                 : `<div class="q">Their cards cover the sale exactly. Nothing changes hands.</div>`;
+      bal = `<div class="outcome"><div class="scale"><div class="pan buy ${heavy==='l'?'heavy':''}"><label>Cards in</label><div class="v">${money(t.buyTotal)}</div><span class="muted">credit</span></div><div class="fulcrum ${heavy}">▲</div><div class="pan sell ${heavy==='r'?'heavy':''}"><label>Cards out</label><div class="v">${money(t.sellTotal)}</div><span class="muted">sale</span></div></div>${line}<div class="figs"><div class="fig net"><label>Net</label><div class="v">${money(t.net)}</div></div></div></div>`;
+    } else if(c.kind){ const h=c.kind==='sell'?c.sell:c.buy; bal=`<div class="outcome"><div class="figs"><div class="fig"><label>${kindLabel(c.kind)} total</label><div class="v">${money(Math.abs(h.total))}${h.tender?`<small>${h.tender}</small>`:''}</div></div><div class="fig net"><label>Net</label><div class="v">${money(h.net)}</div></div></div></div>`; }
+    return `<div class="cols">${sideBlock('buy',c,{tender: c.kind==='trade'?'hidden':'toggle'})}${sideBlock('sell',c)}</div>` + bal;
+  }
+  function headersTable(c){
+    const H=[c.buy,c.sell].filter(Boolean); if(!H.length) return `<div class="hdrs"><table><tr><td class="null">nothing would be written</td></tr></table></div>`;
+    const cols=['kind','origin','tender','tender_modifier_pct','total_pct','remainder_tender','total','net','trade_id'];
+    const cell=(h,k)=> (k in h) ? (h[k]==null?'<td class="null">null</td>':`<td>${k==='total'||k==='net'?money2(h[k]):esc(h[k])}</td>`) : '<td class="null">—</td>';
+    return `<div class="hdrs"><table><thead><tr>${cols.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${H.map(h=>`<tr>${cols.map(k=>cell(h,k)).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function wireDraft(c){
+    const d=$('#draft');
+    const inp=$('#dsearch');
+    inp.oninput=e=>{ ui.dquery=e.target.value; ui.hi=0; renderDraft(); keepFocus(); };
+    inp.onfocus=()=>{ if(ui.mode==='cell'){ ui.mode='search'; ui.cell=null; renderDraft(); keepFocus(); } };
+    d.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{ ui.side=b.dataset.side; renderDraft(); keepFocus(); });
+    d.querySelectorAll('.r[data-i]').forEach(r=>r.onclick=()=>{ ui.hi=+r.dataset.i; pickHighlighted(false); });
+    d.querySelectorAll('[data-tender]').forEach(b=>b.onclick=()=>dispatch({type:'tender',tender:b.dataset.tender}));
+    d.querySelectorAll('[data-rt]').forEach(b=>b.onclick=()=>dispatch({type:'remainderTender',tender:b.dataset.rt}));
+    d.querySelectorAll('[data-rev]').forEach(b=>b.onclick=()=>dispatch({type:'price',id:+b.dataset.rev,pence:null}));
+    ['sell','buy'].forEach(side=>{ const p=$('#pct_'+side); if(p){ p.onchange=()=>dispatch({type:'pct',side,pct:parseInt(p.value,10)||0}); p.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape'){ e.preventDefault(); p.blur(); focusSearch(); } e.stopPropagation(); }; } });
+    d.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=e=>{ if(e.target.closest('input,.rev')) return; enterCell(+tr.dataset.id); });
+    if(ui.priceEdit){ const pi=$('#pr_'+ui.priceEdit); if(pi){ pi.focus(); pi.select(); pi.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'){ const v=Math.round(parseFloat(pi.value)*100); const id=ui.priceEdit; ui.priceEdit=null; dispatch({type:'price',id,pence:isNaN(v)?null:v}); focusRow(id); } if(e.key==='Escape'){ const id=ui.priceEdit; ui.priceEdit=null; renderDraft(); focusRow(id); } }; pi.onblur=()=>{ if(ui.priceEdit){ ui.priceEdit=null; renderDraft(); } }; } }
+    $('#hood').onclick=()=>{ ui.hood=!ui.hood; renderDraft(); };
+    $('#collapse').onclick=()=>{ ui.collapsed=true; render(); };
+    $('#cbar').onclick=()=>{ ui.collapsed=false; render(); };
+    $('#commit').onclick=()=>{ ui.modal={pos:''}; renderModal(); };
+    if(ui.mode==='cell'&&ui.cell!=null) focusRow(ui.cell);
+  }
+  function keepFocus(){ const i=$('#dsearch'); if(i&&ui.mode==='search'&&document.activeElement!==i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } }
+  function focusSearch(){ ui.mode='search'; ui.cell=null; renderDraft(); const i=$('#dsearch'); i.focus(); }
+  function focusRow(id){ const tr=document.querySelector(`tr[data-id="${id}"]`); if(tr) tr.focus({preventScroll:false}); }
+  function enterCell(id){ const side=sideOf(id); if(!side) return; ui.mode='cell'; ui.cell=id; ui.digits=''; ui.priceEdit=null; S.lastSide=side; renderDraft(); focusRow(id); }
+  const sideOf = id => S.sell.lines.some(l=>l.id===id)?'sell':S.buy.lines.some(l=>l.id===id)?'buy':null;
+  function pickHighlighted(other){ const hits=M.search(ui.dquery,ui.game); const p=hits[ui.hi]; if(!p) return; const side = other ? (ui.side==='sell'?'buy':'sell') : ui.side; dispatch({type:'add',side,printingId:p.id}); ui.side=side; ui.dquery=''; ui.hi=0; renderDraft(); keepFocus(); }
+
+  // ---- keys: one handler, driven by real keydown AND by the walkthrough player
+  function handleKey(ev){
+    const t=ev.target, inInput = t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA');
+    if(ui.modal){ if(ev.key==='Escape'){ ui.modal=null; renderModal(); } return; }
+    if(ev.key==='/' && !inInput){ ev.preventDefault(); $('#lsearch').focus(); return; }
+    if(ui.mode==='search'){
+      if(!(t && t.id==='dsearch')) return;
+      const hits=M.search(ui.dquery,ui.game);
+      if(ev.key==='ArrowDown'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi+1)%hits.length; renderDraft(); keepFocus(); }
+      else if(ev.key==='ArrowUp'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi-1+hits.length)%hits.length; renderDraft(); keepFocus(); }
+      else if(ev.key==='Enter'){ ev.preventDefault(); pickHighlighted(ev.shiftKey); }
+      else if(ev.key==='Tab'&&!ev.shiftKey){ const side=S.lastSide; const l=side&&S[side].lines[0]; if(l){ ev.preventDefault(); enterCell(l.id); } }
+      else if(ev.key==='Escape'){ ev.preventDefault(); ui.dquery=''; ui.hi=0; renderDraft(); keepFocus(); }
+      return;
+    }
+    if(ui.mode==='cell'){
+      if(ui.priceEdit) return;
+      const id=ui.cell, side=sideOf(id); if(!side){ focusSearch(); return; }
+      const k=ev.key, lk=k.toLowerCase();
+      const list = side==='sell'?S.sell.lines:S.buy.lines; const idx=list.findIndex(l=>l.id===id);
+      const order = ui.arrows==='cross' ? [...S[S.lastSide==='sell'?'sell':'buy'].lines, ...S[S.lastSide==='sell'?'buy':'sell'].lines] : list;
+      const oi=order.findIndex(l=>l.id===id);
+      if(k==='Enter'||k==='Escape'){ ev.preventDefault(); focusSearch(); return; }
+      if(k==='ArrowDown'){ ev.preventDefault(); const n=order[oi+1]; if(n) enterCell(n.id); return; }
+      if(k==='ArrowUp'){ ev.preventDefault(); const n=order[oi-1]; if(n) enterCell(n.id); return; }
+      if(k==='Tab'){ ev.preventDefault(); const n=order[oi+(ev.shiftKey?-1:1)]; if(n) enterCell(n.id); else focusSearch(); return; }
+      if(M.COND_KEY[lk]){ ev.preventDefault(); const l=list[idx]; if(side==='sell'){ const r=M.skuRow(l.printingId,M.COND_KEY[lk],l.language); if(!r||r.onHand===0){ toast(`No ${M.COND_KEY[lk]} copy held — condition stays ${l.condition}`); return; } } dispatch({type:'cond',id,condition:M.COND_KEY[lk]}); if(S.movedTo){ enterCell(S.movedTo); delete S.movedTo; } else focusRow(id); return; }
+      if(M.LANG_KEY[lk]){ ev.preventDefault(); const l=list[idx]; if(side==='sell'){ const r=M.skuRow(l.printingId,l.condition,M.LANG_KEY[lk]); if(!r||r.onHand===0){ toast(`No ${M.LANG_KEY[lk]} copy held — language stays ${l.language}`); return; } } dispatch({type:'lang',id,language:M.LANG_KEY[lk]}); if(S.movedTo){ enterCell(S.movedTo); delete S.movedTo; } else focusRow(id); return; }
+      if(/^[0-9]$/.test(k)){ ev.preventDefault(); const now=Date.now(); ui.digits = (now-ui.digitAt<900 ? ui.digits : '') + k; ui.digitAt=now; dispatch({type:'qty',id,qty:parseInt(ui.digits,10)}); focusRow(id); return; }
+      if(lk==='p'){ ev.preventDefault(); ui.priceEdit=id; renderDraft(); return; }
+      if(k==='Backspace'||k==='Delete'){ ev.preventDefault(); const n=order[oi+1]||order[oi-1]; dispatch({type:'remove',id}); if(n) enterCell(n.id); else focusSearch(); return; }
+    }
+  }
+  document.addEventListener('keydown', handleKey);
+
+  // ---- commit modal
+  function renderModal(){
+    const m=$('#modal'); if(!ui.modal){ m.innerHTML=''; return; }
+    const c=M.calc(S);
+    m.innerHTML=`<div class="mask" id="mask"><div class="modal">
+      <h3>Commit ${kindLabel(c.kind)}</h3>
+      <div class="split">${c.kind==='trade'?`Sell <b>${money(c.trade.sellTotal)}</b> <span class="dot">·</span> Buy <b>${money(c.trade.buyTotal)}</b> credit <span class="dot">·</span> net <b>${money(c.trade.net)}</b>${c.trade.remainderTender?` <span class="muted">(remainder in ${c.trade.remainderTender})</span>`:''}`:c.kind?`Total <b>${money(Math.abs((c.sell||c.buy).total))}</b>${c.buy?` ${c.buy.tender}`:''} <span class="dot">·</span> net <b>${money((c.sell||c.buy).net)}</b>`:''}</div>
+      ${headersTable(c)}
+      <label class="muted" style="font-size:12px">POS Reference — the till has already moved the money<input class="pos" id="pos" placeholder="e.g. 20260911-0142" value="${esc(ui.modal.pos)}"></label>
+      <div class="row"><button id="mcancel">Cancel</button><button class="primary" id="mcommit" ${ui.modal.pos.trim()?'':'disabled'}>Commit</button></div>
+    </div></div>`;
+    const pos=$('#pos'); pos.focus(); pos.oninput=e=>{ ui.modal.pos=e.target.value; $('#mcommit').disabled=!ui.modal.pos.trim(); };
+    pos.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'&&ui.modal.pos.trim()) $('#mcommit').click(); if(e.key==='Escape'){ ui.modal=null; renderModal(); } };
+    $('#mcancel').onclick=()=>{ ui.modal=null; renderModal(); };
+    $('#mask').onclick=e=>{ if(e.target.id==='mask'){ ui.modal=null; renderModal(); } };
+    $('#mcommit').onclick=()=>{ const ref=ui.modal.pos.trim(); ui.modal=null; toast(`Committed ${kindLabel(c.kind)} · net ${money(netOf(c))} · POS ${esc(ref)} — draft cleared`); S=M.initial(); ui.mode='search'; ui.cell=null; render(); };
+  }
+  function toast(html){ const t=$('#toast'); t.innerHTML=`<div class="toast">${html}</div>`; clearTimeout(ui.toastT); ui.toastT=setTimeout(()=>t.innerHTML='',3200); }
+
+  // ---- prototype rail
+  function seg(items,cur,attr){ return `<div class="rseg">${items.map(([k,l])=>`<button class="${cur===k?'on':''}" data-${attr}="${k}">${l}</button>`).join('')}</div>`; }
+  function renderRail(){
+    $('#rail').innerHTML=`
+      <div class="railrow">
+        <span class="rail-title">PROTOTYPE · #46 · <code>?variant=${ui.variant}</code></span>
+        <div class="rg"><label>Variant</label>${seg(Object.entries(VARIANTS).map(([k,v])=>[k,`${k} · ${v}`]),ui.variant,'v')}</div>
+        <div class="rg"><label>Arrows</label>${seg([['side','stay in side'],['cross','cross sides']],ui.arrows,'arrows')}</div>
+        <div class="rg"><label>Default Tender</label>${seg([['cash','cash'],['credit','credit']],M.STORE.defaultTender,'def')} <span class="muted">modifier ${M.STORE.tenderModifierPct}%</span></div>
+        <button class="rbtn" data-reset>Reset draft</button>
+      </div>
+      <div class="railrow">
+        <div class="rg"><label>Walkthroughs</label>${WALKS.map((w,i)=>`<button class="rbtn ${ui.walk===i?'on':''}" data-walk="${i}" title="${esc(w.title)}">${i+1}</button>`).join('')}</div>
+        <div class="rail-say">${ui.say||'<span class="muted">Pick a walkthrough, or just drive it: search above, click Sell / Buy, type in the draft.</span>'}</div>
+      </div>`;
+    const r=$('#rail');
+    r.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ ui.variant=b.dataset.v; const u=new URL(location); u.searchParams.set('variant',ui.variant); history.replaceState(null,'',u); render(); });
+    r.querySelectorAll('[data-arrows]').forEach(b=>b.onclick=()=>{ ui.arrows=b.dataset.arrows; render(); });
+    r.querySelectorAll('[data-def]').forEach(b=>b.onclick=()=>{ M.STORE.defaultTender=b.dataset.def; S.buy.tender=b.dataset.def; S.remainderTender=b.dataset.def; render(); });
+    r.querySelector('[data-reset]').onclick=()=>{ S=M.initial(); ui.mode='search'; ui.cell=null; ui.say=''; ui.walk=null; render(); };
+    r.querySelectorAll('[data-walk]').forEach(b=>b.onclick=()=>runWalk(+b.dataset.walk));
+  }
+  document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT') return; if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ if(ui.mode==='cell') return; const ks=Object.keys(VARIANTS); const i=ks.indexOf(ui.variant); ui.variant=ks[(i+(e.key==='ArrowRight'?1:ks.length-1))%ks.length]; const u=new URL(location); u.searchParams.set('variant',ui.variant); history.replaceState(null,'',u); render(); } });
+
+  // ---- walkthroughs: each step narrates, then either dispatches or feeds keys through handleKey exactly as a person would
+  const P = (name,set,num,finish) => M.find(name,set,num,finish).id;
+  const add = (side,name,set,num,finish,cond,lang) => () => { dispatch({type:'add',side,printingId:P(name,set,num,finish),condition:cond,language:lang}); ui.side=side; };
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+  async function keys(str){ for(const tok of str.split(' ')){ const shift=tok.startsWith('S+'); const key=shift?tok.slice(2):tok; const target = ui.mode==='search' ? $('#dsearch') : document.querySelector(`tr[data-id="${ui.cell}"]`);
+      const ch = key==='Space'?' ':key;
+      if(ui.mode==='search'&&ch.length===1&&!shift){ ui.dquery+=ch; ui.hi=0; renderDraft(); keepFocus(); }
+      else handleKey({key: ch, shiftKey:shift, target, preventDefault(){}});
+      await sleep(90); } }
+  const fresh = () => { S=M.initial(); ui.mode='search'; ui.cell=null; ui.dquery=''; ui.game='mtg'; };
+  const WALKS = [
+    { title:'A Trade with cards to spare — the #43 worked example', steps:[
+      ['Fresh draft. The customer brings four cards and takes two.', fresh],
+      ['Buy side: Jace WWK, Force of Will EMA, Ragavan MH2, Charizard ex OBF full art — £100 in cash terms.', add('buy','Jace, the Mind Sculptor','WWK',31)],
+      ['', add('buy','Force of Will','EMA',49)], ['', add('buy','Ragavan, Nimble Pilferer','MH2',138,'nonfoil')], ['', add('buy','Charizard ex','OBF',215)],
+      ['Still only a Buy: £100 cash, or £125 credit with the +25% modifier. Watch the tender toggle.', ()=>{}],
+      ['Sell side: Luffy OP05 secret rare (£60) and a pinned Snapcaster UMA (£20) — £80.', add('sell','Monkey.D.Luffy','OP05',119,'secret rare','NM','en')],
+      ['', add('sell','Snapcaster Mage','UMA',71,undefined,'NM','en')],
+      ['Now a Trade. <b>£80 covered</b> in credit; <b>remainder £45 credit / £36 cash</b>. Is that legible while the cards are still going in? (probe 1, 2)', ()=>{}],
+      ['Flip the remainder to cash: net becomes −£36 (= £100 × (1 − 80/125)).', ()=>dispatch({type:'remainderTender',tender:'cash'})],
+      ['Show the headers: Buy tender credit, remainder_tender cash, both halves net −£36.', ()=>{ ui.hood=true; renderDraft(); }],
+    ]},
+    { title:'The sale outweighs their cards — customer pays', steps:[
+      ['Fresh draft. Same £80 sale, smaller pile.', fresh],
+      ['', add('sell','Monkey.D.Luffy','OP05',119,'secret rare','NM','en')], ['', add('sell','Snapcaster Mage','UMA',71,undefined,'NM','en')],
+      ['Buy side: Ragavan (£22.50) and Jace (£27.50) — £50 cash, £62.50 credit.', add('buy','Ragavan, Nimble Pilferer','MH2',138,'nonfoil')], ['', add('buy','Jace, the Mind Sculptor','WWK',31)],
+      ['All £62.50 of their cards counts; the customer pays the £17.50 gap at the POS, no tender recorded. Does this read as the same control in a different state? (probe 3)', ()=>{}],
+    ]},
+    { title:'Even, via a Total Percentage', steps:[
+      ['Fresh draft. Sell Snapcaster UMA at its pinned £20.', fresh],
+      ['', add('sell','Snapcaster Mage','UMA',71,undefined,'NM','en')],
+      ['Buy The One Ring LTR: £20 cash → £25 credit. Store owes £5 credit or £4 cash.', add('buy','The One Ring','LTR',246)],
+      ['Set the Buy Total Percentage to −20%: the pile is now worth £20 credit. Even.', ()=>dispatch({type:'pct',side:'buy',pct:-20})],
+      ['Headers: net 0 on both halves, remainder_tender null, total_pct −20 snapshotted.', ()=>{ ui.hood=true; renderDraft(); }],
+    ]},
+    { title:'A plain Buy — tender toggle and Total Percentage', steps:[
+      ['Fresh draft. Buy Ragavan and Jace: £50 in the Default Tender.', fresh],
+      ['', add('buy','Ragavan, Nimble Pilferer','MH2',138,'nonfoil')], ['', add('buy','Jace, the Mind Sculptor','WWK',31)],
+      ['Flip to credit: the lines keep their cash prices; the total takes +25% → £62.50.', ()=>dispatch({type:'tender',tender:'credit'})],
+      ['Add +10% for the lot: £68.80 (rounded to 10p, once, last).', ()=>dispatch({type:'pct',side:'buy',pct:10})],
+    ]},
+    { title:'A plain Sell — Total Percentage, a blocked line, a held copy', steps:[
+      ['Fresh draft. Sell Luffy OP05 and a Lightning Bolt M10.', fresh],
+      ['', add('sell','Monkey.D.Luffy','OP05',119,'secret rare','NM','en')], ['', add('sell','Lightning Bolt','M10',146,undefined,'NM','en')],
+      ['10% off the lot: Total Percentage −10.', ()=>dispatch({type:'pct',side:'sell',pct:-10})],
+      ['Add Thoughtseize THS — on-hand 0 → blocked; a found Adjustment first (#31 §6).', add('sell','Thoughtseize','THS',107,undefined,'NM','en')],
+      ['Add Charizard ex OBF 125 ×5: one copy is held by Basket 4821 → warning, not a block (#31 §7).', add('sell','Charizard ex','OBF',125,undefined,'NM','en')],
+      ['', async()=>{ enterCell(S.sell.lines[0].id); await keys('5 Escape'); }],
+    ]},
+    { title:'Both Total Percentages at once', steps:[
+      ['Rebuild walkthrough 1\'s Trade.', fresh],
+      ['', add('buy','Jace, the Mind Sculptor','WWK',31)], ['', add('buy','Force of Will','EMA',49)], ['', add('buy','Ragavan, Nimble Pilferer','MH2',138,'nonfoil')], ['', add('buy','Charizard ex','OBF',215)],
+      ['', add('sell','Monkey.D.Luffy','OP05',119,'secret rare','NM','en')], ['', add('sell','Snapcaster Mage','UMA',71,undefined,'NM','en')],
+      ['Sell −10%: sale £72.', ()=>dispatch({type:'pct',side:'sell',pct:-10})],
+      ['Buy +10%: pile £137.50 credit. Remainder £65.50 credit / £52.40 cash. Two percentages in view at once — confusing, or fine? (probe 4)', ()=>dispatch({type:'pct',side:'buy',pct:10})],
+    ]},
+    { title:'Keyboard: Tab into the last-touched side, arrows between rows', steps:[
+      ['Fresh draft. Type in the draft search with the Buy side active.', ()=>{ fresh(); ui.side='buy'; renderDraft(); keepFocus(); }],
+      ['“ragavan” → Enter adds to Buy at NM + en.', ()=>keys('r a g a v a n Enter')],
+      ['Tab enters the newest Buy line; L grades it LP; 2 makes it two copies.', ()=>keys('Tab l 2')],
+      ['Esc back to search. Switch to One Piece, “luffy op01”, Shift+Enter adds to the OTHER side — Sell.', async()=>{ await keys('Escape'); ui.game='op'; render(); keepFocus(); await keys('l u f f y Space o p 0 1 S+Enter'); }],
+      ['Back to Magic. “snapcaster uma” → Shift+Enter again: second Sell line.', async()=>{ ui.game='mtg'; render(); keepFocus(); await keys('s n a p c a s t e r Space u m a S+Enter'); }],
+      ['Tab now enters the newest line of the last-touched side (Sell). ↓ walks to the older Sell line.', ()=>keys('Tab ArrowDown')],
+      ['↓ again: with “stay in side” it stops here; with “cross sides” (rail) it steps into the Buy side. (probe 5)', ()=>keys('ArrowDown')],
+      ['P opens the price for editing on this line; Esc leaves it.', ()=>keys('p')],
+    ]},
+  ];
+  async function runWalk(i){ if(ui.walk!=null&&ui.running) return; ui.walk=i; ui.running=true; const w=WALKS[i]; ui.say=`<b>${i+1}. ${esc(w.title)}</b>`; renderRail();
+    for(const [say,fn] of w.steps){ if(say){ ui.say=`<b>${i+1}.</b> ${say}`; renderRail(); } await fn(); render(); await sleep(say?1400:400); }
+    ui.say=`<b>${i+1}. ${esc(w.title)}</b> — done. React in the panel; ${ui.variant==='C'?'':'← → switch variants; '}the rail resets.`; ui.running=false; renderRail(); }
+
+  // ---- boot: a realistic working state (walkthrough 1's Trade), so the first look shows the question
+  fresh();
+  ['Jace, the Mind Sculptor|WWK|31','Force of Will|EMA|49','Ragavan, Nimble Pilferer|MH2|138|nonfoil','Charizard ex|OBF|215'].forEach(s=>{ const [n,set,num,f]=s.split('|'); S=M.reduce(S,{type:'add',side:'buy',printingId:P(n,set,+num,f)}); });
+  S=M.reduce(S,{type:'add',side:'sell',printingId:P('Monkey.D.Luffy','OP05',119,'secret rare'),condition:'NM',language:'en'});
+  S=M.reduce(S,{type:'add',side:'sell',printingId:P('Snapcaster Mage','UMA',71),condition:'NM',language:'en'});
+  ui.lquery='luffy'; ui.game='op';
+  render();
+})();
+</script>
