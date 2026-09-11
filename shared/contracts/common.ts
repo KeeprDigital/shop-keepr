@@ -5,6 +5,8 @@
  * typed per code. Problem+json was rejected as ceremony for two in-repo
  * consumers.
  */
+import { isOneOf } from '../domain/one-of';
+
 export const ERROR_CODES = [
 	'VALIDATION_FAILED',
 	'UNAUTHENTICATED',
@@ -18,7 +20,7 @@ export const ERROR_CODES = [
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
 export function isErrorCode(value: unknown): value is ErrorCode {
-	return typeof value === 'string' && (ERROR_CODES as readonly string[]).includes(value);
+	return isOneOf(ERROR_CODES, value);
 }
 
 /** `details` shape per code. Codes absent here carry no details. */

@@ -9,6 +9,4 @@ export default defineConfig({
 	schema: './server/db/schema/index.ts',
 	out: './server/db/migrations',
 	casing: 'snake_case',
-	strict: true,
-	verbose: true,
 });

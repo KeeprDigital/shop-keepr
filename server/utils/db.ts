@@ -5,7 +5,7 @@ import { createDb } from '../db/client';
 export function useDb(event: H3Event) {
 	const binding = event.context.cloudflare?.env?.DB;
 	if (!binding) {
-		throw apiError('INTERNAL', undefined, 'D1 binding DB is not available');
+		throw apiError('INTERNAL', { message: 'D1 binding DB is not available' });
 	}
 	return createDb(binding);
 }

@@ -17,7 +17,7 @@ export async function readHealth(db: Db): Promise<Health> {
 		where: eq(store.id, STORE_ID),
 	});
 	if (!row) {
-		throw apiError('INTERNAL', undefined, 'Store row missing; run the migrations');
+		throw apiError('INTERNAL', { message: 'Store row missing; run the migrations' });
 	}
 	return { ok: true, store: row, checkedAt: Date.now() };
 }

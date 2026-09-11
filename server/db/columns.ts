@@ -13,7 +13,7 @@ import { LANGUAGES } from '../../shared/domain/language';
  * - ids are opaque ULIDs generated in app code (`newId()`), stored as text
  * - `store_id` is on every store-owned table, first in every composite index
  * - timestamps are epoch-ms integers; never hand D1 a `Date`
- * - Money is an integer of minor units
+ * - Money is an integer of minor units (`minorUnits()`)
  * - Condition and Language are the closed lists from `shared/`
  */
 
@@ -23,7 +23,7 @@ export const storeId = () => text('store_id').notNull();
 
 export const epochMs = () => integer({ mode: 'number' });
 
-export const money = () => integer({ mode: 'number' }).$type<Money>();
+export const minorUnits = () => integer({ mode: 'number' }).$type<Money>();
 
 export const condition = () => text({ enum: CONDITIONS }).$type<Condition>();
 

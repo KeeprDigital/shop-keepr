@@ -3,6 +3,8 @@
  * controlled list. Language belongs to the SKU, not the Printing, and is
  * `NOT NULL` in the SKU key (ADR 0002).
  */
+import { isOneOf } from './one-of';
+
 export const LANGUAGES = [
 	'en',
 	'ja',
@@ -22,10 +24,10 @@ export const LANGUAGES = [
 export type Language = (typeof LANGUAGES)[number];
 
 export function isLanguage(value: unknown): value is Language {
-	return typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value);
+	return isOneOf(LANGUAGES, value);
 }
 
-const byLowerCase = new Map<string, Language>(LANGUAGES.map(tag => [tag.toLowerCase(), tag]));
+const LANGUAGE_BY_LOWERCASED_TAG = new Map<string, Language>(LANGUAGES.map(tag => [tag.toLowerCase(), tag]));
 
 /**
  * The one shared normalisation rule at the write boundary (ADR 0002): blank,
@@ -38,7 +40,7 @@ export function normaliseLanguage(input: string | null | undefined, storeDefault
 	if (!trimmed) {
 		return storeDefault;
 	}
-	const tag = byLowerCase.get(trimmed.toLowerCase());
+	const tag = LANGUAGE_BY_LOWERCASED_TAG.get(trimmed.toLowerCase());
 	if (!tag) {
 		throw new RangeError(`Unknown Language tag: ${trimmed}`);
 	}
