@@ -4,7 +4,7 @@ status: accepted
 
 # The Catalogue mirror is two read models, split by who reads them
 
-The mirror holds every Printing twice: once in a shared `printing` table that carries identity and display fields and nothing game-specific, and once in a search table per Game System (`mtg_printing`, `pokemon_printing`, …) that carries that game's typed facet columns *plus* the name, folded-name, set, number and Market Price columns a game-scoped filter-and-sort needs in one index. Stock, the ledger, Baskets and repricing read only `printing`; search reads only the per-game tables; one sync module writes both from the same Catalogue record. Decided in [#15](https://github.com/KeeprDigital/shop-keepr/issues/15).
+The mirror holds every Printing twice: once in a shared `printing` table that carries identity and display fields and nothing game-specific, and once in a search table per Game System (`mtg_printing`, `pokemon_printing`, …) that carries that game's typed facet columns _plus_ the name, folded-name, set, number and Market Price columns a game-scoped filter-and-sort needs in one index. Stock, the ledger, Baskets and repricing read only `printing`; search reads only the per-game tables; one sync module writes both from the same Catalogue record. Decided in [#15](https://github.com/KeeprDigital/shop-keepr/issues/15).
 
 ## Considered options
 

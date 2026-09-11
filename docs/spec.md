@@ -1492,12 +1492,12 @@ The order below follows the dependencies, not priorities: each layer is testable
 
 **Test facts fixed by the map** ([#9](https://github.com/KeeprDigital/shop-keepr/issues/9), [#23](https://github.com/KeeprDigital/shop-keepr/issues/23)):
 
-- `server/api` routes cannot be unit-tested in the `nuxt` vitest environment; only the e2e runner exercises them, and it always runs the Node build, never the Cloudflare preset. Keep route handlers thin and the logic behind them unit-testable.
+- `server/api` routes cannot be unit-tested in the `nuxt` vitest environment; only the e2e runner exercises them. The runner builds the Worker under the Cloudflare preset, applies the migrations to the local D1 and serves the build with `wrangler dev` ([#54](https://github.com/KeeprDigital/shop-keepr/issues/54)). Keep route handlers thin and the logic behind them unit-testable; code that talks to D1 is tested in the `db` vitest project, which runs inside workerd against a fresh local D1.
 - The sync module takes `{ fetch, baseURL, credential }`; tests pass a `fetch` that serves the committed fixture. Nuxt's `registerEndpoint` does not intercept absolute URLs; do not build a second code path for tests.
 - Every commit runs unit and contract tests against the fixture, offline. The merge gate runs integration tests against Catalogue **staging**. Production is never an automated test target.
 - Never measure search on a generated corpus; use the real card-name corpus in `spike/typo-search/data/`.
 
-**Repo conventions already in place**: pnpm, Node ≥ 22, `pnpm lint` (antfu config, tabs and semicolons), `pnpm typecheck`, `pnpm test` (vitest, `test/unit`), `pnpm test:e2e` (Playwright, `test/e2e`). Wrangler is a dev dependency; the Nitro Cloudflare preset is not yet configured.
+**Repo conventions already in place**: pnpm, Node ≥ 22, `pnpm lint` (antfu config, tabs and semicolons), `pnpm typecheck`, `pnpm test` (vitest: `test/unit` in the Nuxt environment, `test/db` inside workerd), `pnpm test:e2e` (Playwright, `test/e2e`, against the built Worker). Nitro Cloudflare preset, `wrangler.jsonc` with the D1 binding, Drizzle schema in `server/db/schema` with migrations in `server/db/migrations` (`pnpm db:generate` → `pnpm db:migrate`), and `shared/` with Condition, Language, `Money` and error codes ([#54](https://github.com/KeeprDigital/shop-keepr/issues/54)).
 
 ## 10. Deferred, open, and at risk
 
