@@ -1,0 +1,780 @@
+<meta charset="utf-8">
+<title>Kiosk Basket Flow</title>
+<!--
+  PROTOTYPE — throwaway. shop-keepr issue #28: "What does the kiosk feel like to a customer?"
+  Three structurally different kiosk variants on one stage, switched from the rail at the bottom (← / → keys too).
+  One file, no build, no server. Everything is in memory; reload wipes it.
+  Fake Catalogue mirror + stock are shared with the #27 prototype (prototype/large-buy-entry) and live in the first <script>.
+
+    A · Gate      — #26 as written: Attract (pick a game) → Search (per-Printing grid) → Printing page → Basket slideover.
+    B · Card-first — #28 as written: game as a segmented control; results grouped by Card → Printings → Condition chips; Basket as a column.
+    C · Everything — search across every game at once, sectioned by game; master-detail; Basket as a bottom bar.
+
+  Domain rules honoured throughout: Sell Price is the only price a customer sees (never Market Price, never a pin marker);
+  a Hold is created at add and the Basket owns the clock (ADD/REMOVE resets it; submit resets it once more);
+  the customer never sees a countdown; the loser of a race sees "just gone" and is offered other Conditions / Printings;
+  submission is explicit and issues a random three-digit Basket Number; idle 60 s → "still there?" → 30 s → cancel + home.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#EEF2F0; --panel:#FFFFFF; --panel-2:#F6F8F7; --ink:#17201C; --muted:#5F6B66; --line:#D6DDD9; --line-strong:#B4BEB9;
+    --accent:#0F6E56; --accent-ink:#FFFFFF; --accent-tint:#E1F0EA; --accent-tint-2:#C3E3D5;
+    --deep:#0B3D31; --deep-2:#0E4A3B; --deep-ink:#F2F7F4; --deep-muted:#9FC4B6;
+    --warn:#9A5B00; --warn-tint:#FFF3DC; --danger:#A32D2D; --danger-tint:#FBE7E7;
+    --rail:#151A18; --rail-2:#1F2624; --rail-ink:#E9EEEB; --rail-muted:#8E9995; --rail-line:#2C3532;
+    --shadow:0 12px 40px rgba(16,28,22,.16);
+    --display:"Bricolage Grotesque","Source Sans 3",system-ui,sans-serif; --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0F1513; --panel:#182320; --panel-2:#1F2B27; --ink:#E8EEEB; --muted:#9AA8A2; --line:#2B3833; --line-strong:#3E4E48;
+    --accent:#4FB593; --accent-ink:#0B1F19; --accent-tint:#173A30; --accent-tint-2:#1E4D3F;
+    --warn:#E0A64A; --warn-tint:#3A2C10; --danger:#E27676; --danger-tint:#3F1E1E; --shadow:0 12px 40px rgba(0,0,0,.5);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0F1513; --panel:#182320; --panel-2:#1F2B27; --ink:#E8EEEB; --muted:#9AA8A2; --line:#2B3833; --line-strong:#3E4E48;
+    --accent:#4FB593; --accent-ink:#0B1F19; --accent-tint:#173A30; --accent-tint-2:#1E4D3F;
+    --warn:#E0A64A; --warn-tint:#3A2C10; --danger:#E27676; --danger-tint:#3F1E1E; --shadow:0 12px 40px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 var(--sans);padding:20px 16px 150px}
+  button,input{font:inherit;color:inherit}
+  button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+  button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:tabular-nums}
+  .lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* ---------- page frame ---------- */
+  .frame{max-width:1280px;margin:0 auto}
+  .frame-head{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .frame-head h1{font-size:20px}
+  .frame-head .sub{color:var(--muted);font-size:14px}
+  .frame-head .sub b{color:var(--ink);font-weight:600}
+  .stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:640px;box-shadow:var(--shadow)}
+  @media (min-width:900px){.stage{aspect-ratio:16/10;min-height:0}}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden}
+  @media (max-width:899px){.stage{min-height:0}.screen{position:relative;min-height:640px}}
+
+  /* ---------- deep (attract / number) ---------- */
+  .deep{background:var(--deep);color:var(--deep-ink);align-items:center;justify-content:center;text-align:center;padding:40px 24px;gap:28px}
+  .deep .lbl{color:var(--deep-muted)}
+  .deep h2{font-size:clamp(28px,4vw,44px);font-weight:700;max-width:16ch}
+  .deep p{margin:0;color:var(--deep-muted);font-size:18px;max-width:40ch}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;width:100%;max-width:960px}
+  .tile{border:0;border-radius:16px;padding:34px 18px;background:var(--deep-2);color:var(--deep-ink);font-family:var(--display);font-size:26px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:14px;transition:transform .12s}
+  .tile:hover{transform:translateY(-2px)}
+  .tile .dot{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font:600 13px var(--mono);color:#fff}
+  .tile small{font:500 13px var(--sans);color:var(--deep-muted);letter-spacing:.04em}
+  .bignum{font-family:var(--display);font-weight:700;font-size:clamp(96px,18vw,200px);line-height:1;letter-spacing:-.03em;color:#fff}
+  .deep .done{border:0;border-radius:12px;padding:16px 40px;background:#fff;color:var(--deep);font:600 20px var(--display)}
+  .deep .auto{font-size:14px;color:var(--deep-muted)}
+  .g-mtg{background:#7A5A2D}.g-pkm{background:#B08A12}.g-op{background:#A5352C}.g-rift{background:#3F5490}
+
+  /* ---------- top bar (shared look; each variant lays it out differently) ---------- */
+  .bar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .bar .store{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .bar .store small{display:block;font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .search{flex:1 1 260px;display:flex;align-items:center;gap:10px;border:2px solid var(--line-strong);border-radius:14px;padding:10px 16px;background:var(--panel);min-width:0}
+  .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-tint)}
+  .search input{flex:1;border:0;background:transparent;font-size:22px;font-family:var(--display);font-weight:500;min-width:0;outline:0}
+  .search input::placeholder{color:var(--muted);font-weight:500}
+  .search .x{border:0;background:var(--panel-2);border-radius:50%;width:32px;height:32px;color:var(--muted);font-size:18px;line-height:1}
+  .search .ico{color:var(--muted);font-size:20px}
+  .bigbtn{border:0;border-radius:12px;padding:12px 18px;background:var(--panel-2);color:var(--ink);font-weight:600;font-size:16px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+  .bigbtn.primary{background:var(--accent);color:var(--accent-ink)}
+  .bigbtn.ghost{background:transparent;border:2px solid var(--line)}
+  .bigbtn:disabled{opacity:.45;cursor:not-allowed}
+  .bigbtn .count{background:rgba(255,255,255,.25);border-radius:999px;padding:0 8px;font-family:var(--mono);font-size:13px}
+  .seg{display:inline-flex;background:var(--panel-2);border-radius:12px;padding:4px;gap:2px}
+  .seg button{border:0;background:transparent;border-radius:9px;padding:9px 16px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+  .seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .seg .dot{width:10px;height:10px;border-radius:50%}
+  .toggle{display:inline-flex;align-items:center;gap:10px;font-weight:600;cursor:pointer;user-select:none}
+  .toggle .sw{width:46px;height:26px;border-radius:999px;background:var(--line-strong);position:relative;transition:background .15s}
+  .toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+  .toggle.on .sw{background:var(--accent)}
+  .toggle.on .sw::after{left:23px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .chip{border:2px solid var(--line);border-radius:999px;padding:6px 14px;background:var(--panel);font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px}
+  .chip.on{border-color:var(--accent);background:var(--accent-tint);color:var(--accent)}
+  .chip .dot{width:10px;height:10px;border-radius:50%}
+  .chip .x{opacity:.7}
+
+  /* ---------- body regions ---------- */
+  .body{flex:1;display:flex;min-height:0}
+  .scroll{flex:1;overflow:auto;padding:18px 20px 24px;min-width:0}
+  .subhead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:14px;color:var(--muted);font-size:14px}
+  .subhead b{color:var(--ink)}
+  .notice{border-radius:10px;padding:10px 14px;background:var(--accent-tint);color:var(--accent);font-weight:600;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+  .notice.warn{background:var(--warn-tint);color:var(--warn)}
+  .notice.danger{background:var(--danger-tint);color:var(--danger)}
+  .notice button{border:0;border-radius:999px;padding:5px 12px;background:var(--panel);color:inherit;font-weight:600}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:18px}
+  .empty b{display:block;color:var(--ink);font-family:var(--display);font-size:26px;margin-bottom:8px}
+
+  /* thumbs — the Catalogue's image would go here; the prototype paints the set code */
+  .thumb{border-radius:8px;display:grid;place-items:center;color:#fff;font:600 12px/1.15 var(--mono);text-align:center;flex:none;padding:6px}
+  .thumb small{font-weight:400;opacity:.85;font-size:10px;display:block}
+  .thumb.lg{font-size:18px;border-radius:14px}
+  .thumb.lg small{font-size:13px}
+
+  /* A: grid of Printings */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+  .pcard{border:0;border-radius:14px;background:var(--panel-2);padding:12px;text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .12s}
+  .pcard:hover{transform:translateY(-2px)}
+  .pcard .thumb{width:100%;aspect-ratio:5/7;height:auto;max-width:100%;font-size:16px}
+  .pcard .n{font-weight:600;font-size:16px;line-height:1.25}
+  .pcard .p{font-size:13px;color:var(--muted)}
+  .pcard .price{font-family:var(--display);font-weight:700;font-size:20px;margin-top:auto}
+  .pcard .price small{font:500 12px var(--sans);color:var(--muted);margin-right:4px}
+  .pcard .oos{color:var(--muted);font-weight:600}
+
+  /* A: printing page */
+  .detail{display:grid;grid-template-columns:minmax(220px,340px) 1fr;gap:28px;align-items:start}
+  @media (max-width:760px){.detail{grid-template-columns:1fr}}
+  .detail .thumb{width:100%;aspect-ratio:5/7;height:auto;max-width:100%}
+  .detail h2{font-size:32px}
+  .detail .meta{color:var(--muted);font-size:16px;margin:4px 0 20px}
+  .condrows{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+  .condrow{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:14px 18px;border-radius:14px;background:var(--panel-2)}
+  .condrow .c{font-weight:600;font-size:18px}
+  .condrow .c small{display:block;font-size:13px;color:var(--muted);font-weight:500}
+  .condrow .price{font-family:var(--display);font-weight:700;font-size:24px}
+  .condrow .add{border:0;border-radius:12px;padding:12px 22px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:16px}
+  .condrow .add.in{background:var(--accent-tint);color:var(--accent)}
+  .condrow.gone{background:var(--danger-tint)}
+  .condrow.gone .c small{color:var(--danger);font-weight:600}
+  .strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+  .strip button{flex:none;border:2px solid var(--line);border-radius:12px;background:var(--panel);padding:8px;width:130px;text-align:left;display:flex;flex-direction:column;gap:6px}
+  .strip button.on{border-color:var(--accent);background:var(--accent-tint)}
+  .strip .thumb{width:100%;aspect-ratio:5/7;height:auto;font-size:11px}
+  .strip .s{font-size:12px;font-weight:600}
+  .strip .s small{display:block;color:var(--muted);font-weight:500}
+
+  /* B: Card-grouped list + basket column */
+  .cardlist{display:flex;flex-direction:column;gap:10px}
+  .cardrow{border-radius:14px;background:var(--panel-2);overflow:hidden}
+  .cardrow > .hd{width:100%;border:0;background:transparent;text-align:left;display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:14px 18px}
+  .cardrow .hd .n{font-family:var(--display);font-weight:600;font-size:22px}
+  .cardrow .hd .n small{display:block;font:500 13px var(--sans);color:var(--muted)}
+  .cardrow .hd .from{font-family:var(--display);font-weight:700;font-size:18px;text-align:right}
+  .cardrow .hd .from small{display:block;font:500 12px var(--sans);color:var(--muted)}
+  .cardrow .hd .chev{color:var(--muted);font-size:20px;transition:transform .15s}
+  .cardrow.open .hd .chev{transform:rotate(90deg)}
+  .prow{display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:start;padding:12px 18px;border-top:1px solid var(--line)}
+  .prow .thumb{width:56px;height:78px;font-size:11px}
+  .prow .pn{font-weight:600}
+  .prow .pn small{color:var(--muted);font-weight:500;margin-left:6px}
+  .condchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .cc{border:2px solid var(--line);border-radius:12px;background:var(--panel);padding:8px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:118px}
+  .cc b{font-family:var(--display);font-weight:700;font-size:18px}
+  .cc span{font-size:12px;color:var(--muted);font-weight:600}
+  .cc.in{border-color:var(--accent);background:var(--accent-tint)}
+  .cc.in span{color:var(--accent)}
+  .cc.gone{border-color:var(--danger);background:var(--danger-tint)}
+  .cc.gone span{color:var(--danger)}
+  .cc.oos{opacity:.5}
+  .col{width:340px;flex:none;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  @media (max-width:899px){.body{flex-direction:column}.col{width:auto;border-left:0;border-top:1px solid var(--line)}}
+
+  /* C: sectioned master-detail + bottom bar */
+  .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,420px);flex:1;min-height:0}
+  @media (max-width:899px){.split{grid-template-columns:1fr}}
+  .section h3{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-family:var(--sans)}
+  .section h3 .dot{width:10px;height:10px;border-radius:50%}
+  .rows{display:flex;flex-direction:column;gap:6px}
+  .row{border:0;border-radius:12px;background:var(--panel-2);display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:8px 12px;text-align:left;width:100%}
+  .row.on{background:var(--accent-tint);box-shadow:inset 0 0 0 2px var(--accent)}
+  .row .thumb{width:44px;height:62px;font-size:10px}
+  .row .n{font-weight:600}
+  .row .n small{display:block;color:var(--muted);font-weight:500;font-size:13px}
+  .row .price{font-family:var(--display);font-weight:700;font-size:18px;text-align:right}
+  .row .price small{display:block;font:500 12px var(--sans);color:var(--muted)}
+  .pane{border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:18px 20px}
+  @media (max-width:899px){.pane{border-left:0;border-top:1px solid var(--line)}}
+  .pane .thumb{width:160px;height:224px;margin-bottom:14px}
+  .pane h2{font-size:26px}
+  .bottombar{border-top:1px solid var(--line);background:var(--panel);padding:12px 20px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+  .bottombar .sum{font-family:var(--display);font-weight:700;font-size:22px}
+  .bottombar .sum small{font:500 14px var(--sans);color:var(--muted);margin-right:8px}
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-height:78%;background:var(--panel);border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:30}
+  .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--line-strong);margin:10px auto 0}
+
+  /* basket (slideover / column / sheet share these inner pieces) */
+  .slideover{position:absolute;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:30}
+  .scrim{position:absolute;inset:0;background:rgba(10,20,16,.4);z-index:25}
+  .bhead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .bhead h2{font-size:22px}
+  .bhead .close{border:0;background:var(--panel-2);border-radius:50%;width:36px;height:36px;font-size:18px}
+  .blines{flex:1;overflow:auto;padding:8px 20px}
+  .bline{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+  .bline .n{font-weight:600}
+  .bline .n small{display:block;color:var(--muted);font-weight:500;font-size:13px}
+  .bline .r{display:flex;align-items:center;gap:8px}
+  .bline .price{font-family:var(--display);font-weight:700;font-size:18px;min-width:64px;text-align:right}
+  .qty{display:inline-flex;align-items:center;border:2px solid var(--line);border-radius:10px;overflow:hidden}
+  .qty button{border:0;background:transparent;width:36px;height:36px;font-size:20px;line-height:1}
+  .qty span{min-width:28px;text-align:center;font-weight:600;font-family:var(--mono)}
+  .bline.gone{opacity:.7}
+  .bline .msg{font-size:13px;color:var(--danger);font-weight:600}
+  .bfoot{padding:14px 20px 18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+  .total{display:flex;justify-content:space-between;align-items:baseline}
+  .total .v{font-family:var(--display);font-weight:700;font-size:30px}
+  .bfoot .primary{width:100%;padding:16px;font-size:18px;border-radius:14px}
+  .bfoot .note{font-size:13px;color:var(--muted);text-align:center}
+
+  /* submit confirm */
+  .confirm{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(10,20,16,.45);padding:20px}
+  .confirm .card{background:var(--panel);border-radius:18px;width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+  .confirm .card h2{font-size:26px;padding:20px 24px 4px}
+  .confirm .card p{margin:0;padding:0 24px 12px;color:var(--muted)}
+  .confirm .lines{overflow:auto;padding:0 24px;max-height:260px}
+  .confirm .line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .confirm .line small{color:var(--muted)}
+  .confirm .field{padding:14px 24px 0}
+  .confirm .field label{display:block;font-weight:600;margin-bottom:6px}
+  .confirm .field input{width:100%;border:2px solid var(--line-strong);border-radius:12px;padding:12px 14px;font-size:18px;background:var(--panel)}
+  .confirm .actions{display:flex;gap:10px;padding:18px 24px 22px}
+  .confirm .actions .bigbtn{flex:1;justify-content:center;padding:14px;font-size:17px}
+
+  /* idle overlay */
+  .idle{position:absolute;inset:0;z-index:50;background:rgba(11,61,49,.92);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px}
+  .idle h2{font-size:40px;color:#fff}
+  .idle p{margin:0;color:var(--deep-muted);font-size:18px}
+  .idle .ring{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;font:700 40px var(--display);background:conic-gradient(#fff var(--pct),rgba(255,255,255,.18) 0)}
+  .idle .ring span{width:104px;height:104px;border-radius:50%;background:var(--deep);display:grid;place-items:center}
+  .idle .done{border:0;border-radius:14px;padding:16px 44px;background:#fff;color:var(--deep);font:600 22px var(--display)}
+
+  /* facet slideover */
+  .facets{padding:16px 20px;overflow:auto;flex:1}
+  .facets .grp{margin-bottom:20px}
+  .facets .grp .lbl{margin-bottom:8px;display:block}
+  .not-enrolled{display:none}
+
+  /* ---------- rail (the prototype's own controls; not part of the design) ---------- */
+  .rail{position:fixed;left:0;right:0;bottom:0;background:var(--rail);color:var(--rail-ink);font:13px/1.35 var(--mono);z-index:100;border-top:1px solid var(--rail-line)}
+  .rail .in{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+  .rail .grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .rail .grp > span{color:var(--rail-muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:2px}
+  .rail button{border:1px solid var(--rail-line);background:var(--rail-2);color:var(--rail-ink);border-radius:6px;padding:5px 9px;font:inherit}
+  .rail button.on{background:var(--rail-ink);color:var(--rail);border-color:var(--rail-ink)}
+  .rail button.arrow{font-size:15px;padding:3px 9px}
+  .rail .vname{font-weight:500;min-width:170px;text-align:center}
+  .rail .vname small{display:block;color:var(--rail-muted);font-size:11px}
+  .drawer{max-width:1280px;margin:0 auto;padding:0 16px 14px;display:none;gap:14px}
+  .drawer.open{display:grid;grid-template-columns:1fr;max-height:44vh;overflow:auto}
+  @media (min-width:900px){.drawer.open{grid-template-columns:1.4fr 1fr}}
+  .drawer .box{background:var(--rail-2);border:1px solid var(--rail-line);border-radius:8px;padding:12px 14px;min-width:0}
+  .drawer .box h4{margin:0 0 8px;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--rail-muted)}
+  .drawer pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.5 var(--mono);color:var(--rail-ink)}
+  .drawer .k{color:var(--rail-muted)}
+  .wt{font:14px/1.5 var(--sans)}
+  .wt h4{font:600 16px var(--display);color:var(--rail-ink);letter-spacing:0;text-transform:none;margin-bottom:6px}
+  .wt p{margin:0 0 8px;color:#C9D2CE}
+  .wt ol{margin:0 0 8px;padding-left:20px;color:#C9D2CE}
+  .wt li{margin-bottom:4px}
+  .wt b{color:var(--rail-ink)}
+  .wt .do{font:12px var(--mono);margin-left:6px}
+  .wt .q{color:#F0C070}
+  .drawer .tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="frame">
+  <div class="frame-head">
+    <div><h1>Kiosk basket flow</h1><div class="sub">Prototype for <b>#28</b> · a customer at the in-store kiosk, landscape touchscreen. Use the rail below to switch variant, treatment and scenario.</div></div>
+    <div class="sub">Store: <b>Keepr</b> · default Language <b>en</b> · Hold <b>20 min</b></div>
+  </div>
+  <div class="stage" id="stage" aria-live="polite"></div>
+</div>
+
+<div class="rail" id="rail">
+  <div class="in">
+    <div class="grp"><span>Variant</span><button class="arrow" data-act="prevVariant" aria-label="previous variant">‹</button><div class="vname" id="vname"></div><button class="arrow" data-act="nextVariant" aria-label="next variant">›</button></div>
+    <div class="grp" id="nearmiss"><span>Near miss</span></div>
+    <div class="grp" id="scen"><span>Scenario</span></div>
+    <div class="grp"><span>Panels</span><button data-act="toggleHood" id="hoodBtn">Under the hood</button><button data-act="toggleWt" id="wtBtn">Walkthroughs</button></div>
+  </div>
+  <div class="drawer" id="drawer"></div>
+</div>
+
+<script>
+// =====================================================================
+// Fake Catalogue mirror + stock. Same rows as the #27 prototype, so the two agree.
+// [game, name, set, num, finish, release, market pence]. Market Price is never shown here; Sell Price is derived from it.
+// =====================================================================
+const G = { mtg:'Magic', pkm:'Pokémon', op:'One Piece', rift:'Riftbound' };
+const GAMES = ['mtg','pkm','op','rift'];
+const STORE_LANG = 'en';
+const TTL_MIN = 20, IDLE_S = 60, IDLE_GRACE_S = 30, NUMBER_RETURN_S = 30;
+const COND = { NM:'Near Mint', LP:'Lightly Played', MP:'Moderately Played', HP:'Heavily Played', DMG:'Damaged' };
+const LANGS = { en:'English', ja:'Japanese' };
+const RULES = { sellPct:1.0, cond:{NM:1,LP:.85,MP:.7,HP:.5,DMG:.3}, lang:{en:1,ja:.9}, roundTo:10, floor:25 };
+const raw = [
+  ['mtg','Lightning Bolt','LEA',161,'nonfoil',1993.08,32000],['mtg','Lightning Bolt','M10',146,'nonfoil',2009.07,240],['mtg','Lightning Bolt','STA',42,'etched foil',2021.04,650],['mtg','Lightning Bolt','CLB',187,'nonfoil',2022.06,120],
+  ['mtg','Counterspell','ICE',64,'nonfoil',1995.06,180],['mtg','Counterspell','MH2',267,'nonfoil',2021.06,110],['mtg','Counterspell','CMM',81,'nonfoil',2023.08,90],
+  ['mtg','Sol Ring','C21',263,'nonfoil',2021.04,150],['mtg','Sol Ring','CMM',395,'nonfoil',2023.08,120],['mtg','Sol Ring','LTC',284,'nonfoil',2023.06,210],
+  ['mtg','Jace, the Mind Sculptor','WWK',31,'nonfoil',2010.02,5500],['mtg','Jace, the Mind Sculptor','EMA',57,'nonfoil',2016.06,3000],['mtg','Jace, the Mind Sculptor','2XM',56,'nonfoil',2020.08,2500],
+  ['mtg','Ragavan, Nimble Pilferer','MH2',138,'nonfoil',2021.06,4500],['mtg','Ragavan, Nimble Pilferer','MH2',138,'foil',2021.06,6500],['mtg','Ragavan, Nimble Pilferer','MH2',383,'extended art',2021.06,7000],['mtg','Ragavan, Nimble Pilferer','MH2',421,'sketch',2021.06,6000],
+  ['mtg','Thoughtseize','LRW',145,'nonfoil',2007.10,1400],['mtg','Thoughtseize','THS',107,'nonfoil',2013.09,1100],['mtg','Thoughtseize','2XM',109,'nonfoil',2020.08,900],
+  ['mtg','Snapcaster Mage','ISD',78,'nonfoil',2011.09,1800],['mtg','Snapcaster Mage','MM3',56,'nonfoil',2017.03,1400],['mtg','Snapcaster Mage','UMA',71,'nonfoil',2018.12,1300],
+  ['mtg','Force of Will','ALL',25,'nonfoil',1996.06,7000],['mtg','Force of Will','EMA',49,'nonfoil',2016.06,5500],['mtg','Force of Will','2XM',60,'nonfoil',2020.08,4500],
+  ['mtg','Delighted Halfling','LTR',158,'nonfoil',2023.06,600],['mtg','The One Ring','LTR',246,'nonfoil',2023.06,4000],['mtg','The One Ring','LTR',380,'extended art',2023.06,5500],
+  ['mtg','Fatal Push','AER',57,'nonfoil',2017.01,200],['mtg','Fatal Push','KLR',79,'nonfoil',2020.11,150],
+  ['mtg','Elvish Mystic','M14',169,'nonfoil',2013.07,40],['mtg','Elvish Mystic','M15',175,'nonfoil',2014.07,40],
+  ['mtg',"Urza's Saga",'MH2',259,'nonfoil',2021.06,3000],['mtg','Esper Sentinel','MH2',12,'nonfoil',2021.06,400],['mtg','Solitude','MH2',32,'nonfoil',2021.06,2500],['mtg','Endurance','MH2',158,'nonfoil',2021.06,2000],['mtg','Subtlety','MH2',67,'nonfoil',2021.06,1000],['mtg','Grief','MH2',87,'nonfoil',2021.06,600],['mtg','Fury','MH2',126,'nonfoil',2021.06,600],['mtg','Dauthi Voidwalker','MH2',100,'nonfoil',2021.06,900],['mtg','Sanctifier en-Vec','MH2',33,'nonfoil',2021.06,200],['mtg','Prismatic Ending','MH2',25,'nonfoil',2021.06,150],['mtg','Ignoble Hierarch','MH2',168,'nonfoil',2021.06,200],['mtg','Shardless Agent','MH2',292,'nonfoil',2021.06,150],['mtg','Kaldra Compleat','MH2',226,'nonfoil',2021.06,300],
+  ['pkm','Pikachu','BS',58,'nonholo',1999.01,800],['pkm','Pikachu','MEW',25,'nonholo',2023.09,50],['pkm','Pikachu','MEW',173,'illustration rare',2023.09,300],['pkm','Pikachu','SVP',27,'promo',2023.06,600],
+  ['pkm','Charizard','BS',4,'holo',1999.01,35000],['pkm','Charizard','MEW',6,'nonholo',2023.09,400],['pkm','Charizard ex','OBF',125,'nonholo',2023.08,1200],['pkm','Charizard ex','OBF',223,'special illustration rare',2023.08,18000],['pkm','Charizard ex','OBF',215,'full art',2023.08,4500],
+  ['pkm','Umbreon VMAX','EVS',95,'nonholo',2021.08,4000],['pkm','Umbreon VMAX','EVS',215,'alternate art',2021.08,70000],
+  ['pkm','Gardevoir ex','SVI',86,'nonholo',2023.03,500],['pkm','Gardevoir ex','SVI',245,'special illustration rare',2023.03,6000],
+  ['pkm','Mew ex','MEW',151,'nonholo',2023.09,600],['pkm','Mew ex','MEW',193,'full art',2023.09,2500],['pkm','Mew ex','MEW',205,'special illustration rare',2023.09,9000],
+  ['pkm',"Boss's Orders",'PAL',172,'nonholo',2023.06,120],['pkm',"Boss's Orders",'RCL',154,'nonholo',2020.05,150],['pkm',"Boss's Orders",'BRS',132,'nonholo',2022.02,80],['pkm',"Boss's Orders",'PAL',265,'special illustration rare',2023.06,3000],
+  ['pkm','Iono','PAL',185,'nonholo',2023.06,150],['pkm','Iono','PAL',254,'special illustration rare',2023.06,7000],
+  ['pkm','Bulbasaur','MEW',1,'nonholo',2023.09,30],['pkm','Squirtle','MEW',7,'nonholo',2023.09,40],['pkm','Mewtwo','MEW',150,'nonholo',2023.09,60],
+  ['op','Monkey.D.Luffy','OP01',3,'leader',2022.12,200],['op','Monkey.D.Luffy','OP01',24,'normal',2022.12,80],['op','Monkey.D.Luffy','OP02',62,'normal',2023.03,150],['op','Monkey.D.Luffy','OP05',119,'secret rare',2023.12,6000],['op','Monkey.D.Luffy','OP05',119,'manga art',2023.12,40000],['op','Monkey.D.Luffy','ST01',1,'leader',2022.12,100],
+  ['op','Roronoa Zoro','OP01',1,'leader',2022.12,300],['op','Roronoa Zoro','OP01',25,'normal',2022.12,100],['op','Roronoa Zoro','OP01',25,'parallel',2022.12,2500],['op','Roronoa Zoro','OP06',118,'secret rare',2024.03,3500],
+  ['op','Nami','OP01',16,'normal',2022.12,70],['op','Nami','OP03',40,'normal',2023.06,50],['op','Nami','OP03',40,'parallel',2023.06,4500],['op','Nami','ST01',7,'normal',2022.12,50],
+  ['op','Trafalgar Law','OP01',47,'normal',2022.12,150],['op','Trafalgar Law','OP01',47,'parallel',2022.12,3000],['op','Trafalgar Law','OP05',69,'normal',2023.12,200],
+  ['op','Shanks','OP01',120,'secret rare',2022.12,1200],['op','Shanks','OP01',120,'parallel',2022.12,12000],
+  ['op','Portgas.D.Ace','OP02',13,'normal',2023.03,120],['op','Portgas.D.Ace','OP02',13,'parallel',2023.03,4000],['op','Portgas.D.Ace','OP03',1,'leader',2023.06,200],
+  ['op','Kaido','OP01',61,'normal',2022.12,50],['op','Yamato','OP01',121,'secret rare',2022.12,1000],['op','Boa Hancock','OP01',78,'normal',2022.12,150],['op','Sanji','OP01',13,'normal',2022.12,80],['op','Usopp','OP01',17,'normal',2022.12,40],['op','Nico Robin','OP01',18,'normal',2022.12,60],
+  ['rift','Jinx, Loose Cannon','OGN',45,'normal',2025.10,400],['rift','Jinx, Loose Cannon','OGN',298,'alternate art',2025.10,3000],['rift','Jinx, Loose Cannon','SFD',55,'normal',2026.03,200],['rift','Ahri, Nine-Tailed','OGN',12,'normal',2025.10,300],['rift','Yasuo, Unforgiven','OGN',201,'normal',2025.10,250],['rift','Garen, Might of Demacia','OGN',101,'normal',2025.10,100],['rift','Lux, Lady of Luminosity','OGN',103,'normal',2025.10,150],['rift','Teemo, Swift Scout','OGN',150,'normal',2025.10,60],['rift','Volibear, Relentless Storm','OGN',240,'normal',2025.10,200],['rift','Annie, Dark Child','OGN',180,'normal',2025.10,100],
+];
+// Facets per game (#15): set + rarity for every game, plus one game-specific facet here (the real list is longer; enough to feel the slideover).
+const EXTRA_FACET = { mtg:'Colour', pkm:'Energy type', op:'Colour', rift:'Domain' };
+const EXTRA = {
+  mtg:{ 'Lightning Bolt':'Red','Counterspell':'Blue','Sol Ring':'Colourless','Jace, the Mind Sculptor':'Blue','Ragavan, Nimble Pilferer':'Red','Thoughtseize':'Black','Snapcaster Mage':'Blue','Force of Will':'Blue','Delighted Halfling':'Green','The One Ring':'Colourless','Fatal Push':'Black','Elvish Mystic':'Green',"Urza's Saga":'Colourless','Esper Sentinel':'White','Solitude':'White','Endurance':'Green','Subtlety':'Blue','Grief':'Black','Fury':'Red','Dauthi Voidwalker':'Black','Sanctifier en-Vec':'White','Prismatic Ending':'White','Ignoble Hierarch':'Green','Shardless Agent':'Green','Kaldra Compleat':'Colourless' },
+  pkm:{ 'Pikachu':'Lightning','Charizard':'Fire','Charizard ex':'Fire','Umbreon VMAX':'Darkness','Gardevoir ex':'Psychic','Mew ex':'Psychic',"Boss's Orders":'Trainer','Iono':'Trainer','Bulbasaur':'Grass','Squirtle':'Water','Mewtwo':'Psychic' },
+  op:{ 'Monkey.D.Luffy':'Red','Roronoa Zoro':'Red','Nami':'Red','Trafalgar Law':'Green','Shanks':'Red','Portgas.D.Ace':'Red','Kaido':'Purple','Yamato':'Red','Boa Hancock':'Red','Sanji':'Red','Usopp':'Red','Nico Robin':'Red' },
+  rift:{ 'Jinx, Loose Cannon':'Chaos','Ahri, Nine-Tailed':'Mind','Yasuo, Unforgiven':'Fury','Garen, Might of Demacia':'Order','Lux, Lady of Luminosity':'Order','Teemo, Swift Scout':'Chaos','Volibear, Relentless Storm':'Fury','Annie, Dark Child':'Fury' },
+};
+function rarityOf(g,market,finish){
+  if(/secret|special illustration|manga|alternate|parallel/.test(finish)) return g==='op'?'SEC':g==='pkm'?'Secret':g==='rift'?'Epic':'Mythic';
+  if(g==='op') return market>=1000?'SR':market>=150?'R':market>=70?'UC':'C';
+  if(g==='pkm') return market>=1000?'Ultra Rare':market>=300?'Rare':market>=100?'Uncommon':'Common';
+  if(g==='rift') return market>=300?'Rare':market>=150?'Uncommon':'Common';
+  return market>=3000?'Mythic':market>=800?'Rare':market>=100?'Uncommon':'Common';
+}
+const CAT = raw.map((r,i)=>({ id:'prt_'+String(i+1).padStart(3,'0'), game:r[0], name:r[1], set:r[2], num:r[3], finish:r[4], release:r[5], market:r[6], rarity:rarityOf(r[0],r[6],r[4]), extra:(EXTRA[r[0]]||{})[r[1]]||'Other' }));
+const byId = Object.fromEntries(CAT.map(p=>[p.id,p]));
+const find = (name,set,num,finish) => CAT.find(p=>p.name===name&&p.set===set&&p.num===num&&(!finish||p.finish===finish));
+const printingLabel = p => (p.game==='op'||p.game==='rift') ? `${p.set}-${String(p.num).padStart(3,'0')}` : `${p.set} #${p.num}`;
+const finishLabel = p => /^(nonfoil|normal|nonholo)$/.test(p.finish) ? '' : p.finish;
+const gbp = pence => '£' + (pence/100).toFixed(2);
+
+// ---- stock: SKU rows. The kiosk only ever sees on-hand > 0 rows. Sell Price = stored column (rule-derived here).
+function sellPrice(p,cond,lang){ const v=p.market*RULES.cond[cond]*(RULES.lang[lang]??.8)*RULES.sellPct; return Math.max(Math.round(v/RULES.roundTo)*RULES.roundTo, RULES.floor); }
+const STOCK = [];
+const skuKey = (pid,cond,lang) => `${pid}|${cond}|${lang}`;
+const hold = (name,set,num,cond,lang,qty,finish) => { const p=find(name,set,num,finish); STOCK.push({ key:skuKey(p.id,cond,lang), printingId:p.id, condition:cond, language:lang, onHand:qty, sell:sellPrice(p,cond,lang) }); };
+hold('Lightning Bolt','M10',146,'NM','en',12); hold('Lightning Bolt','M10',146,'LP','en',3); hold('Lightning Bolt','CLB',187,'NM','en',6); hold('Lightning Bolt','STA',42,'NM','en',1);
+hold('Counterspell','MH2',267,'NM','en',6); hold('Counterspell','CMM',81,'NM','en',4); hold('Counterspell','ICE',64,'MP','en',2);
+hold('Ragavan, Nimble Pilferer','MH2',138,'NM','en',2,'nonfoil'); hold('Ragavan, Nimble Pilferer','MH2',138,'LP','en',1,'nonfoil'); hold('Ragavan, Nimble Pilferer','MH2',138,'NM','en',1,'foil');
+hold('Jace, the Mind Sculptor','2XM',56,'NM','en',1); hold('Thoughtseize','2XM',109,'NM','en',3); hold('Snapcaster Mage','UMA',71,'NM','en',2); hold('Force of Will','2XM',60,'LP','en',1);
+hold('Sol Ring','C21',263,'NM','en',7); hold('Sol Ring','CMM',395,'NM','en',3); hold('Solitude','MH2',32,'NM','en',1); hold('Fury','MH2',126,'NM','en',2); hold('Grief','MH2',87,'NM','en',3); hold('Endurance','MH2',158,'NM','en',1);
+hold("Urza's Saga",'MH2',259,'NM','en',2); hold('Esper Sentinel','MH2',12,'NM','en',4); hold('Elvish Mystic','M14',169,'NM','en',9); hold('The One Ring','LTR',246,'NM','en',1); hold('Fatal Push','AER',57,'NM','en',5);
+hold('Pikachu','MEW',25,'NM','en',20); hold('Pikachu','MEW',173,'NM','en',1); hold('Charizard ex','OBF',125,'NM','en',5); hold('Charizard ex','OBF',215,'NM','en',1); hold('Charizard','MEW',6,'NM','en',3); hold('Charizard','MEW',6,'LP','en',2);
+hold("Boss's Orders",'PAL',172,'NM','en',9); hold('Iono','PAL',185,'NM','en',4); hold('Mew ex','MEW',151,'NM','en',2); hold('Gardevoir ex','SVI',86,'NM','en',3); hold('Bulbasaur','MEW',1,'NM','en',6); hold('Squirtle','MEW',7,'NM','en',5); hold('Mewtwo','MEW',150,'NM','en',4); hold('Umbreon VMAX','EVS',95,'LP','en',1);
+hold('Monkey.D.Luffy','OP01',3,'NM','en',4); hold('Monkey.D.Luffy','OP01',24,'NM','en',8); hold('Monkey.D.Luffy','OP02',62,'NM','en',2); hold('Monkey.D.Luffy','OP05',119,'NM','en',1,'secret rare'); hold('Monkey.D.Luffy','ST01',1,'NM','en',3);
+hold('Roronoa Zoro','OP01',25,'LP','en',2,'normal'); hold('Roronoa Zoro','OP01',1,'NM','en',2); hold('Nami','OP01',16,'NM','en',6); hold('Nami','OP01',16,'NM','ja',1); hold('Nami','OP03',40,'NM','en',3,'normal');
+hold('Trafalgar Law','OP01',47,'NM','en',3,'normal'); hold('Shanks','OP01',120,'NM','en',1,'secret rare'); hold('Portgas.D.Ace','OP02',13,'NM','en',2,'normal'); hold('Kaido','OP01',61,'NM','en',5); hold('Sanji','OP01',13,'NM','en',4); hold('Usopp','OP01',17,'NM','en',3);
+hold('Jinx, Loose Cannon','OGN',45,'NM','en',3); hold('Jinx, Loose Cannon','OGN',298,'NM','en',1); hold('Ahri, Nine-Tailed','OGN',12,'NM','en',2); hold('Yasuo, Unforgiven','OGN',201,'NM','en',2); hold('Teemo, Swift Scout','OGN',150,'NM','en',6); hold('Garen, Might of Demacia','OGN',101,'NM','en',3);
+const stockOf = pid => STOCK.filter(r=>r.printingId===pid && r.onHand>0);
+const skuByKey = Object.fromEntries(STOCK.map(r=>[r.key,r]));
+
+// =====================================================================
+// Search: the #24 cascade, approximated in JS. Stop at the first non-empty tier.
+//  1 folded exact · 2 no-space exact · 3 token-AND prefix (FTS5 stand-in) · 4 phonetic (crude skeleton, stands in for Double Metaphone) · 5 per-token trigram
+// Only the tokens that failed are fuzzy-resolved (tier 5). Returns which tier answered and any token it corrected.
+// =====================================================================
+const fold = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/['’]/g,'').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+const skel = t => t.replace(/[aeiouy]/g,'').replace(/(.)\1+/g,'$1').replace(/ph/g,'f').replace(/ck|q/g,'k').replace(/z/g,'s').replace(/c/g,'k');
+const tri = t => { const s=`  ${t} `; const out=new Set(); for(let i=0;i<s.length-2;i++) out.add(s.slice(i,i+3)); return out; };
+const VOCAB = (()=>{ const m=new Map(); CAT.forEach(p=>fold(p.name).split(' ').forEach(w=>{ if(!m.has(w)) m.set(w,{w,t:tri(w),sk:skel(w)}); })); return [...m.values()]; })();
+function search(q, games){
+  const f=fold(q); const pool=CAT.filter(p=>games.includes(p.game));
+  if(!f) return {hits:[],tier:0,corrected:[]};
+  let hits=pool.filter(p=>fold(p.name)===f); if(hits.length) return {hits,tier:1,corrected:[]};
+  hits=pool.filter(p=>fold(p.name).replace(/ /g,'')===f.replace(/ /g,'')); if(hits.length) return {hits,tier:2,corrected:[]};
+  const toks=f.split(' ');
+  const tokAnd=(resolve)=>pool.filter(p=>{ const w=fold(p.name).split(' '); return toks.every(t=>resolve(t,w)); });
+  hits=tokAnd((t,w)=>w.some(x=>x.startsWith(t))); if(hits.length) return {hits,tier:3,corrected:[]};
+  hits=tokAnd((t,w)=>{ const s=skel(t); return s.length>=2 && w.some(x=>skel(x)===s); }); if(hits.length) return {hits,tier:4,corrected:[]};
+  // tier 5: resolve each token that failed on its own to the best vocabulary token by trigram overlap, then AND.
+  const corrected=[]; const resolved=toks.map(t=>{
+    if(VOCAB.some(v=>v.w.startsWith(t))) return t;
+    const tt=tri(t); let best=null,bs=0; VOCAB.forEach(v=>{ let n=0; tt.forEach(x=>{ if(v.t.has(x)) n++; }); const s=n/(tt.size+v.t.size-n); if(s>bs){bs=s;best=v.w;} });
+    if(best && bs>=.25){ corrected.push({from:t,to:best}); return best; } return t;
+  });
+  hits=pool.filter(p=>{ const w=fold(p.name).split(' '); return resolved.every(t=>w.some(x=>x.startsWith(t))); });
+  return {hits,tier:5,corrected:hits.length?corrected:[]};
+}
+const sortHits = hits => hits.slice().sort((a,b)=>a.name.localeCompare(b.name)||(b.release-a.release)||(a.num-b.num)||a.finish.localeCompare(b.finish));
+
+// =====================================================================
+// State. One object; render() repaints the stage from it.
+// =====================================================================
+const VARIANTS = [
+  { key:'A', name:'Gate', sub:'#26 as written · pick a game, then per-Printing grid' },
+  { key:'B', name:'Card-first', sub:'#28 as written · results grouped by Card, Basket column' },
+  { key:'C', name:'Everything', sub:'search every game at once · master-detail · bottom bar' },
+];
+const NEARMISS = [ {key:'silent',label:'silent'}, {key:'banner',label:'banner'}, {key:'dym',label:'did you mean?'} ];
+let S;
+function fresh(){ return {
+  variant: S?.variant ?? 'A', nearMiss: S?.nearMiss ?? 'banner', hood:S?.hood??false, wt:S?.wt??null, wtOpen:S?.wtOpen??false,
+  screen:'attract', game:null, games:GAMES.slice(), query:'', inStock:true, facets:{}, filterOpen:false,
+  printingId:null, expanded:{}, sel:null,
+  basket:{ state:'none', lines:[], expiresAt:null, number:null, name:'', history:[] },
+  basketOpen:false, submitOpen:false, dymPending:null,
+  otherHolds:{}, gone:{}, lastSearch:null, idle:null, numberLeft:NUMBER_RETURN_S, log:[],
+};}
+S = fresh(); S.game = 'mtg';
+const $ = sel => document.querySelector(sel);
+const now = () => Date.now();
+const log = m => { S.log.unshift(`${new Date().toLocaleTimeString([], {hour12:false})}  ${m}`); S.log=S.log.slice(0,12); };
+
+// ---- availability = on-hand − Holds by other Baskets − what is already in this Basket
+const inBasket = key => S.basket.lines.find(l=>l.key===key)?.qty ?? 0;
+const available = key => { const r=skuByKey[key]; if(!r) return 0; return Math.max(0, r.onHand - (S.otherHolds[key]??0) - inBasket(key)); };
+const availableToOthers = key => { const r=skuByKey[key]; return Math.max(0, r.onHand - (S.otherHolds[key]??0) - inBasket(key)); };
+
+// ---- Basket + Hold mechanics (#10, ADR 0006)
+function touchClock(why){ S.basket.expiresAt = now()+TTL_MIN*60000; log(`clock reset (${why}) → expires in ${TTL_MIN} min`); }
+function addLine(key){
+  const r=skuByKey[key]; const p=byId[r.printingId];
+  if(available(key)<=0){ S.gone[key]=true; log(`ADD ${p.name} ${r.condition} — just gone (changes=0)`); return false; }
+  if(S.basket.state==='none'){ S.basket={ state:'open', lines:[], expiresAt:null, number:null, name:'', history:[] }; log('Basket → open'); }
+  const l=S.basket.lines.find(x=>x.key===key);
+  if(l) l.qty++; else S.basket.lines.push({ key, printingId:r.printingId, condition:r.condition, language:r.language, qty:1, price:r.sell });
+  delete S.gone[key]; touchClock('add'); log(`Hold +1 ${p.name} ${r.condition} @ ${gbp(r.sell)} (price snapshotted)`);
+  return true;
+}
+function changeQty(key,d){
+  const l=S.basket.lines.find(x=>x.key===key); if(!l) return;
+  if(d>0 && available(key)<=0){ S.gone[key]=true; log('qty+1 refused — just gone'); return; }
+  l.qty+=d; if(l.qty<=0) S.basket.lines=S.basket.lines.filter(x=>x.key!==key);
+  if(!S.basket.lines.length){ S.basket.state='none'; log('last line removed → Basket cancelled, Holds released'); return; }
+  touchClock(d>0?'qty +1':'qty −1');
+}
+function submit(){
+  if(S.basket.state!=='open'||!S.basket.lines.length) return;
+  S.basket.state='submitted'; S.basket.number=100+Math.floor(Math.random()*900); touchClock('submit — final reset, no more resets');
+  S.basket.name=($('#nameField')?.value||'').trim(); log(`Basket → submitted · number ${S.basket.number}${S.basket.name?' · '+S.basket.name:''}`);
+  S.submitOpen=false; S.basketOpen=false; S.screen='number'; S.numberLeft=NUMBER_RETURN_S;
+}
+function cancelBasket(why){ if(S.basket.state==='open'){ S.basket.state='cancelled'; log(`Basket → cancelled (${why}), Holds released immediately`); } }
+function resetKiosk(why){ cancelBasket(why); const keep={variant:S.variant,nearMiss:S.nearMiss,hood:S.hood,wt:S.wt,wtOpen:S.wtOpen,log:S.log,otherHolds:{}}; S=fresh(); Object.assign(S,keep); S.game='mtg'; if(S.variant!=='A') S.screen='search'; log(`kiosk reset (${why})`); }
+
+// ---- idle (#10 §4): 60 s → "still there?" → 30 s → cancel + home
+let lastActivity=now(), idleTimer=null;
+document.addEventListener('pointerdown',()=>{ lastActivity=now(); },true);
+document.addEventListener('keydown',()=>{ lastActivity=now(); },true);
+setInterval(()=>{
+  if(S.screen==='number'){ S.numberLeft--; if(S.numberLeft<=0){ resetKiosk('number screen auto-return'); render(); } else { const el=$('#autoReturn'); if(el) el.textContent=`Back to the start in ${S.numberLeft} s`; } return; }
+  if(S.idle){ S.idle.left--; if(S.idle.left<=0){ S.idle=null; resetKiosk('idle'); render(); } else renderIdle(); return; }
+  const active = S.basket.state==='open' || S.screen!=='attract';
+  if(active && now()-lastActivity > IDLE_S*1000){ S.idle={left:IDLE_GRACE_S}; log('idle 60 s → "still there?"'); render(); }
+},1000);
+function renderIdle(){ const r=$('#idleRing'); if(!r) return; r.style.setProperty('--pct', `${(S.idle.left/IDLE_GRACE_S)*100}%`); r.querySelector('span').textContent=S.idle.left; }
+
+// =====================================================================
+// Rendering
+// =====================================================================
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const thumb = (p,cls='') => `<div class="thumb ${cls} g-${p.game}">${esc(p.set)}<small>#${p.num}</small></div>`;
+const gdot = g => `<span class="dot g-${g}"></span>`;
+const cheapest = p => { const s=stockOf(p.id); return s.length? Math.min(...s.map(r=>r.sell)) : null; };
+const basketCount = () => S.basket.state==='open' ? S.basket.lines.reduce((n,l)=>n+l.qty,0) : 0;
+const basketTotal = () => S.basket.lines.reduce((n,l)=>n+l.qty*l.price,0);
+
+function runSearch(){
+  const games = S.variant==='C' ? S.games : [S.game];
+  const res = search(S.query, games); S.lastSearch={ query:S.query, games, ...res };
+  let hits=res.hits;
+  if(S.nearMiss==='dym' && res.tier===5 && res.corrected.length && S.dymPending!==S.query){ return {hits:[], res, pendingDym:true}; }
+  if(S.inStock) hits=hits.filter(p=>stockOf(p.id).length);
+  const f=S.facets; if(f.set) hits=hits.filter(p=>p.set===f.set); if(f.rarity) hits=hits.filter(p=>p.rarity===f.rarity); if(f.extra) hits=hits.filter(p=>p.extra===f.extra);
+  return {hits:sortHits(hits), res, pendingDym:false};
+}
+function nearMissBlock(res, pendingDym){
+  if(!res.corrected.length || res.tier!==5) return '';
+  const fixed = res.corrected.map(c=>`<b>${esc(c.to)}</b>`).join(', ');
+  if(S.nearMiss==='silent') return '';
+  if(S.nearMiss==='banner') return `<div class="notice">Showing results for ${fixed} <span style="font-weight:500;opacity:.8">— nothing matched “${esc(S.query)}” exactly</span></div>`;
+  if(pendingDym) return `<div class="notice">Did you mean ${fixed}? <button data-act="acceptDym">Yes, show those</button><button data-act="clearQuery">No, clear</button></div>`;
+  return `<div class="notice">Showing results for ${fixed}</div>`;
+}
+function searchBox(placeholder){
+  return `<div class="search"><span class="ico">⌕</span><input id="q" type="search" placeholder="${esc(placeholder)}" value="${esc(S.query)}" autocomplete="off" aria-label="Search cards">${S.query?'<button class="x" data-act="clearQuery" aria-label="clear">×</button>':''}</div>`;
+}
+const inStockToggle = () => `<button class="toggle ${S.inStock?'on':''}" data-act="toggleInStock" role="switch" aria-checked="${S.inStock}"><span class="sw"></span>In stock only</button>`;
+const basketBtn = () => `<button class="bigbtn ${basketCount()?'primary':''}" data-act="openBasket">Basket ${basketCount()?`<span class="count">${basketCount()}</span> ${gbp(basketTotal())}`:''}</button>`;
+function facetChips(){
+  const f=S.facets; const out=[];
+  if(f.set) out.push(`<button class="chip on" data-act="facet" data-k="set" data-v="">Set ${esc(f.set)} <span class="x">×</span></button>`);
+  if(f.rarity) out.push(`<button class="chip on" data-act="facet" data-k="rarity" data-v="">${esc(f.rarity)} <span class="x">×</span></button>`);
+  if(f.extra) out.push(`<button class="chip on" data-act="facet" data-k="extra" data-v="">${esc(f.extra)} <span class="x">×</span></button>`);
+  return out.join('');
+}
+function facetSlideover(){
+  const g=S.game; const pool=CAT.filter(p=>p.game===g);
+  const opts=(k,vals)=>vals.map(v=>`<button class="chip ${S.facets[k]===v?'on':''}" data-act="facet" data-k="${k}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
+  const sets=[...new Set(pool.map(p=>p.set))].sort(); const rar=[...new Set(pool.map(p=>p.rarity))]; const ex=[...new Set(pool.map(p=>p.extra))].sort();
+  return `<div class="scrim" data-act="closeFilter"></div><div class="slideover" role="dialog" aria-label="Filters">
+    <div class="bhead"><h2>Filter ${esc(G[g])}</h2><button class="close" data-act="closeFilter" aria-label="close">×</button></div>
+    <div class="facets">
+      <div class="grp"><span class="lbl">Set</span><div class="chips">${opts('set',sets)}</div></div>
+      <div class="grp"><span class="lbl">Rarity</span><div class="chips">${opts('rarity',rar)}</div></div>
+      <div class="grp"><span class="lbl">${esc(EXTRA_FACET[g])}</span><div class="chips">${opts('extra',ex)}</div></div>
+    </div>
+    <div class="bfoot"><button class="bigbtn primary" data-act="closeFilter">Show results</button><button class="bigbtn ghost" data-act="clearFacets">Clear filters</button></div>
+  </div>`;
+}
+// Condition rows for a Printing: full words, price, Add. Language row only when a non-default-language copy is held.
+function condRows(p, compact=false){
+  const rows=stockOf(p.id).sort((a,b)=>Object.keys(COND).indexOf(a.condition)-Object.keys(COND).indexOf(b.condition)||a.language.localeCompare(b.language));
+  if(!rows.length) return `<div class="empty" style="padding:24px"><b>Not in stock</b>Ask at the counter — we may be able to order it.</div>`;
+  return rows.map(r=>{ const gone=S.gone[r.key]; const n=inBasket(r.key);
+    return `<div class="condrow ${gone?'gone':''}"><div class="c">${COND[r.condition]}${r.language!==STORE_LANG?` · ${LANGS[r.language]}`:''}<small>${gone?'Just gone — someone else took the last one':n?`${n} in your basket`:available(r.key)>1?`${available(r.key)} available`:'Last one'}</small></div><div class="price">${gbp(r.sell)}</div><button class="add ${n?'in':''}" data-act="add" data-key="${r.key}" ${gone?'disabled':''}>${n?'Add another':'Add'}</button></div>`; }).join('');
+}
+function goneAlternatives(p){
+  const keys=Object.keys(S.gone).filter(k=>skuByKey[k].printingId===p.id); if(!keys.length) return '';
+  const others=stockOf(p.id).filter(r=>!S.gone[r.key]&&available(r.key)>0);
+  const otherPr=CAT.filter(x=>x.name===p.name&&x.id!==p.id&&stockOf(x.id).some(r=>available(r.key)>0));
+  return `<div class="notice danger">That copy just went to another basket.${others.length?` Still here: ${others.map(r=>COND[r.condition]).join(', ')}.`:''}${otherPr.length?` Other versions of ${esc(p.name)} are in stock below.`:''}</div>`;
+}
+function otherPrintingsStrip(p){
+  const others=CAT.filter(x=>x.name===p.name&&x.game===p.game).filter(x=>!S.inStock||stockOf(x.id).length);
+  if(others.length<2) return '';
+  return `<span class="lbl">Other versions of ${esc(p.name)}</span><div class="strip" style="margin-top:8px">${others.map(x=>`<button class="${x.id===p.id?'on':''}" data-act="openPrinting" data-id="${x.id}">${thumb(x)}<span class="s">${esc(printingLabel(x))}<small>${esc(finishLabel(x)||'standard')} · ${cheapest(x)!=null?'from '+gbp(cheapest(x)):'not in stock'}</small></span></button>`).join('')}</div>`;
+}
+
+// ---- Basket inner (shared by A slideover, B column, C sheet)
+function basketInner(opts={}){
+  const lines=S.basket.state==='open'?S.basket.lines:[];
+  const body = lines.length ? lines.map(l=>{ const p=byId[l.printingId]; const gone=S.gone[l.key];
+    return `<div class="bline ${gone?'gone':''}"><div class="n">${esc(p.name)}<small>${esc(printingLabel(p))}${finishLabel(p)?' · '+esc(finishLabel(p)):''} · ${COND[l.condition]}${l.language!==STORE_LANG?' · '+LANGS[l.language]:''}</small>${gone?'<div class="msg">No more of these — the one in your basket is safe</div>':''}</div><div class="r"><div class="qty"><button data-act="qty" data-key="${l.key}" data-d="-1" aria-label="remove one">−</button><span>${l.qty}</span><button data-act="qty" data-key="${l.key}" data-d="1" aria-label="add one" ${available(l.key)<=0?'disabled':''}>+</button></div><div class="price">${gbp(l.qty*l.price)}</div></div></div>`; }).join('')
+    : `<div class="empty"><b>Your basket is empty</b>Find a card and tap Add.</div>`;
+  return `${opts.head!==false?`<div class="bhead"><h2>Your basket</h2>${opts.closable?'<button class="close" data-act="closeBasket" aria-label="close">×</button>':''}</div>`:''}
+    <div class="blines">${body}</div>
+    <div class="bfoot"><div class="total"><span class="lbl">Total</span><span class="v">${gbp(basketTotal())}</span></div>
+      <button class="bigbtn primary" data-act="openSubmit" ${lines.length?'':'disabled'}>Send to the counter</button>
+      <div class="note">Nothing is paid here. Your cards are put aside while you shop; you pay at the counter.</div></div>`;
+}
+function submitSheet(){
+  return `<div class="confirm" role="dialog" aria-label="Send to the counter"><div class="card">
+    <h2>Send this basket to the counter?</h2><p>Staff will have it ready. You will get a number to quote.</p>
+    <div class="lines">${S.basket.lines.map(l=>{const p=byId[l.printingId];return `<div class="line"><span>${l.qty} × ${esc(p.name)} <small>${esc(printingLabel(p))} · ${COND[l.condition]}</small></span><b class="num">${gbp(l.qty*l.price)}</b></div>`;}).join('')}
+      <div class="line" style="border:0"><b>Total</b><b class="num">${gbp(basketTotal())}</b></div></div>
+    <div class="field"><label for="nameField">Your name <span style="color:var(--muted);font-weight:500">(optional)</span></label><input id="nameField" type="text" placeholder="So staff can call you" value="${esc(S.basket.name)}"></div>
+    <div class="actions"><button class="bigbtn ghost" data-act="closeSubmit">Keep shopping</button><button class="bigbtn primary" data-act="submit">Send it</button></div>
+  </div></div>`;
+}
+function numberScreen(){
+  const b=S.basket; const nm=b.name?`, ${esc(b.name)}`:'';
+  return `<div class="screen deep">
+    <span class="lbl">Your number</span>
+    <div class="bignum num">${b.number}</div>
+    <h2>Go to the counter and say ${b.number}${nm}</h2>
+    <p>${b.lines.reduce((n,l)=>n+l.qty,0)} card${b.lines.length>1?'s':''} · ${gbp(basketTotal())} · put aside for ${TTL_MIN} minutes</p>
+    <button class="done" data-act="done">Done</button>
+    <div class="auto" id="autoReturn">Back to the start in ${S.numberLeft} s</div>
+  </div>`;
+}
+function idleOverlay(){
+  return `<div class="idle" role="alertdialog"><h2>Still there?</h2><p>Tap to keep your basket. Otherwise it clears and the cards go back on the shelf.</p><div class="ring" id="idleRing" style="--pct:${(S.idle.left/IDLE_GRACE_S)*100}%"><span>${S.idle.left}</span></div><button class="done" data-act="stillHere">I'm still here</button></div>`;
+}
+
+// ---------------- Variant A · Gate ----------------
+function renderA(){
+  if(S.screen==='attract') return `<div class="screen deep"><span class="lbl">Keepr · singles kiosk</span><h2>What do you play?</h2><p>Pick a game to browse the singles we have in stock.</p>
+    <div class="tiles">${GAMES.map(g=>`<button class="tile" data-act="pickGame" data-g="${g}"><span class="dot g-${g}">${g.toUpperCase()}</span>${esc(G[g])}<small>${STOCK.filter(r=>byId[r.printingId].game===g&&r.onHand>0).length} cards in stock</small></button>`).join('')}</div></div>`;
+  if(S.screen==='number') return numberScreen();
+  const bar=`<div class="bar"><button class="bigbtn ghost" data-act="toAttract">${gdot(S.game)} ${esc(G[S.game])} <span style="color:var(--muted);font-weight:500">· change</span></button>${searchBox(`Search ${G[S.game]} cards`)}${basketBtn()}</div>`;
+  if(S.screen==='printing'){ const p=byId[S.printingId];
+    return `<div class="screen">${bar}<div class="body"><div class="scroll"><button class="bigbtn ghost" data-act="backToSearch" style="margin-bottom:14px">‹ Back to results</button>
+      <div class="detail">${thumb(p,'lg')}<div><h2>${esc(p.name)}</h2><div class="meta">${esc(printingLabel(p))}${finishLabel(p)?' · '+esc(finishLabel(p)):''} · ${esc(p.rarity)}</div>
+        ${goneAlternatives(p)}<div class="condrows">${condRows(p)}</div>${otherPrintingsStrip(p)}</div></div></div></div>
+      ${S.basketOpen?`<div class="scrim" data-act="closeBasket"></div><div class="slideover" role="dialog" aria-label="Your basket">${basketInner({closable:true})}</div>`:''}
+      ${S.submitOpen?submitSheet():''}${S.idle?idleOverlay():''}</div>`; }
+  const {hits,res,pendingDym}=S.query?runSearch():{hits:[],res:null,pendingDym:false};
+  const browse = !S.query ? sortHits(CAT.filter(p=>p.game===S.game&&stockOf(p.id).length&&(!S.facets.set||p.set===S.facets.set)&&(!S.facets.rarity||p.rarity===S.facets.rarity)&&(!S.facets.extra||p.extra===S.facets.extra))) : hits;
+  const grid = browse.length ? `<div class="grid">${browse.map(p=>{const c=cheapest(p);return `<button class="pcard" data-act="openPrinting" data-id="${p.id}">${thumb(p)}<div><div class="n">${esc(p.name)}</div><div class="p">${esc(printingLabel(p))}${finishLabel(p)?' · '+esc(finishLabel(p)):''}</div></div><div class="price">${c!=null?`<small>from</small>${gbp(c)}`:'<span class="oos">Not in stock</span>'}</div></button>`;}).join('')}</div>`
+    : pendingDym ? '' : `<div class="empty"><b>Nothing found for “${esc(S.query)}”</b>Check the spelling, or ask at the counter.</div>`;
+  return `<div class="screen">${bar}
+    <div class="bar" style="padding-top:10px;padding-bottom:10px;background:var(--panel-2)"><button class="bigbtn" data-act="openFilter">Filter</button><div class="chips">${facetChips()}</div><span style="flex:1"></span>${inStockToggle()}</div>
+    <div class="body"><div class="scroll"><div class="subhead"><span>${S.query?`<b>${browse.length}</b> result${browse.length===1?'':'s'} in ${esc(G[S.game])}`:`<b>${esc(G[S.game])}</b> singles in stock, A–Z`}</span></div>${res?nearMissBlock(res,pendingDym):''}${grid}</div></div>
+    ${S.filterOpen?facetSlideover():''}
+    ${S.basketOpen?`<div class="scrim" data-act="closeBasket"></div><div class="slideover" role="dialog" aria-label="Your basket">${basketInner({closable:true})}</div>`:''}
+    ${S.submitOpen?submitSheet():''}${S.idle?idleOverlay():''}</div>`;
+}
+
+// ---------------- Variant B · Card-first ----------------
+function renderB(){
+  if(S.screen==='number') return numberScreen();
+  const seg=`<div class="seg" role="tablist">${GAMES.map(g=>`<button role="tab" aria-selected="${S.game===g}" class="${S.game===g?'on':''}" data-act="pickGameStay" data-g="${g}">${gdot(g)}${esc(G[g])}</button>`).join('')}</div>`;
+  const {hits,res,pendingDym}=S.query?runSearch():{hits:[],res:null,pendingDym:false};
+  const pool = S.query ? hits : sortHits(CAT.filter(p=>p.game===S.game&&stockOf(p.id).length));
+  // group by Card (name within the game)
+  const cards=[]; pool.forEach(p=>{ let c=cards.find(x=>x.name===p.name); if(!c){c={name:p.name,prints:[]};cards.push(c);} c.prints.push(p); });
+  const list = cards.length ? `<div class="cardlist">${cards.map(c=>{ const open=S.expanded[c.name]??(S.query&&cards.length<=3); const from=Math.min(...c.prints.map(p=>cheapest(p)??Infinity)); const nStock=c.prints.filter(p=>stockOf(p.id).length).length;
+      return `<div class="cardrow ${open?'open':''}"><button class="hd" data-act="expand" data-n="${esc(c.name)}"><div class="n">${esc(c.name)}<small>${c.prints.length} version${c.prints.length===1?'':'s'}${S.inStock?'':` · ${nStock} in stock`}</small></div><div class="from">${isFinite(from)?gbp(from):'—'}<small>${isFinite(from)?'from':'not in stock'}</small></div><span class="chev">›</span></button>
+        ${open?c.prints.map(p=>{ const rows=stockOf(p.id); return `<div class="prow">${thumb(p)}<div><div class="pn">${esc(printingLabel(p))}${finishLabel(p)?` · ${esc(finishLabel(p))}`:''}<small>${esc(p.rarity)}</small></div>${goneAlternatives(p)}
+          <div class="condchips">${rows.length?rows.map(r=>{const n=inBasket(r.key);const gone=S.gone[r.key];return `<button class="cc ${n?'in':''} ${gone?'gone':''}" data-act="add" data-key="${r.key}" ${gone?'disabled':''}><b>${gbp(r.sell)}</b><span>${COND[r.condition]}${r.language!==STORE_LANG?' · '+LANGS[r.language]:''}${gone?' · just gone':n?` · ${n} in basket`:available(r.key)===1?' · last one':''}</span></button>`;}).join(''):'<span class="cc oos"><b>—</b><span>Not in stock</span></span>'}</div></div></div>`; }).join(''):''}</div>`; }).join('')}</div>`
+    : pendingDym ? '' : `<div class="empty"><b>${S.query?`No ${esc(G[S.game])} card called “${esc(S.query)}”`:'Nothing in stock'}</b>${S.query?'Try another game above, or ask at the counter.':''}</div>`;
+  return `<div class="screen">
+    <div class="bar"><div class="store">Keepr<small>singles kiosk</small></div>${seg}${searchBox(`Search ${G[S.game]}`)}${inStockToggle()}</div>
+    <div class="body"><div class="scroll"><div class="subhead"><span>${S.query?`<b>${cards.length}</b> card${cards.length===1?'':'s'} match in ${esc(G[S.game])}`:`<b>${esc(G[S.game])}</b> cards in stock, A–Z`}</span><span>Tap a card to see its versions and conditions</span></div>${res?nearMissBlock(res,pendingDym):''}${list}</div>
+      <div class="col">${basketInner({closable:false})}</div></div>
+    ${S.submitOpen?submitSheet():''}${S.idle?idleOverlay():''}</div>`;
+}
+
+// ---------------- Variant C · Everything ----------------
+function renderC(){
+  if(S.screen==='number') return numberScreen();
+  const chips=`<div class="chips">${GAMES.map(g=>`<button class="chip ${S.games.includes(g)?'on':''}" data-act="toggleGame" data-g="${g}">${gdot(g)}${esc(G[g])}</button>`).join('')}</div>`;
+  const {hits,res,pendingDym}=S.query?runSearch():{hits:[],res:null,pendingDym:false};
+  const pool = S.query ? hits : sortHits(CAT.filter(p=>S.games.includes(p.game)&&stockOf(p.id).length)).slice(0,60);
+  const sections=GAMES.filter(g=>S.games.includes(g)).map(g=>({g,items:pool.filter(p=>p.game===g)})).filter(s=>s.items.length);
+  const list = sections.length ? sections.map(s=>`<div class="section"><h3>${gdot(s.g)}${esc(G[s.g])} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${s.items.length}</span></h3><div class="rows">${s.items.map(p=>{const c=cheapest(p);return `<button class="row ${S.sel===p.id?'on':''}" data-act="select" data-id="${p.id}">${thumb(p)}<div class="n">${esc(p.name)}<small>${esc(printingLabel(p))}${finishLabel(p)?' · '+esc(finishLabel(p)):''}</small></div><div class="price">${c!=null?gbp(c):'—'}<small>${c!=null?(stockOf(p.id).length>1?'from':''):'not in stock'}</small></div></button>`;}).join('')}</div></div>`).join('')
+    : pendingDym ? '' : `<div class="empty"><b>${S.query?`Nothing called “${esc(S.query)}”`:'Pick at least one game'}</b>${S.query?'in the games you have ticked.':''}</div>`;
+  const sel=S.sel?byId[S.sel]:null;
+  const pane = sel ? `${thumb(sel,'lg')}<span class="lbl">${gdot(sel.game)} ${esc(G[sel.game])}</span><h2>${esc(sel.name)}</h2><div class="meta" style="color:var(--muted);margin:2px 0 14px">${esc(printingLabel(sel))}${finishLabel(sel)?' · '+esc(finishLabel(sel)):''} · ${esc(sel.rarity)}</div>${goneAlternatives(sel)}<div class="condrows">${condRows(sel)}</div>${otherPrintingsStrip(sel)}`
+    : `<div class="empty"><b>Tap a card</b>Its conditions and prices show here.</div>`;
+  const sheetOpen=S.basketOpen;
+  return `<div class="screen">
+    <div class="bar"><div class="store">Keepr<small>singles kiosk</small></div>${searchBox('Search any card, any game')}${inStockToggle()}</div>
+    <div class="bar" style="padding-top:10px;padding-bottom:10px;background:var(--panel-2)">${chips}<span style="flex:1"></span><button class="bigbtn" data-act="openFilter" ${S.games.length===1?'':'disabled title="Pick one game to filter"'}>Filter${S.games.length===1?'':' · pick one game'}</button><div class="chips">${S.games.length===1?facetChips():''}</div></div>
+    <div class="split"><div class="scroll">${res?nearMissBlock(res,pendingDym):''}${list}</div><div class="pane">${pane}</div></div>
+    <div class="bottombar"><div class="sum"><small>Basket</small>${basketCount()?`${basketCount()} card${basketCount()===1?'':'s'} · ${gbp(basketTotal())}`:'empty'}</div><div style="display:flex;gap:10px"><button class="bigbtn" data-act="openBasket" ${basketCount()?'':'disabled'}>View basket</button><button class="bigbtn primary" data-act="openSubmit" ${basketCount()?'':'disabled'}>Send to the counter</button></div></div>
+    ${S.filterOpen&&S.games.length===1?(S.game=S.games[0],facetSlideover()):''}
+    ${sheetOpen?`<div class="scrim" data-act="closeBasket"></div><div class="sheet" role="dialog" aria-label="Your basket"><div class="grab"></div>${basketInner({closable:true})}</div>`:''}
+    ${S.submitOpen?submitSheet():''}${S.idle?idleOverlay():''}</div>`;
+}
+
+// ---------------- rail + drawer ----------------
+function renderRail(){
+  const v=VARIANTS.find(x=>x.key===S.variant); $('#vname').innerHTML=`${v.key} · ${esc(v.name)}<small>${esc(v.sub)}</small>`;
+  $('#nearmiss').innerHTML=`<span>Near miss</span>`+NEARMISS.map(n=>`<button data-act="nearMiss" data-k="${n.key}" class="${S.nearMiss===n.key?'on':''}">${n.label}</button>`).join('');
+  $('#scen').innerHTML=`<span>Scenario</span><button data-act="scenRace">another kiosk takes the last Ragavan NM</button><button data-act="scenRaceLuffy">…and the Luffy OP05 SEC</button><button data-act="scenIdle">idle now</button><button data-act="scenReset">reset kiosk</button>`;
+  $('#hoodBtn').className=S.hood?'on':''; $('#wtBtn').className=S.wtOpen?'on':'';
+  const d=$('#drawer'); d.className='drawer'+((S.hood||S.wtOpen)?' open':''); d.innerHTML=(S.wtOpen?renderWt():'')+(S.hood?renderHood():'');
+  if(!S.wtOpen && S.hood) d.style.gridTemplateColumns='1fr'; else d.style.gridTemplateColumns='';
+}
+function renderHood(){
+  const b=S.basket; const ls=S.lastSearch;
+  const lines=b.lines.map(l=>{const p=byId[l.printingId];const r=skuByKey[l.key];return `  ${l.qty}× ${p.name} ${l.condition}/${l.language}  snapshot ${gbp(l.price)}  on-hand ${r.onHand} · others hold ${S.otherHolds[l.key]??0} · yours ${l.qty} · left for others ${availableToOthers(l.key)}`;}).join('\n');
+  const exp=b.expiresAt?`${Math.max(0,Math.round((b.expiresAt-now())/1000))} s (${TTL_MIN} min TTL${b.state==='submitted'?', no more resets':', resets on every add/remove'})`:'—';
+  const viewed=S.printingId||S.sel; const vp=viewed?byId[viewed]:null;
+  const avail=vp?stockOf(vp.id).map(r=>`  ${r.condition}/${r.language}: on-hand ${r.onHand} − other Holds ${S.otherHolds[r.key]??0} − in this Basket ${inBasket(r.key)} = <b>${available(r.key)}</b> available${S.gone[r.key]?'  ← just gone':''}`).join('\n'):'  (open a Printing)';
+  return `<div class="box"><h4>Under the hood</h4><pre><span class="k">Basket</span>      state <b>${b.state}</b>${b.number?` · number ${b.number}`:''}${b.name?` · name "${esc(b.name)}"`:''}
+<span class="k">Clock</span>       expires in ${exp}  <span class="k">(ADR 0006: one clock on the Basket, every Hold inherits it; the customer never sees it)</span>
+<span class="k">Holds</span>${lines?'\n'+esc(lines).replace(/\n/g,'\n'):'       none'}
+<span class="k">Search</span>      ${ls?`"${esc(ls.query)}" in [${ls.games.join(', ')}] → tier <b>${ls.tier}</b> ${['—','folded exact','no-space exact','token-AND prefix (FTS5)','phonetic','per-token trigram'][ls.tier]}${ls.corrected.length?' · corrected '+ls.corrected.map(c=>`${esc(c.from)}→${esc(c.to)}`).join(', '):''} · ${ls.hits.length} Printings${S.variant==='C'?` · ${ls.games.length} game-scoped queries in one batch()`:''}`:'—'}
+<span class="k">Availability</span> of the Printing on screen
+${avail}
+<span class="k">Other kiosks</span> ${Object.keys(S.otherHolds).length?Object.entries(S.otherHolds).map(([k,q])=>`${byId[skuByKey[k].printingId].name} ${skuByKey[k].condition} ×${q}`).join(', '):'none'}
+<span class="k">Log</span>
+${esc(S.log.join('\n'))}</pre></div>`;
+}
+const WT = [
+  { t:'1 · Game System first', html:`<p>Search is game-scoped by architecture (#6, #15): a Printing's Facets mean nothing in another game, and a search table is per game. The question is whether the customer feels a <b>choice</b> or a <b>gate</b>.</p><ol>
+    <li><b>A</b> gates: a full-screen "What do you play?" before anything else. <button class="do" data-act="wtGo" data-v="A" data-screen="attract">show A</button></li>
+    <li><b>B</b> makes the game a segmented control beside the search box; switching keeps the query. Type <b>luffy</b> in Magic, then tap One Piece. <button class="do" data-act="wtGo" data-v="B" data-q="luffy" data-g="mtg">do it</button></li>
+    <li><b>C</b> removes the choice: one search over every game, sectioned by game, chips to narrow. Type <b>charizard</b>. <button class="do" data-act="wtGo" data-v="C" data-q="charizard">do it</button> Then look at the Filter button: Facets only exist once one game is ticked.</li></ol>
+    <p class="q">Which feels right: gate, control, or none — and is C's disabled Filter an honest signal or a wart?</p>` },
+  { t:'2 · Card → Printing → Condition', html:`<p>The ladder: a customer asks for a <b>Card</b> ("any Luffys?"), then picks a <b>Printing</b>, and price and availability become real only at the <b>Condition</b>. #28 said results group by Card; #26 later said per Printing because the kiosk sells specific copies. Both are built.</p><ol>
+    <li><b>A</b>: per-Printing cards with "from £x", one tap to a Printing page with Condition rows in full words. Search <b>luffy</b> in One Piece. <button class="do" data-act="wtGo" data-v="A" data-q="luffy" data-g="op">do it</button></li>
+    <li><b>B</b>: one row per Card that unfolds into Printings, each with Condition chips you tap to add — no page change. <button class="do" data-act="wtGo" data-v="B" data-q="luffy" data-g="op">do it</button></li>
+    <li><b>C</b>: per-Printing rows, detail beside them. <button class="do" data-act="wtGo" data-v="C" data-q="luffy">do it</button></li></ol>
+    <p class="q">Does "from £0.80" on a Printing mislead when the £0.80 copy is Heavily Played? Is a Language row ("Japanese") legible where it appears — Nami OP01 has one?</p>` },
+  { t:'3 · A near miss', html:`<p>The #24 cascade answers most searches at tier 1–3 and is invisible. A keyboard slip falls to tier 5, where a single token is corrected. What should the screen say? Three treatments in the rail: <b>silent</b>, <b>banner</b> ("Showing results for…"), <b>did you mean?</b> (results wait for a tap).</p><ol>
+    <li>Type <b>ragavn</b> in Magic. <button class="do" data-act="wtGo" data-v="A" data-q="ragavn" data-g="mtg">do it</button> Flip the treatment.</li>
+    <li>Type <b>jace mind sculper</b> — a subset <i>and</i> a typo; only <b>sculper</b> is fuzzed. <button class="do" data-act="wtGo" data-v="A" data-q="jace mind sculper" data-g="mtg">do it</button></li>
+    <li>Type <b>farfetchd</b>-style: <b>bosss orders</b> hits tier 2 (no-space) silently. <button class="do" data-act="wtGo" data-v="A" data-q="bosss orders" data-g="pkm">do it</button></li>
+    <li>Type <b>luffy</b> in Magic: a miss that is really the wrong game. <button class="do" data-act="wtGo" data-v="A" data-q="luffy" data-g="mtg">do it</button> Compare B's empty state, which points at the other games.</li></ol>
+    <p class="q">Silent, banner or did-you-mean? And should a cross-game miss say "try One Piece"?</p>` },
+  { t:'4 · The Basket and its Holds', html:`<p>A Hold is created at add. The Basket owns one clock (20 min) that resets on every add/remove and once more on submit; the customer never sees a countdown (#10). What they <i>do</i> see: a copy that goes to another kiosk, and the idle reset.</p><ol>
+    <li>Open Ragavan MH2 (2 NM, 1 LP in stock) and add the NM. <button class="do" data-act="wtGo" data-v="A" data-q="ragavan" data-g="mtg">do it</button></li>
+    <li>Now the scenario <b>another kiosk takes the last Ragavan NM</b> (rail). Your copy is safe — the other kiosk gets one, and there were two. Tap <b>Add another</b>: <b>just gone</b>, and the row offers Lightly Played and the other versions.</li>
+    <li>Reset, add nothing, run the same scenario, then try to add Ragavan NM: gone before you started. <button class="do" data-act="scenReset">reset</button></li>
+    <li>The Luffy OP05 secret rare has exactly one copy. Add it, then run <b>…and the Luffy OP05 SEC</b>: the other kiosk loses, your basket line stays. Watch the under-the-hood panel.</li>
+    <li><b>Idle now</b> in the rail: the 60 s "still there?" overlay with its 30 s ring; let it run out and the Basket cancels, Holds release, home.</li></ol>
+    <p class="q">Is "just gone" the right tone? Should the line in the basket say anything when the rest sell out? Is the idle overlay too loud, too quiet?</p>` },
+  { t:'5 · Handoff', html:`<p>The Basket Number is the only identity. Submission is explicit ("Send to the counter"); a confirm sheet shows the lines, the total and an optional name; the number screen is full-bleed and returns to the start after 30 s.</p><ol>
+    <li>With something in the basket, tap <b>Send to the counter</b> in any variant. <button class="do" data-act="wtGo" data-v="B" data-q="pikachu" data-g="pkm">start in B</button></li>
+    <li>Type a name or leave it. Send. Read the number screen from six feet away.</li>
+    <li>The copy says "put aside for 20 minutes" — the one mention of the Hold the customer ever gets.</li></ol>
+    <p class="q">Name field: keep, drop, or make it the counter's job? Is "Send to the counter" the verb? Does "20 minutes" belong on this screen?</p>` },
+];
+function renderWt(){
+  const i=S.wt??0; const w=WT[i];
+  return `<div class="box wt"><div class="tabs">${WT.map((x,j)=>`<button data-act="wtTab" data-i="${j}" class="${j===i?'on':''}">${x.t.split(' · ')[0]}</button>`).join('')}</div><h4>${w.t}</h4>${w.html}</div>`;
+}
+
+function render(){
+  const stage=$('#stage'); const active=document.activeElement; const focusQ = active && active.id==='q'; const pos = focusQ ? active.selectionStart : null;
+  stage.innerHTML = S.variant==='A'?renderA():S.variant==='B'?renderB():renderC();
+  if(focusQ){ const q=$('#q'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(e){} } }
+  renderRail();
+}
+
+// =====================================================================
+// Events
+// =====================================================================
+document.addEventListener('click', e=>{
+  const el=e.target.closest('[data-act]'); if(!el) return; const a=el.dataset.act; const d=el.dataset;
+  const acts={
+    prevVariant(){ const i=VARIANTS.findIndex(v=>v.key===S.variant); setVariant(VARIANTS[(i+VARIANTS.length-1)%VARIANTS.length].key); },
+    nextVariant(){ const i=VARIANTS.findIndex(v=>v.key===S.variant); setVariant(VARIANTS[(i+1)%VARIANTS.length].key); },
+    nearMiss(){ S.nearMiss=d.k; S.dymPending=null; },
+    toggleHood(){ S.hood=!S.hood; }, toggleWt(){ S.wtOpen=!S.wtOpen; if(S.wt==null) S.wt=0; }, wtTab(){ S.wt=+d.i; },
+    wtGo(){ if(d.v) setVariant(d.v); if(d.g){ S.game=d.g; S.games=GAMES.slice(); } if(d.screen) S.screen=d.screen; else { S.screen='search'; } if(d.q!=null){ S.query=d.q; S.dymPending=null; S.sel=null; S.expanded={}; } S.filterOpen=false; S.basketOpen=false; setTimeout(()=>$('#q')?.focus(),0); },
+    scenRace(){ otherKioskTakes(skuKey(find('Ragavan, Nimble Pilferer','MH2',138,'nonfoil').id,'NM','en')); },
+    scenRaceLuffy(){ otherKioskTakes(skuKey(find('Monkey.D.Luffy','OP05',119,'secret rare').id,'NM','en')); },
+    scenIdle(){ if(S.screen==='number') return; S.idle={left:IDLE_GRACE_S}; log('scenario: idle now'); },
+    scenReset(){ resetKiosk('scenario'); },
+    pickGame(){ S.game=d.g; S.screen='search'; S.query=''; S.facets={}; },
+    pickGameStay(){ S.game=d.g; S.facets={}; S.expanded={}; S.dymPending=null; },
+    toggleGame(){ const on=S.games.includes(d.g); S.games = on ? S.games.filter(g=>g!==d.g) : [...S.games,d.g]; S.facets={}; S.sel=null; },
+    toAttract(){ S.screen='attract'; S.query=''; S.facets={}; },
+    backToSearch(){ S.screen='search'; S.printingId=null; },
+    toggleInStock(){ S.inStock=!S.inStock; },
+    openFilter(){ S.filterOpen=true; }, closeFilter(){ S.filterOpen=false; }, clearFacets(){ S.facets={}; },
+    facet(){ S.facets[d.k] = d.v ? (S.facets[d.k]===d.v?null:d.v) : null; },
+    clearQuery(){ S.query=''; S.dymPending=null; setTimeout(()=>$('#q')?.focus(),0); },
+    acceptDym(){ S.dymPending=S.query; },
+    openPrinting(){ S.printingId=d.id; S.screen='printing'; },
+    select(){ S.sel=d.id; },
+    expand(){ S.expanded[d.n]=!(S.expanded[d.n]??(S.query&&true)); },
+    add(){ const ok=addLine(d.key); if(ok && S.variant==='A' && !S.basketOpen){ /* stay on the page; the basket button counts up */ } },
+    qty(){ changeQty(d.key,+d.d); },
+    openBasket(){ S.basketOpen=true; }, closeBasket(){ S.basketOpen=false; },
+    openSubmit(){ if(basketCount()) S.submitOpen=true; }, closeSubmit(){ S.submitOpen=false; },
+    submit(){ submit(); },
+    done(){ resetKiosk('Done'); },
+    stillHere(){ S.idle=null; lastActivity=now(); log('customer tapped "still here"'); },
+  };
+  if(acts[a]){ acts[a](); render(); }
+});
+function otherKioskTakes(key){
+  const r=skuByKey[key]; const p=byId[r.printingId]; const left=availableToOthers(key);
+  if(left<=0){ log(`OTHER KIOSK: ADD ${p.name} ${r.condition} → changes=0, "just gone" on the other screen. Your Hold protected it.`); return; }
+  S.otherHolds[key]=(S.otherHolds[key]??0)+left; log(`OTHER KIOSK: took ${left} × ${p.name} ${r.condition} — now 0 available to you`);
+}
+function setVariant(k){ S.variant=k; S.basketOpen=false; S.filterOpen=false; S.submitOpen=false; S.dymPending=null; if(k==='A'&&S.screen==='search'&&!S.game) S.screen='attract'; if(k!=='A'&&S.screen==='attract') S.screen='search'; if(k!=='A'&&S.screen==='printing'){ S.sel=S.printingId; S.screen='search'; } if(k==='A'&&S.sel){ S.printingId=S.sel; } if(!S.game) S.game='mtg'; }
+document.addEventListener('input', e=>{ if(e.target.id==='q'){ S.query=e.target.value; S.dymPending=null; S.expanded={}; if(S.variant==='C') S.sel=null; render(); } });
+document.addEventListener('keydown', e=>{
+  const t=e.target; const typing = t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
+  if(typing){ if(e.key==='Escape'&&t.id==='q'){ S.query=''; render(); } return; }
+  if(e.key==='ArrowLeft'){ document.querySelector('[data-act="prevVariant"]').click(); }
+  if(e.key==='ArrowRight'){ document.querySelector('[data-act="nextVariant"]').click(); }
+  if(e.key==='Escape'){ S.basketOpen=false; S.filterOpen=false; S.submitOpen=false; render(); }
+});
+window.addEventListener('resize', ()=>{ /* layout is CSS-driven */ });
+render();
+</script>
