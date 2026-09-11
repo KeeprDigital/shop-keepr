@@ -64,11 +64,16 @@
   .txbar b{font-weight:600}
   .txbar .n{font-family:var(--mono);font-variant-numeric:tabular-nums}
   .txbar .go{margin-left:auto;color:var(--accent);font-weight:600}
-  .lk{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:14px;align-items:start}
-  @media (max-width:900px){.lk{grid-template-columns:1fr}}
-  .rlist{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-height:calc(100vh - 260px);overflow-y:auto}
+  .rlist{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:auto;max-width:960px}
   .ghead{font-size:12px;font-weight:600;padding:6px 12px;background:#FAFBFA;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .row{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);cursor:pointer}
+  .row{display:grid;grid-template-columns:30px minmax(160px,1fr) 110px 72px 72px 72px;gap:12px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);cursor:pointer;min-width:640px}
+  .row .pr{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12.5px;text-align:right}
+  .row .pr small{display:block;font-family:var(--sans);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .row .pr.dim{color:var(--muted)}
+  .modal.card{width:min(780px,94vw);padding:0}
+  .modal.card .dt{padding:18px 20px}
+  .modal.card .close{position:absolute;right:10px;top:10px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+  .modal.card{position:relative}
   .row:first-child,.ghead+.row{border-top:0}
   .row.hi{background:#F4F6F5}
   .row.sel{background:var(--accent-tint)}
@@ -455,7 +460,9 @@ const M = (() => {
     if(!ui.lquery) list=`<div class="none">Type a card name. <span class="mono">name SET</span> or <span class="mono">name #n</span> narrows.</div>`;
     else if(!hits.length) list=`<div class="none">Nothing in ${M.G[ui.game]} matches “${esc(ui.lquery)}”.</div>`;
     else {
-      const row=(p,i)=>{ const held=M.heldSummary(p.id); return `<div class="row ${p.id===ui.sel?'sel':''} ${i===ui.hi?'hi':''}" data-pid="${p.id}" data-i="${i}">${thumb(p)}<div><div class="n">${esc(p.name)}</div><div class="p"><b>${M.printingLabel(p)}</b> · ${esc(p.finish)}</div></div><div class="h ${held?'yes':''}">${held?`held ${held}`:'none held'}</div></div>`; };
+      const row=(p,i)=>{ const held=M.heldSummary(p.id); const hr=M.heldRows(p.id).filter(r=>r.onHand>0); const bp=M.buyPrice(p.id,'NM',M.STORE_LANG);
+        const sell = hr.length ? (()=>{ const v=hr.map(r=>r.sell); const lo=Math.min(...v), hi=Math.max(...v); return lo===hi?money2(lo):`${money2(lo)}–${money2(hi)}`; })() : null;
+        return `<div class="row ${p.id===ui.sel?'sel':''} ${i===ui.hi?'hi':''}" data-pid="${p.id}" data-i="${i}">${thumb(p)}<div><div class="n">${esc(p.name)}</div><div class="p"><b>${M.printingLabel(p)}</b> · ${esc(p.finish)}</div></div><div class="h ${held?'yes':''}">${held?`held ${held}`:'none held'}</div><div class="pr dim"><small>Market</small>${money2(p.market)}</div><div class="pr ${sell?'':'dim'}"><small>Sell</small>${sell||'—'}</div><div class="pr"><small>Buy NM</small>${money2(bp.price)}${bp.pinned?'<span class="pin">⌖</span>':''}</div></div>`; };
       if(ui.group){ const groups=[]; hits.forEach((p,i)=>{ let g=groups.find(x=>x.name===p.name); if(!g){ g={name:p.name,items:[]}; groups.push(g);} g.items.push([p,i]); });
         list=groups.map(g=>`<div class="ghead">${esc(g.name)} <span class="muted">· ${g.items.length}</span></div>${g.items.map(([p,i])=>row(p,i)).join('')}`).join(''); }
       else list=hits.map(row).join('');
@@ -463,17 +470,20 @@ const M = (() => {
     $('#main').innerHTML = `
       <div class="head"><h1>Lookup</h1><div class="games">${Object.entries(M.G).map(([k,v])=>`<button class="${ui.game===k?'on':''}" data-game="${k}">${v}</button>`).join('')}</div></div>
       <div class="srow"><input class="lsearch" id="lsearch" placeholder="Card name in ${M.G[ui.game]}   (press / to focus)" value="${esc(ui.lquery)}" autocomplete="off"><label class="tog"><input type="checkbox" id="group" ${ui.group?'checked':''}> Group by Card</label></div>
-      <p class="hint">${ui.lquery ? `<b>${hits.length}</b> Printing${hits.length===1?'':'s'} · <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> opens the card · then <kbd>S</kbd> Sell, <kbd>B</kbd> Buy, <kbd>Esc</kbd> back` : `Do we have X, how many? In-stock filter off: found-but-none-held reads as <i>found, none held</i>.`}</p>
+      <p class="hint">${ui.lquery ? `<b>${hits.length}</b> Printing${hits.length===1?'':'s'} · <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> opens the card · in it <kbd>S</kbd> Sell, <kbd>B</kbd> Buy, <kbd>↑</kbd><kbd>↓</kbd> next card, <kbd>Esc</kbd> closes` : `Do we have X, how many? In-stock filter off: found-but-none-held reads as <i>found, none held</i>.`}</p>
       ${nLines()?`<a class="txbar" data-go="txn"><b>${esc(ui.name)}</b><span class="n">${nLines()} line${nLines()===1?'':'s'}</span><span>·</span><span>${kindLabel(c.kind)}</span><span>·</span><span class="n">net ${money(netOf(c))}</span><span class="go">Open →</span></a>`:''}
-      <div class="lk"><div class="rlist">${list}</div><div class="detail ${ui.focus==='detail'&&ui.sel?'focus':''}" id="detail">${detailHtml(hits)}</div></div>`;
+      <div class="rlist">${list}</div>`;
     const inp=$('#lsearch'); inp.oninput=e=>{ ui.lquery=e.target.value; ui.hi=0; ui.focus='search'; renderLookup(); focusSearch(); };
     inp.onfocus=()=>{ if(ui.focus!=='search'){ ui.focus='search'; renderLookup(); focusSearch(); } };
     $('#group').onchange=e=>{ ui.group=e.target.checked; renderLookup(); };
     $('#main').querySelectorAll('[data-game]').forEach(b=>b.onclick=()=>{ ui.game=b.dataset.game; ui.sel=null; ui.hi=0; renderLookup(); focusSearch(); });
-    $('#main').querySelectorAll('.row[data-pid]').forEach(r=>r.onclick=()=>{ ui.sel=r.dataset.pid; ui.hi=+r.dataset.i; ui.focus='detail'; ui.menu=false; renderLookup(); });
+    $('#main').querySelectorAll('.row[data-pid]').forEach(r=>r.onclick=()=>{ ui.sel=r.dataset.pid; ui.hi=+r.dataset.i; ui.open=true; ui.menu=false; renderLookup(); renderModal(); });
     const tb=$('.txbar'); if(tb) tb.onclick=()=>go('txn');
-    wireDetail();
-    if(ui.focus==='search') focusSearch();
+    if(!ui.open) focusSearch();
+  }
+  function cardModalHtml(){
+    const hits=results(); if(!ui.sel||!M.byId[ui.sel]) { ui.open=false; return ''; }
+    return `<div class="mask" id="cmask"><div class="modal card"><button class="close" id="cclose">Esc</button>${detailHtml(hits)}</div></div>`;
   }
   function detailHtml(hits){
     const p=ui.sel&&M.byId[ui.sel]; if(!p) return `<div class="empty">${hits.length?'Pick a Printing to see what we hold and act on it.':'Search first.'}</div>`;
@@ -486,18 +496,21 @@ const M = (() => {
         <div class="more"><button id="more" title="more actions">…</button>${ui.menu?`<div class="menu"><button data-act="adjust">Adjust…</button><button data-act="pin">Pin…</button></div>`:''}</div></div>
       <div><h3>Held</h3>${held}</div>
       <div><h3>Buy</h3><div class="buyrow"><select id="bcond">${M.CONDITIONS.map(x=>`<option ${x===ui.buyPick.condition?'selected':''}>${x}</option>`).join('')}</select><select id="blang">${['en','ja'].map(x=>`<option ${x===ui.buyPick.language?'selected':''}>${x}</option>`).join('')}</select><span class="pr"><small>Buy Price</small>${money2(bp.price)}${bp.pinned?'<span class="pin">⌖</span>':''}</span><button class="abtn buy" id="buy">Buy</button></div></div>
-      <div class="dhint"><kbd>S</kbd> sells the first held copy · <kbd>B</kbd> buys at the picked grade · <kbd>Esc</kbd> back to search</div>
+      <div class="dhint"><kbd>S</kbd> sells the first held copy · <kbd>B</kbd> buys at the picked grade · <kbd>↑</kbd><kbd>↓</kbd> next card · <kbd>Esc</kbd> closes</div>
     </div>`;
   }
   function wireDetail(){
-    const d=$('#detail'); if(!d||!ui.sel) return;
+    const d=$('#cmask'); if(!d||!ui.sel) return;
+    $('#cclose').onclick=()=>closeCard();
+    d.onclick=e=>{ if(e.target.id==='cmask') closeCard(); };
     d.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{ const [cond,lang]=b.dataset.sell.split('|'); addSell(ui.sel,cond,lang); });
-    const bc=$('#bcond'), bl=$('#blang'); bc.onchange=()=>{ ui.buyPick.condition=bc.value; renderLookup(); }; bl.onchange=()=>{ ui.buyPick.language=bl.value; renderLookup(); };
+    const bc=$('#bcond'), bl=$('#blang'); bc.onchange=()=>{ ui.buyPick.condition=bc.value; renderModal(); }; bl.onchange=()=>{ ui.buyPick.language=bl.value; renderModal(); };
     [bc,bl].forEach(x=>x.onkeydown=e=>e.stopPropagation());
     $('#buy').onclick=()=>addBuy(ui.sel);
-    $('#more').onclick=()=>{ ui.menu=!ui.menu; renderLookup(); };
-    d.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{ ui.menu=false; toast(b.dataset.act==='adjust'?'Adjust modal (#26): qty delta or count, regrade, Reason — not in this prototype':'Pin modal (#26): side, value — not in this prototype'); renderLookup(); });
+    $('#more').onclick=()=>{ ui.menu=!ui.menu; renderModal(); };
+    d.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{ ui.menu=false; toast(b.dataset.act==='adjust'?'Adjust modal (#26): qty delta or count, regrade, Reason — not in this prototype':'Pin modal (#26): side, value — not in this prototype'); renderModal(); });
   }
+  function closeCard(){ ui.open=false; ui.menu=false; renderModal(); renderLookup(); focusSearch(); }
   function addSell(pid,cond,lang){ if(!cond){ const r=M.heldRows(pid).filter(r=>r.onHand>0); if(!r.length){ toast('None held — nothing to Sell'); return; } const nm=r.find(x=>x.condition==='NM'&&x.language===M.STORE_LANG)||r[0]; cond=nm.condition; lang=nm.language; }
     dispatch({type:'add',side:'sell',printingId:pid,condition:cond,language:lang}); toast(`Sell · ${esc(M.byId[pid].name)} ${cond} — on the ${esc(ui.name)}`); }
   function addBuy(pid){ dispatch({type:'add',side:'buy',printingId:pid,condition:ui.buyPick.condition,language:ui.buyPick.language}); toast(`Buy · ${esc(M.byId[pid].name)} ${ui.buyPick.condition} — on the ${esc(ui.name)}`); }
@@ -606,11 +619,11 @@ const M = (() => {
       const hits=results();
       if(ev.key==='/' && !inInput){ ev.preventDefault(); ui.focus='search'; renderLookup(); focusSearch(); return; }
       if(inInput && t.id!=='lsearch') return;
-      if(ev.key==='ArrowDown'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi+1)%hits.length; if(ui.focus==='detail') ui.sel=hits[ui.hi].id; ui.menu=false; renderLookup(); return; }
-      if(ev.key==='ArrowUp'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi-1+hits.length)%hits.length; if(ui.focus==='detail') ui.sel=hits[ui.hi].id; ui.menu=false; renderLookup(); return; }
-      if(ev.key==='Enter'){ if(hits[ui.hi]){ ev.preventDefault(); ui.sel=hits[ui.hi].id; ui.focus='detail'; ui.menu=false; renderLookup(); if(t&&t.blur) t.blur(); } return; }
-      if(ev.key==='Escape'){ ev.preventDefault(); if(ui.menu){ ui.menu=false; renderLookup(); return; } if(ui.focus==='detail'){ ui.focus='search'; renderLookup(); focusSearch(); } else { ui.lquery=''; ui.sel=null; ui.hi=0; renderLookup(); focusSearch(); } return; }
-      if(ui.focus==='detail' && !inInput && ui.sel){ const k=ev.key.toLowerCase(); if(k==='s'){ ev.preventDefault(); addSell(ui.sel); } else if(k==='b'){ ev.preventDefault(); addBuy(ui.sel); } }
+      if(ev.key==='ArrowDown'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi+1)%hits.length; if(ui.open) ui.sel=hits[ui.hi].id; ui.menu=false; renderLookup(); renderModal(); return; }
+      if(ev.key==='ArrowUp'&&hits.length){ ev.preventDefault(); ui.hi=(ui.hi-1+hits.length)%hits.length; if(ui.open) ui.sel=hits[ui.hi].id; ui.menu=false; renderLookup(); renderModal(); return; }
+      if(ev.key==='Enter'){ if(hits[ui.hi]&&!ui.open){ ev.preventDefault(); ui.sel=hits[ui.hi].id; ui.open=true; ui.menu=false; renderLookup(); renderModal(); if(t&&t.blur) t.blur(); } return; }
+      if(ev.key==='Escape'){ ev.preventDefault(); if(ui.menu){ ui.menu=false; renderModal(); return; } if(ui.open){ closeCard(); } else { ui.lquery=''; ui.sel=null; ui.hi=0; renderLookup(); focusSearch(); } return; }
+      if(ui.open && !inInput && ui.sel){ const k=ev.key.toLowerCase(); if(k==='s'){ ev.preventDefault(); addSell(ui.sel); } else if(k==='b'){ ev.preventDefault(); addBuy(ui.sel); } }
       return;
     }
     // the two-sided page
@@ -639,7 +652,8 @@ const M = (() => {
 
   // ---- commit modal
   function renderModal(){
-    const m=$('#modal'); if(!ui.modal){ m.innerHTML=''; return; }
+    const m=$('#modal');
+    if(!ui.modal){ m.innerHTML = (ui.page==='lookup'&&ui.open) ? cardModalHtml() : ''; wireDetail(); return; }
     const c=M.calc(S);
     m.innerHTML=`<div class="mask" id="mask"><div class="modal">
       <h3>Commit ${kindLabel(c.kind)}</h3>
@@ -688,10 +702,10 @@ const M = (() => {
   const add = (side,name,set,num,finish,cond,lang) => () => dispatch({type:'add',side,printingId:P(name,set,num,finish),condition:cond||(side==='buy'?'NM':undefined),language:lang||(side==='buy'?M.STORE_LANG:undefined)});
   const sleep = ms => new Promise(r=>setTimeout(r,ms));
   async function keys(str){ for(const tok of str.split(' ')){ const shift=tok.startsWith('S+'); const key=shift?tok.slice(2):tok; const ch = key==='Space'?' ':key;
-      if(ui.page==='lookup'&&ui.focus==='search'&&ch.length===1&&!shift){ ui.lquery+=ch; ui.hi=0; renderLookup(); }
-      else { const target = ui.page==='lookup' ? (ui.focus==='search'?$('#lsearch'):document.body) : (ui.mode==='cell'?document.querySelector(`tr[data-id="${ui.cell}"]`):document.body); handleKey({key:ch, shiftKey:shift, target, preventDefault(){}}); }
+      if(ui.page==='lookup'&&!ui.open&&ch.length===1&&!shift){ ui.lquery+=ch; ui.hi=0; renderLookup(); }
+      else { const target = ui.page==='lookup' ? (ui.open?document.body:$('#lsearch')) : (ui.mode==='cell'?document.querySelector(`tr[data-id="${ui.cell}"]`):document.body); handleKey({key:ch, shiftKey:shift, target, preventDefault(){}}); }
       await sleep(90); } }
-  const fresh = () => { S=M.initial(); ui.mode='idle'; ui.cell=null; ui.lquery=''; ui.sel=null; ui.hi=0; ui.game='mtg'; ui.focus='search'; ui.hood=false; };
+  const fresh = () => { S=M.initial(); ui.mode='idle'; ui.cell=null; ui.lquery=''; ui.sel=null; ui.hi=0; ui.game='mtg'; ui.focus='search'; ui.open=false; ui.menu=false; ui.hood=false; };
   const onPage = page => () => go(page);
   const WALKS = [
     { title:'A Trade with cards to spare — the #43 worked example', steps:[
