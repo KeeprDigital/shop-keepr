@@ -53,9 +53,9 @@ export const LEDGER_REASONS = [...ADJUSTMENT_REASONS, ...REVERSAL_REASONS] as co
 export type LedgerReason = (typeof LEDGER_REASONS)[number];
 
 /** The Reasons the Adjust modal offers: `initial-load` belongs to the Ingest session (spec §8.2, _Adjust modal_). */
-export const ADJUST_MODAL_REASONS = ADJUSTMENT_REASONS.filter(reason => reason !== 'initial-load');
+export const ADJUST_MODAL_REASONS = ADJUSTMENT_REASONS.filter((reason): reason is AdjustModalReason => reason !== 'initial-load');
 
-export type AdjustModalReason = (typeof ADJUST_MODAL_REASONS)[number];
+export type AdjustModalReason = Exclude<AdjustmentReason, 'initial-load'>;
 
 /** The Reasons a count change takes; a regrade's Reason is fixed to `condition-regrade`. */
 export const COUNT_CHANGE_REASONS = ADJUST_MODAL_REASONS.filter((reason): reason is CountChangeReason => reason !== 'condition-regrade');

@@ -1,12 +1,12 @@
 import type { AdjustmentInput } from '../../server/ledger/adjustment';
 import { env } from 'cloudflare:test';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../../server/db/client';
 import { ledgerEntry, ledgerLine, sku } from '../../server/db/schema';
 import { recordAdjustment } from '../../server/ledger/adjustment';
 import { STORE_ID } from '../../server/utils/store';
-import { seedPrinting, STAFF_ACTOR } from '../support/stock';
+import { linesOf as linesOfIn, PIKACHU_NM, seedPrinting, STAFF_ACTOR } from '../support/stock';
 
 const db = createDb(env.DB);
 
@@ -15,11 +15,7 @@ async function skuRow(printingId: string, condition: string, language = 'en') {
 	return rows.find(row => row.condition === condition && row.language === language);
 }
 
-async function linesOf(entryId: string) {
-	return db.select().from(ledgerLine).where(eq(ledgerLine.entryId, entryId)).orderBy(asc(ledgerLine.quantity));
-}
-
-const PIKACHU_NM = { printingId: 'prt-pokemon-base1-58', condition: 'NM', language: 'en' } as const;
+const linesOf = (entryId: string) => linesOfIn(db, entryId);
 
 function adjust(input: Partial<AdjustmentInput> & Pick<AdjustmentInput, 'change' | 'reason'>) {
 	return recordAdjustment(db, { ...PIKACHU_NM, ...input }, STAFF_ACTOR);
@@ -157,5 +153,26 @@ describe('an Adjustment (spec §3, ADR 0001)', () => {
 
 		expect((await skuRow(PIKACHU_NM.printingId, 'NM', 'en'))?.onHand).toBe(2);
 		expect((await skuRow(PIKACHU_NM.printingId, 'NM', 'ja'))?.onHand).toBe(1);
+	});
+
+	it('refuses a new count that changes nothing, so no zero-quantity line is ever written', async () => {
+		await adjust({ change: { delta: 2 }, reason: 'found' });
+		const before = await ledgerCounts();
+
+		await expect(adjust({ change: { newCount: 2 }, reason: 'miscount' })).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
+		await expect(adjust({ change: { newCount: 0 }, reason: 'miscount', condition: 'LP' })).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
+
+		expect(await ledgerCounts()).toEqual(before);
+		expect(await skuRow(PIKACHU_NM.printingId, 'LP')).toBeUndefined();
+	});
+
+	it('refuses a regrade given as a new count: a regrade moves copies', async () => {
+		await adjust({ change: { delta: 2 }, reason: 'found' });
+
+		await expect(adjust({ change: { newCount: 1 }, regradeTo: 'LP', reason: 'condition-regrade' })).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
+	});
+
+	it('names a Printing the Mirror does not hold as not found', async () => {
+		await expect(adjust({ printingId: 'prt-nowhere', change: { delta: 1 }, reason: 'found' })).rejects.toMatchObject({ data: { code: 'NOT_FOUND' } });
 	});
 });

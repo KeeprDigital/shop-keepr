@@ -5,12 +5,18 @@ import { signInAsStaff } from './staff-session';
 /** A fixture Printing the store holds for these tests: Charizard, Base Set 4. */
 const CHARIZARD = { printingId: 'prt-pokemon-base1-4', condition: 'NM', language: 'en' } as const;
 
-/** Sets the count from whatever an earlier run left, through the same write path the modal uses. */
+/**
+ * Sets the count from whatever an earlier run left, through the same write
+ * path the modal uses. A count already held is refused as nothing to
+ * record, which is the state wanted.
+ */
 async function setCount(page: Page, baseURL: string, newCount: number, key = CHARIZARD) {
 	const response = await page.request.post(`${baseURL}api/staff/adjustments`, {
 		data: { ...key, change: { newCount }, reason: 'miscount' },
 	});
-	expect(response.status()).toBe(200);
+	if (response.status() !== 200) {
+		expect(await response.json()).toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
+	}
 }
 
 function charizardRow(page: Page) {

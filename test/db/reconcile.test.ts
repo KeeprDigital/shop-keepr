@@ -20,6 +20,16 @@ describe('the reconcile job (spec §3, _Reconcile job and projection_drift_)', (
 		await recordAdjustment(db, { ...PIKACHU, condition: 'LP', change: { delta: 1 }, reason: 'found' }, STAFF_ACTOR);
 	});
 
+	it('heals every drifted SKU in one run', async () => {
+		await db.update(sku).set({ onHand: 0 });
+
+		const outcome = await reconcileOnHand(db);
+
+		expect(outcome.healed.map(heal => heal.ledgerOnHand).sort()).toEqual([1, 3]);
+		expect((await db.select().from(sku)).map(row => row.onHand).sort()).toEqual([1, 3]);
+		expect(await db.select().from(projectionDrift)).toHaveLength(2);
+	});
+
 	it('writes nothing on a clean run', async () => {
 		const outcome = await reconcileOnHand(db);
 

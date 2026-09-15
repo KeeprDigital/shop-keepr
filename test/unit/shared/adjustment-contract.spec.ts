@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { zAdjustmentRequest, zReversalRequest } from '../../../shared/contracts/staff/adjustment';
+import { zAdjustmentRequest } from '../../../shared/contracts/staff/adjustment';
 
 const base = { printingId: 'prt-1', condition: 'NM', language: 'en' } as const;
 
@@ -25,13 +25,11 @@ describe('the Adjust modal request (spec §8.2, _Adjust modal_)', () => {
 		expect(zAdjustmentRequest.safeParse({ ...base, change: { delta: 1 }, regradeTo: 'LP', reason: 'miscount' }).success).toBe(false);
 		expect(zAdjustmentRequest.safeParse({ ...base, change: { delta: 1 }, reason: 'condition-regrade' }).success).toBe(false);
 		expect(zAdjustmentRequest.safeParse({ ...base, change: { delta: 1 }, regradeTo: 'NM', reason: 'condition-regrade' }).success).toBe(false);
+		expect(zAdjustmentRequest.safeParse({ ...base, change: { newCount: 1 }, regradeTo: 'LP', reason: 'condition-regrade' }).success).toBe(false);
 	});
-});
 
-describe('the Reversal request', () => {
-	it('needs a note with Reason other', () => {
-		expect(zReversalRequest.safeParse({ reason: 'other' }).success).toBe(false);
-		expect(zReversalRequest.safeParse({ reason: 'other', note: 'Wrong binder' }).success).toBe(true);
-		expect(zReversalRequest.safeParse({ reason: 'keying-error' }).success).toBe(true);
+	it('leaves Language to the write boundary: blank or any spelling passes here', () => {
+		expect(zAdjustmentRequest.safeParse({ ...base, language: undefined, change: { delta: 1 }, reason: 'found' }).success).toBe(true);
+		expect(zAdjustmentRequest.safeParse({ ...base, language: 'JA', change: { delta: 1 }, reason: 'found' }).success).toBe(true);
 	});
 });

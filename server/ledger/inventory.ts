@@ -1,3 +1,4 @@
+import type { SQL } from 'drizzle-orm';
 /**
  * Inventory (spec §8.2, `/inventory`): "what do we hold". Every SKU with
  * stock on hand, joined to its Printing for display, filtered by Game
@@ -6,7 +7,7 @@
  */
 import type { InventoryPage, InventoryQuery, InventoryRow, InventorySort } from '../../shared/contracts/staff/inventory';
 import type { Db } from '../db/client';
-import { and, asc, desc, eq, gt, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm';
 import { CONDITIONS } from '../../shared/domain/condition';
 import { printing, sku } from '../db/schema';
 import { STORE_ID } from '../utils/store';
@@ -24,15 +25,25 @@ const SORT_COLUMNS = {
 	gameSystem: printing.gameSystem,
 } satisfies Record<InventorySort, unknown>;
 
+/** A substring match on the name, the typed wildcards taken literally; SQLite's LIKE has no escape unless told. */
+function nameContains(q: string | undefined): SQL | undefined {
+	const needle = q?.trim().toLowerCase();
+	if (!needle) {
+		return undefined;
+	}
+	const escaped = needle.replaceAll(/[%_\\]/g, char => `\\${char}`);
+	return sql`lower(${printing.name}) LIKE ${`%${escaped}%`} ESCAPE '\\'`;
+}
+
 /** The stable order within a Printing, after whatever column leads. */
 const TIE_BREAK = [asc(printing.name), asc(printing.setCode), asc(printing.collectorNumber), asc(conditionRank), asc(sku.language)];
 
 export async function listInventory(db: Db, query: InventoryQuery): Promise<InventoryPage> {
-	const held = and(eq(sku.storeId, STORE_ID), gt(sku.onHand, 0));
+	const inStock = and(eq(sku.storeId, STORE_ID), gt(sku.onHand, 0));
 	const filters = [
-		held,
+		inStock,
 		query.game ? eq(printing.gameSystem, query.game) : undefined,
-		query.q?.trim() ? like(sql`lower(${printing.name})`, `%${query.q.trim().toLowerCase().replaceAll(/[%_\\]/g, char => `\\${char}`)}%`) : undefined,
+		nameContains(query.q),
 	];
 	const lead = SORT_COLUMNS[query.sort ?? 'name'];
 	const rows: InventoryRow[] = await db
@@ -58,7 +69,7 @@ export async function listInventory(db: Db, query: InventoryQuery): Promise<Inve
 		.selectDistinct({ gameSystem: printing.gameSystem })
 		.from(sku)
 		.innerJoin(printing, eq(printing.id, sku.printingId))
-		.where(held)
+		.where(inStock)
 		.orderBy(asc(printing.gameSystem));
 	return { rows, games: games.map(row => row.gameSystem) };
 }

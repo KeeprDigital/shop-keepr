@@ -50,14 +50,15 @@ const schema = z.object({
 });
 type Schema = z.output<typeof schema>;
 
-const state = reactive<Partial<Schema>>({ mode: 'delta', quantity: undefined, regradeTo: undefined, reason: undefined, note: '' });
+const blank = (): Partial<Schema> => ({ mode: 'delta', quantity: undefined, regradeTo: undefined, reason: undefined, note: '' });
+const state = reactive<Partial<Schema>>(blank());
 const failure = ref<string | null>(null);
 const submitting = ref(false);
 const toast = useToast();
 
 watch(open, (isOpen) => {
 	if (isOpen) {
-		Object.assign(state, { mode: 'delta', quantity: undefined, regradeTo: undefined, reason: undefined, note: '' });
+		Object.assign(state, blank());
 		failure.value = null;
 	}
 });

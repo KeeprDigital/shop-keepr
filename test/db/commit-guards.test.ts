@@ -4,11 +4,9 @@ import { createDb } from '../../server/db/client';
 import { ledgerEntry, ledgerLine, sku } from '../../server/db/schema';
 import { recordAdjustment } from '../../server/ledger/adjustment';
 import { commitStatements } from '../../server/ledger/commit';
-import { seedPrinting, STAFF_ACTOR } from '../support/stock';
+import { PIKACHU_NM, seedPrinting, STAFF_ACTOR } from '../support/stock';
 
 const db = createDb(env.DB);
-
-const PIKACHU_NM = { printingId: 'prt-pokemon-base1-58', condition: 'NM', language: 'en' } as const;
 
 /**
  * `batch()` is atomic but not conditional (spec §4.1; ADR 0011): a

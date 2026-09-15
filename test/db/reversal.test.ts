@@ -1,23 +1,19 @@
 import { env } from 'cloudflare:test';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../../server/db/client';
-import { ledgerEntry, ledgerLine, sku } from '../../server/db/schema';
+import { ledgerEntry, sku } from '../../server/db/schema';
 import { recordAdjustment, reverseAdjustment } from '../../server/ledger/adjustment';
-import { seedPrinting, STAFF_ACTOR } from '../support/stock';
+import { linesOf as linesOfIn, PIKACHU_NM, seedPrinting, STAFF_ACTOR } from '../support/stock';
 
 const db = createDb(env.DB);
-
-const PIKACHU_NM = { printingId: 'prt-pokemon-base1-58', condition: 'NM', language: 'en' } as const;
 
 async function onHand(condition: 'NM' | 'LP') {
 	const rows = await db.select().from(sku).where(eq(sku.condition, condition));
 	return rows[0]?.onHand;
 }
 
-async function linesOf(entryId: string) {
-	return db.select().from(ledgerLine).where(eq(ledgerLine.entryId, entryId)).orderBy(asc(ledgerLine.quantity));
-}
+const linesOf = (entryId: string) => linesOfIn(db, entryId);
 
 describe('a Reversal (ADR 0001)', () => {
 	beforeEach(async () => {
@@ -82,5 +78,30 @@ describe('a Reversal (ADR 0001)', () => {
 
 	it('only reverses an Adjustment: an unknown entry is not found', async () => {
 		await expect(reverseAdjustment(db, { entryId: 'nope', reason: 'keying-error' }, STAFF_ACTOR)).rejects.toMatchObject({ data: { code: 'NOT_FOUND' } });
+	});
+
+	it('never reverses more than the entry recorded, across every Reversal of it', async () => {
+		await recordAdjustment(db, { ...PIKACHU_NM, change: { delta: 10 }, reason: 'found' }, STAFF_ACTOR);
+		const original = await recordAdjustment(db, { ...PIKACHU_NM, change: { delta: 4 }, reason: 'found' }, STAFF_ACTOR);
+		const [line] = await linesOf(original.entryId);
+
+		await reverseAdjustment(db, { entryId: original.entryId, reason: 'keying-error', portion: [{ lineId: line!.id, copies: 3 }] }, STAFF_ACTOR);
+
+		await expect(reverseAdjustment(db, { entryId: original.entryId, reason: 'keying-error', portion: [{ lineId: line!.id, copies: 2 }] }, STAFF_ACTOR))
+			.rejects
+			.toMatchObject({ data: { code: 'CONFLICT' } });
+		await reverseAdjustment(db, { entryId: original.entryId, reason: 'keying-error' }, STAFF_ACTOR);
+		expect(await onHand('NM')).toBe(10);
+		await expect(reverseAdjustment(db, { entryId: original.entryId, reason: 'keying-error' }, STAFF_ACTOR))
+			.rejects
+			.toMatchObject({ data: { code: 'CONFLICT' } });
+	});
+
+	it('rejects a portion naming a line the entry does not have', async () => {
+		const original = await recordAdjustment(db, { ...PIKACHU_NM, change: { delta: 1 }, reason: 'found' }, STAFF_ACTOR);
+
+		await expect(reverseAdjustment(db, { entryId: original.entryId, reason: 'keying-error', portion: [{ lineId: 'line_elsewhere', copies: 1 }] }, STAFF_ACTOR))
+			.rejects
+			.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
 	});
 });

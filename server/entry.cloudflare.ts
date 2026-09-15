@@ -14,8 +14,8 @@ export { CatalogueSyncWorkflow } from './catalogue/sync/workflow';
 const handler: ExportedHandler<Env> = {
 	...nitro,
 	/** The hourly reconcile (spec §3, _Reconcile job_): heals `on_hand` from the ledger, logs every heal. */
-	async scheduled(controller, env, context) {
-		context.waitUntil(reconcileOnHand(createDb(env.DB)));
+	async scheduled(_controller, env) {
+		await reconcileOnHand(createDb(env.DB));
 	},
 };
 
