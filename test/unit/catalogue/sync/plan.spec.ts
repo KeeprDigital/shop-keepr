@@ -56,6 +56,14 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		expect(plan.printings[0]).toMatchObject({ record: renamed });
 	});
 
+	it('writes a Printing whose search row is missing or outdated, and does not call that drift', async () => {
+		const mirror = await mirrorOf(magic);
+		mirror.printings.set(bolt.id, { ...mirror.printings.get(bolt.id)!, searchHeld: false });
+		const plan = await planPage(ok(magic), mirror, { fullWalk: true });
+		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0 });
+		expect(plan.printings[0]).toMatchObject({ record: bolt });
+	});
+
 	it('counts a change found by a full walk as drift', async () => {
 		const page = magic.map(r => (r === bolt ? { ...bolt, rarity: 'uncommon' } : r));
 		const plan = await planPage(ok(page), await mirrorOf(magic), { fullWalk: true });

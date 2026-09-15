@@ -1,5 +1,5 @@
 /**
- * Bulk-write plumbing for the measured D1 caps (spec §4.1, _Measured
+ * Inline-literal plumbing for the measured D1 caps (spec §4.1, _Measured
  * limits_): 100 bound parameters per statement, so bulk writes inline
  * escaped literals; 100,000 bytes per statement, so rows are packed to a
  * budget under it.

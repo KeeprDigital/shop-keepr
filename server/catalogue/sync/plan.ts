@@ -8,6 +8,8 @@
  *   reconcile share one code path.
  * - A record applies only if its cursor is at or after the stored one.
  * - A hash mismatch on a full walk is drift, counted and recorded.
+ * - A Printing whose search row is missing or outdated is written again
+ *   whatever its hash, and that is not drift (ADR 0008).
  * - A record that fails validation, or needs a column that does not exist,
  *   is quarantined with its raw payload; the run never fails.
  * - Sets and vocabularies come before Printings.
@@ -15,12 +17,19 @@
 import type { QuarantineReason } from '../../../shared/domain/sync-run';
 import type { ParsedRecord } from '../client';
 import type { CatalogueRecord, Cursor, PrintingRecord, SetRecord, VocabularyRecord } from '../generated/types.gen';
-import { judgeFacets } from './facets';
+import { judgeFacets } from '../../search/mirror';
 import { contentHash } from './hash';
 
 export interface ExistingRow {
 	hash: string;
 	cursor: Cursor;
+	/**
+	 * Printings only: whether the game's search row exists at the current
+	 * name-key version (ADR 0008). False makes the record a write whatever
+	 * its hash says; it is never drift, which is the Catalogue disagreeing
+	 * with the Mirror, not the Mirror owing itself a derived row.
+	 */
+	searchHeld?: boolean;
 }
 
 /** What the Mirror holds for the records on this page, keyed as the tables are. */
@@ -91,12 +100,12 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 			return;
 		}
 		const hash = await contentHash(record);
-		if (held?.hash === hash) {
+		if (held?.hash === hash && held.searchHeld !== false) {
 			return;
 		}
 		writes.push({ record, hash });
 		plan.counts.written += 1;
-		if (held && fullWalk) {
+		if (held && fullWalk && held.hash !== hash) {
 			plan.counts.drifted += 1;
 		}
 	}

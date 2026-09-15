@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { literal, packRows, STATEMENT_BYTES } from '../../../../server/catalogue/sync/sql';
+import { literal, packRows, STATEMENT_BYTES } from '../../../server/db/sql';
 
 describe('inline literals (spec §4.1: 100 bound parameters per statement, so bulk writes inline)', () => {
 	it('escapes text and keeps every other value as SQL', () => {
