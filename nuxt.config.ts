@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 export default defineNuxtConfig({
 	modules: [
 		'@nuxt/eslint',
@@ -25,6 +27,14 @@ export default defineNuxtConfig({
 			// `wrangler types` output: the Env interface and D1 globals for
 			// server code. The app project picks it up as a root `*.d.ts`.
 			tsConfig: { include: ['../worker-configuration.d.ts'] },
+		},
+	},
+
+	// The built Worker also exports the Workflow class the binding names;
+	// dev keeps Nitro's own entry.
+	$production: {
+		nitro: {
+			entry: fileURLToPath(new URL('./server/entry.cloudflare.ts', import.meta.url)),
 		},
 	},
 

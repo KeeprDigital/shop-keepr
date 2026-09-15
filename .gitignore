@@ -38,3 +38,8 @@ playwright/.cache
 # Wrangler local state and generated binding types
 .wrangler
 worker-configuration.d.ts
+
+# Local Worker secrets
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
