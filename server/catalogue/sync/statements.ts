@@ -114,7 +114,8 @@ function pageUnapplied({ runId, cursor }: PageWriteContext): string {
 	return `EXISTS (SELECT 1 FROM sync_run WHERE id = ${literal(runId)} AND status = 'running' AND cursor_to = ${literal(cursor)})`;
 }
 
-function quarantineStatements(quarantined: Quarantined[], ctx: PageWriteContext): string[] {
+/** The page's quarantine rows; shared with the Market Price run. */
+export function quarantineStatements(quarantined: Quarantined[], ctx: PageWriteContext): string[] {
 	const { runId, kind, game, now, newId } = ctx;
 	return packRows(
 		'INSERT INTO catalogue_quarantine (id, sync_run_id, kind, game_system, record_kind, record_id, cursor, reason, detail, raw, quarantined_at) SELECT column1, column2, column3, column4, column5, column6, column7, column8, column9, column10, column11 FROM (VALUES ',
@@ -123,10 +124,11 @@ function quarantineStatements(quarantined: Quarantined[], ctx: PageWriteContext)
 	);
 }
 
-function runProgressStatement({ counts, printingsSeen }: PagePlan, ctx: PageWriteContext): string {
+/** The batch's last statement: the run's cursor and counters advance only while the page is unapplied. Shared with the Market Price run. */
+export function runProgressStatement({ counts, printingsSeen }: Pick<PagePlan, 'counts'> & { printingsSeen?: number }, ctx: PageWriteContext): string {
 	return `UPDATE sync_run SET cursor_to = ${literal(ctx.nextCursor)},`
-		+ ` records_seen = records_seen + ${counts.seen}, printings_seen = printings_seen + ${printingsSeen}, records_written = records_written + ${counts.written},`
-		+ ` records_quarantined = records_quarantined + ${counts.quarantined}, records_drifted = records_drifted + ${counts.drifted},`
+		+ ` records_seen = records_seen + ${counts.seen}, printings_seen = printings_seen + ${printingsSeen ?? 0}, records_written = records_written + ${counts.written},`
+		+ ` records_quarantined = records_quarantined + ${counts.quarantined}, records_drifted = records_drifted + ${counts.drifted}, records_skipped = records_skipped + ${counts.skipped},`
 		+ ` updated_at = ${literal(ctx.now)}`
 		+ ` WHERE id = ${literal(ctx.runId)} AND status = 'running' AND cursor_to = ${literal(ctx.cursor)}`;
 }

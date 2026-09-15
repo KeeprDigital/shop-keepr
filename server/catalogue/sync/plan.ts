@@ -68,6 +68,8 @@ export interface PageCounts {
 	written: number;
 	quarantined: number;
 	drifted: number;
+	/** Market Price runs only: movements left unapplied because the Mirror lacks the Printing or the rate was null. */
+	skipped: number;
 }
 
 export interface PagePlan {
@@ -91,7 +93,7 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 		vocabularies: [],
 		printings: [],
 		quarantined: [],
-		counts: { seen: records.length, written: 0, quarantined: 0, drifted: 0 },
+		counts: { seen: records.length, written: 0, quarantined: 0, drifted: 0, skipped: 0 },
 		printingsSeen: 0,
 	};
 
@@ -111,10 +113,10 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 	}
 
 	function quarantine(raw: unknown, reason: QuarantineReason, detail: unknown) {
-		const described = selfDescription(raw);
-		plan.quarantined.push({ reason, ...described, detail, raw });
+		const entry = quarantined(raw, reason, detail);
+		plan.quarantined.push(entry);
 		plan.counts.quarantined += 1;
-		if (described.recordKind === 'printing') {
+		if (entry.recordKind === 'printing') {
 			plan.printingsSeen += 1;
 		}
 	}
@@ -146,11 +148,16 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 	return plan;
 }
 
+/** A payload the run could not apply, described by whatever it says about itself. */
+export function quarantined(raw: unknown, reason: QuarantineReason, detail: unknown): Quarantined {
+	return { reason, ...selfDescription(raw), detail, raw };
+}
+
 /** What a payload says about itself, when it is an object that says anything. */
 function selfDescription(raw: unknown): Pick<Quarantined, 'recordKind' | 'recordId' | 'cursor'> {
 	const field = (name: string): string | null => {
 		const value = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>)[name] : undefined;
 		return typeof value === 'string' ? value : null;
 	};
-	return { recordKind: field('kind'), recordId: field('id') ?? field('code'), cursor: field('cursor') };
+	return { recordKind: field('kind'), recordId: field('id') ?? field('printing_id') ?? field('code'), cursor: field('cursor') };
 }

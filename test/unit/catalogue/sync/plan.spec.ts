@@ -32,7 +32,7 @@ const bolt = magic.find((r): r is PrintingRecord => r.kind === 'printing' && r.i
 describe('planning a page (ADR 0009: hash-compare on every write makes seed, delta and reconcile one code path)', () => {
 	it('inserts everything into an empty Mirror, sets and vocabularies before Printings', async () => {
 		const plan = await planPage(ok(magic), emptyExisting(), { fullWalk: true });
-		expect(plan.counts).toEqual({ seen: magic.length, written: magic.length, quarantined: 0, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: magic.length, written: magic.length, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(plan.sets.map(w => w.record.code)).toEqual(['lea', 'm10', 'unh', 'sta', 'neo', 'mom', 'ptc']);
 		expect(plan.vocabularies).toHaveLength(20);
 		expect(plan.printings).toHaveLength(17);
@@ -43,7 +43,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 
 	it('writes nothing when every record hashes the same as the Mirror', async () => {
 		const plan = await planPage(ok(magic), await mirrorOf(magic), { fullWalk: true });
-		expect(plan.counts).toEqual({ seen: magic.length, written: 0, quarantined: 0, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: magic.length, written: 0, quarantined: 0, drifted: 0, skipped: 0 });
 		expect([...plan.sets, ...plan.vocabularies, ...plan.printings]).toEqual([]);
 	});
 
@@ -51,7 +51,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		const renamed = { ...bolt, name: 'Lightning Bolt (misprint)' };
 		const page = magic.map(r => (r === bolt ? renamed : r));
 		const plan = await planPage(ok(page), await mirrorOf(magic), { fullWalk: false });
-		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(plan.printings).toHaveLength(1);
 		expect(plan.printings[0]).toMatchObject({ record: renamed });
 	});
@@ -60,7 +60,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		const mirror = await mirrorOf(magic);
 		mirror.printings.set(bolt.id, { ...mirror.printings.get(bolt.id)!, searchHeld: false });
 		const plan = await planPage(ok(magic), mirror, { fullWalk: true });
-		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(plan.printings[0]).toMatchObject({ record: bolt });
 	});
 
@@ -73,7 +73,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 	it('never applies a record whose cursor is behind the row it would replace', async () => {
 		const older = { ...bolt, cursor: 'magic-0010', name: 'Stale Bolt' };
 		const plan = await planPage(ok([older]), await mirrorOf(magic), { fullWalk: false });
-		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 0, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(plan.printings).toEqual([]);
 	});
 
@@ -86,7 +86,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		const broken = { kind: 'printing', cursor: 'magic-0099', game: 'magic', id: 'prt-broken' };
 		const issues = [{ code: 'invalid_type', path: ['card_id'], message: 'Required' }];
 		const plan = await planPage([{ ok: false, raw: broken, issues }, ...ok([bolt])], emptyExisting(), { fullWalk: false });
-		expect(plan.counts).toEqual({ seen: 2, written: 1, quarantined: 1, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: 2, written: 1, quarantined: 1, drifted: 0, skipped: 0 });
 		expect(plan.printingsSeen).toBe(2);
 		expect(plan.quarantined).toEqual([{
 			reason: 'validation_failed',
@@ -101,7 +101,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 	it('quarantines a Printing whose colour has no column, naming the facet and value', async () => {
 		const purple = { ...bolt, attributes: { ...bolt.attributes, colour_identity: ['R', 'P'] } };
 		const plan = await planPage(ok([purple]), emptyExisting(), { fullWalk: false });
-		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 1, drifted: 0 });
+		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 1, drifted: 0, skipped: 0 });
 		expect(plan.quarantined[0]).toMatchObject({
 			reason: 'unknown_facet_value',
 			recordKind: 'printing',
