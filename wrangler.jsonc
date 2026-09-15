@@ -31,6 +31,12 @@
 	],
 	// The Catalogue sync (spec §5, ADR 0009): one Workflow, one instance per
 	// (kind, Game System) run. The class is exported by server/entry.cloudflare.ts.
+	// The reconcile job (spec §3, _Reconcile job_; ADR 0001): once an hour,
+	// on_hand is healed from the ledger and every heal is logged, so the
+	// shop floor is correct within the hour. Handled by server/entry.cloudflare.ts.
+	"triggers": {
+		"crons": ["17 * * * *"]
+	},
 	"workflows": [
 		{
 			"binding": "CATALOGUE_SYNC",

@@ -10,23 +10,12 @@
  * only once its drift row exists, so a ledger write racing the job leaves
  * the SKU to the next run rather than overwriting it.
  */
+import type { Heal, ReconcileOutcome } from '../../shared/contracts/staff/reconcile';
 import type { Db } from '../db/client';
 import { sql } from 'drizzle-orm';
 import { newId } from '../utils/ids';
 import { STORE_ID } from '../utils/store';
 import { prepared } from './statement';
-
-export interface Heal {
-	skuId: string;
-	storedOnHand: number;
-	ledgerOnHand: number;
-}
-
-export interface ReconcileOutcome {
-	/** SKU rows compared with the ledger. */
-	checked: number;
-	healed: Heal[];
-}
 
 interface DriftRow {
 	id: string;

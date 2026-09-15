@@ -17,3 +17,12 @@ export function isCondition(value: unknown): value is Condition {
 export function compareCondition(a: Condition, b: Condition): number {
 	return CONDITIONS.indexOf(a) - CONDITIONS.indexOf(b);
 }
+
+/** How the UI shows a Condition: the grade in words, the code beside it. */
+export const CONDITION_LABELS: Record<Condition, string> = {
+	NM: 'Near Mint',
+	LP: 'Lightly Played',
+	MP: 'Moderately Played',
+	HP: 'Heavily Played',
+	DMG: 'Damaged',
+};

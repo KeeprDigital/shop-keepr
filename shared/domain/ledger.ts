@@ -55,6 +55,13 @@ export type LedgerReason = (typeof LEDGER_REASONS)[number];
 /** The Reasons the Adjust modal offers: `initial-load` belongs to the Ingest session (spec §8.2, _Adjust modal_). */
 export const ADJUST_MODAL_REASONS = ADJUSTMENT_REASONS.filter(reason => reason !== 'initial-load');
 
+export type AdjustModalReason = (typeof ADJUST_MODAL_REASONS)[number];
+
+/** The Reasons a count change takes; a regrade's Reason is fixed to `condition-regrade`. */
+export const COUNT_CHANGE_REASONS = ADJUST_MODAL_REASONS.filter((reason): reason is CountChangeReason => reason !== 'condition-regrade');
+
+export type CountChangeReason = Exclude<AdjustModalReason, 'condition-regrade'>;
+
 /** How the UI shows a Reason (spec §3, _Enums_: the UI shows them in words). */
 export const REASON_LABELS: Record<LedgerReason, string> = {
 	'miscount': 'Miscount',

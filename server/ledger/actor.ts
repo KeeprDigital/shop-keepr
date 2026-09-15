@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3';
 import type { Surface } from '../../shared/domain/ledger';
+import { apiError } from '../utils/api-error';
 
 /** Who is writing the ledger: the audit pair every entry carries (spec §3, `ledger_entry`; §7.1). */
 export interface Actor {
