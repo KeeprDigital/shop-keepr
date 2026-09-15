@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cascadeStatements, firstNonEmptyTier, SEARCH_TIERS } from '../../../server/search/cascade';
+import { cascadeStatements, firstNonEmptyTier } from '../../../server/search/cascade';
 import { gameSystem } from '../../../server/search/games';
+import { SEARCH_TIERS } from '../../../shared/contracts/staff/search';
 
 const magic = gameSystem('magic')!;
 
@@ -67,14 +68,15 @@ describe('the five-tier cascade as statements (spec §4.3; ADR 0012)', () => {
 });
 
 describe('stop at the first non-empty tier', () => {
+	const statements = cascadeStatements(magic, { q: 'bolt', inStock: false, facets: {}, limit: 20, offset: 0 });
+	const empty = { results: [] };
+
 	it('takes the first tier with rows and names it', () => {
-		const empty = { results: [] };
-		expect(firstNonEmptyTier(SEARCH_TIERS, [empty, empty, { results: [{ id: 'a' }] }, { results: [{ id: 'b' }] }, empty]))
+		expect(firstNonEmptyTier(statements, [empty, empty, { results: [{ id: 'a' }] }, { results: [{ id: 'b' }] }, empty]))
 			.toEqual({ tier: 'tokens', rows: [{ id: 'a' }] });
 	});
 
 	it('is a miss with no tier when every tier is empty', () => {
-		const empty = { results: [] };
-		expect(firstNonEmptyTier(SEARCH_TIERS, [empty, empty, empty, empty, empty])).toEqual({ tier: null, rows: [] });
+		expect(firstNonEmptyTier(statements, [empty, empty, empty, empty, empty])).toEqual({ tier: null, rows: [] });
 	});
 });

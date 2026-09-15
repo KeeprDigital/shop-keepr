@@ -12,6 +12,9 @@ import { epochMs } from '../columns';
  * search module's write side. Each table's FTS5 index is declared by hand
  * in the migration, since drizzle-kit knows no virtual tables, and its
  * index set is built by the run's finish step (`server/search/mirror.ts`).
+ * This file is the one place outside `server/search` that reads the
+ * registry, and only to declare the tables for drizzle-kit; it names no
+ * game of its own.
  */
 
 /** The columns every search table shares, by name. */

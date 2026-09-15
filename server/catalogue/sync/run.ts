@@ -15,6 +15,7 @@
  * script runs the same code inline.
  */
 import type { SyncKind, SyncRunStatus } from '../../../shared/domain/sync-run';
+import type { D1Client } from '../../db/client';
 import type { CatalogueClient } from '../client';
 import type { Cursor } from '../generated/types.gen';
 import type { Existing, ExistingRow, PageCounts } from './plan';
@@ -25,9 +26,6 @@ import { FIRST_CURSOR } from '../client';
 import { MIRROR_INDEXES } from './indexes';
 import { emptyExisting, planPage, vocabularyKey } from './plan';
 import { pageStatements } from './statements';
-
-/** What the sync needs of D1; a Session provides both. */
-export type D1Client = Pick<D1Database, 'prepare' | 'batch'>;
 
 /**
  * A `running` row with no progress for this long is abandoned by the next
@@ -166,18 +164,18 @@ async function assertRunning(db: D1Client, runId: string): Promise<void> {
 
 /**
  * Hash and cursor of every row the page could touch, read in one
- * `batch()`. A Printing is held only when its search row is too (ADR
- * 0008: the search read model is derived, and a missing or outdated row
- * is a write the next full walk owes).
+ * `batch()`, and for a Printing whether its search row stands at the
+ * current name-key version (ADR 0008: a missing or outdated one is a
+ * write the next full walk owes, not drift).
  */
 async function readExisting(db: D1Client, game: string, printingIds: string[]): Promise<Existing> {
 	const existing = emptyExisting();
 	const selects = [
 		`SELECT code AS key, content_hash AS hash, cursor FROM catalogue_set WHERE game_system = ${literal(game)}`,
 		`SELECT facet, code, content_hash AS hash, cursor FROM catalogue_vocabulary WHERE game_system = ${literal(game)}`,
-		...packRows('SELECT printing_id AS key, content_hash AS hash, cursor FROM printing_detail WHERE printing_id IN (', printingIds.map(literal), `) AND ${heldInSearch(game)}`),
+		...packRows(`SELECT printing_id AS key, content_hash AS hash, cursor, (${heldInSearch(game)}) AS search_held FROM printing_detail WHERE printing_id IN (`, printingIds.map(literal), ')'),
 	];
-	const [sets, vocabularies, ...printings] = await db.batch<{ key: string; facet: string; code: string; hash: string; cursor: Cursor }>(selects.map(sql => db.prepare(sql)));
+	const [sets, vocabularies, ...printings] = await db.batch<{ key: string; facet: string; code: string; hash: string; cursor: Cursor; search_held: number }>(selects.map(sql => db.prepare(sql)));
 	const held = (row: { hash: string; cursor: Cursor }): ExistingRow => ({ hash: row.hash, cursor: row.cursor });
 	for (const row of sets!.results) {
 		existing.sets.set(row.key, held(row));
@@ -186,7 +184,7 @@ async function readExisting(db: D1Client, game: string, printingIds: string[]): 
 		existing.vocabularies.set(vocabularyKey(row.facet, row.code), held(row));
 	}
 	for (const row of printings.flatMap(result => result.results)) {
-		existing.printings.set(row.key, held(row));
+		existing.printings.set(row.key, { ...held(row), searchHeld: row.search_held === 1 });
 	}
 	return existing;
 }

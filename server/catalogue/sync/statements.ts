@@ -68,7 +68,8 @@ function vocabularyStatements(writes: Write<VocabularyRecord>[], { game, now }: 
 /** The incoming Market Price applies when it is a value and not behind the rate held. */
 const PRICE_APPLIES = 'excluded.market_price IS NOT NULL AND (printing.market_price_cursor IS NULL OR excluded.market_price_cursor >= printing.market_price_cursor)';
 
-function printingStatements(writes: Write<PrintingRecord>[], { game, now }: PageWriteContext): string[] {
+/** The `printing` upsert alone; the recall script writes a corpus through it. */
+export function printingStatements(writes: Write<PrintingRecord>[], { game, now }: Pick<PageWriteContext, 'game' | 'now'>): string[] {
 	return packRows(
 		'INSERT INTO printing (id, card_id, game_system, name, set_code, collector_number, rarity, finish, images, market_price, market_price_currency, market_price_cursor, market_price_updated_at, withdrawn, cursor, synced_at) VALUES ',
 		writes.map(({ record }) => tuple([

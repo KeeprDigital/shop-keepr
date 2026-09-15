@@ -6,7 +6,7 @@
  * vocabulary has no values for yet is an empty control.
  */
 import type { FacetOption, FacetValue, SearchOptions } from '../../shared/contracts/staff/search';
-import type { D1Client } from './cascade';
+import type { D1Client } from '../db/client';
 import { GAME_SYSTEMS, gameSystem } from './games';
 
 /** The options for one Game System; undefined for a game with no module. */

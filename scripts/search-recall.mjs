@@ -12,7 +12,6 @@
  *   node scripts/search-recall.mjs --sample 1000
  */
 import { readFileSync } from 'node:fs';
-import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { CLASSES } from '../spike/typo-search/misspellings.mjs';
 import { jiti, withLocalBindings } from './local-d1.mjs';
@@ -24,7 +23,7 @@ const { searchStatements, SEARCH_INDEXES } = await jiti.import('../server/search
 const { searchPrintings } = await jiti.import('../server/search/cascade.ts');
 const { gameSystem } = await jiti.import('../server/search/games/index.ts');
 const { fold } = await jiti.import('../shared/search/name-keys.ts');
-const { packRows, tuple } = await jiti.import('../server/db/sql.ts');
+const { printingStatements } = await jiti.import('../server/catalogue/sync/statements.ts');
 
 const names = JSON.parse(readFileSync(new URL('../spike/typo-search/data/all-card-names.json', import.meta.url), 'utf8'));
 const magic = gameSystem('magic');
@@ -77,9 +76,8 @@ async function load(db) {
 	const started = Date.now();
 	for (let i = 0; i < records.length; i += page) {
 		const slice = records.slice(i, i + page);
-		const printingRows = slice.map(r => tuple([r.id, r.card_id, 'magic', r.name, 'set', r.collector_number, null, null, '[]', null, null, null, null, false, r.cursor, 0]));
 		const statements = [
-			...packRows('INSERT INTO printing (id, card_id, game_system, name, set_code, collector_number, rarity, finish, images, market_price, market_price_currency, market_price_cursor, market_price_updated_at, withdrawn, cursor, synced_at) VALUES ', printingRows, ''),
+			...printingStatements(slice.map(record => ({ record, hash: '' })), { game: 'magic', now: 0 }),
 			...searchStatements('magic', slice, { now: 0 }),
 		];
 		await db.batch(statements.map(sql => db.prepare(sql)));
@@ -135,5 +133,3 @@ await withLocalBindings(async (env) => {
 	}
 	console.log('\nmiss-wrong: queries that returned rows without the source name among them (a lower tier answered with something else).');
 }, { persist: false });
-
-process.exitCode = 0;

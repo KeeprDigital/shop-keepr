@@ -9,25 +9,15 @@
  * there is one, then name, set and number; every measured figure is
  * recall, and a scoring function in D1 is the fix if ordering disappoints.
  */
-import type { AnsweredBy, SearchRow, SearchTier } from '../../shared/contracts/staff/search';
+import type { AnsweredBy, SearchQuery, SearchRow, SearchTier } from '../../shared/contracts/staff/search';
+import type { D1Client } from '../db/client';
 import type { GameSystemModule } from './games';
-import { SEARCH_TIERS } from '../../shared/contracts/staff/search';
 import { fold, foldNoSpace, foldTokens, metaphoneToken, tokenTrigrams } from '../../shared/search/name-keys';
 import { literal } from '../db/sql';
 import { STORE_ID } from '../utils/store';
 
-export { SEARCH_TIERS };
-
-/** What the sync needs of D1; a Session provides both. */
-export type D1Client = Pick<D1Database, 'prepare' | 'batch'>;
-
-export interface CascadeInput {
-	q: string;
-	inStock: boolean;
-	facets: Record<string, string[]>;
-	limit: number;
-	offset: number;
-}
+/** One search's input: the contract's query with every default applied, minus the game the module already names. */
+export type CascadeInput = Omit<Required<SearchQuery>, 'game'>;
 
 export interface TierStatement {
 	tier: SearchTier | 'browse';
@@ -69,11 +59,16 @@ const NAME_ORDER = 'p.name, p.set_code, p.collector_number';
 
 const IN_STOCK = `EXISTS (SELECT 1 FROM sku s WHERE s.store_id = ${literal(STORE_ID)} AND s.printing_id = p.id AND s.on_hand > 0)`;
 
-/** The statements of one search, in tier order; a single `browse` statement when the query has no name. */
+/**
+ * The statements of one search, in tier order; a single `browse` statement
+ * when the query has no name. Tier 3 takes the last token as a prefix, so
+ * typeahead answers before the noisier tiers (spec §4.3.3, Open); tier 5
+ * does not, since a half-typed token has nothing to fuzz against.
+ */
 export function cascadeStatements(module: GameSystemModule, input: CascadeInput): TierStatement[] {
 	const where = [...facetPredicates(module, input.facets), ...(input.inStock ? [IN_STOCK] : [])];
 	const tokens = foldTokens(input.q);
-	const page = `LIMIT ${input.limit} OFFSET ${input.offset}`;
+	const page = `LIMIT ${literal(input.limit)} OFFSET ${literal(input.offset)}`;
 	const plain = (tier: TierStatement['tier'], predicate: string | null): TierStatement => ({
 		tier,
 		sql: `${SELECT} FROM ${module.table} p JOIN printing pr ON pr.id = p.id${whereClause([predicate, ...where])} ORDER BY ${NAME_ORDER} ${page}`,
@@ -161,8 +156,8 @@ function facetPredicates(module: GameSystemModule, facets: Record<string, string
 }
 
 /** The first tier with rows, in the order the statements were issued. */
-export function firstNonEmptyTier<T, Tier extends string>(tiers: readonly Tier[], results: readonly { results: T[] }[]): { tier: Tier | null; rows: T[] } {
-	for (const [i, tier] of tiers.entries()) {
+export function firstNonEmptyTier<T>(statements: readonly TierStatement[], results: readonly { results: T[] }[]): { tier: TierStatement['tier'] | null; rows: T[] } {
+	for (const [i, { tier }] of statements.entries()) {
 		const rows = results[i]?.results ?? [];
 		if (rows.length > 0) {
 			return { tier, rows };
@@ -190,7 +185,7 @@ interface RawRow {
 export async function searchPrintings(db: D1Client, module: GameSystemModule, input: CascadeInput): Promise<{ answeredBy: AnsweredBy; rows: SearchRow[] }> {
 	const statements = cascadeStatements(module, input);
 	const results = await db.batch<RawRow>(statements.map(s => db.prepare(s.sql)));
-	const { tier, rows } = firstNonEmptyTier(statements.map(s => s.tier), results);
+	const { tier, rows } = firstNonEmptyTier(statements, results);
 	return { answeredBy: tier, rows: rows.map(searchRowOf) };
 }
 

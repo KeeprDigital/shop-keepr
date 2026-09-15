@@ -74,12 +74,13 @@ describe('the search read model written by the sync (spec §4.2, §5 _Write shap
 	});
 
 	it('rewrites every search row of the game on the next full walk after the name-key rule changes version', async () => {
-		await env.DB.prepare(`UPDATE mtg_printing SET keys_version = 0, name_folded = 'stale' WHERE id = 'prt-magic-m10-146'`).run();
-		expect(ids(await search('lightning bolt'))).toEqual(BOLTS.filter(id => id !== 'prt-magic-m10-146'));
+		await env.DB.prepare(`UPDATE mtg_printing SET keys_version = 0 WHERE id = 'prt-magic-m10-146'`).run();
 
 		const run = await syncFixture('magic');
 		expect(run.counts).toEqual({ seen: 44, written: 1, quarantined: 0, drifted: 0 });
+		expect(await env.DB.prepare(`SELECT keys_version FROM mtg_printing WHERE id = 'prt-magic-m10-146'`).first()).toEqual({ keys_version: 1 });
 		expect(ids(await search('lightning bolt'))).toEqual(BOLTS);
+		await expect(env.DB.prepare(`INSERT INTO mtg_printing_fts(mtg_printing_fts) VALUES('integrity-check')`).run()).resolves.toBeDefined();
 	});
 
 	it('copies the Market Price `printing` holds, never a null over a rate', async () => {

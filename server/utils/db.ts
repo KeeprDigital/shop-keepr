@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import type { D1Client } from '../db/client';
 import { createDb } from '../db/client';
 
 /** The request's Drizzle handle over the D1 binding. */
@@ -7,7 +8,7 @@ export function useDb(event: H3Event) {
 }
 
 /** The request's D1 Session, for code that writes its own SQL (search). */
-export function useD1(event: H3Event): Pick<D1Database, 'prepare' | 'batch'> {
+export function useD1(event: H3Event): D1Client {
 	return useD1Binding(event).withSession('first-primary');
 }
 

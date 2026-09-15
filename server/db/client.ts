@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './schema';
 
-/** What Drizzle's D1 driver actually calls; a D1 Session provides both. */
-type D1Client = Pick<D1Database, 'prepare' | 'batch'>;
+/** What every D1 caller here actually needs, Drizzle's driver included; a D1 Session provides both. */
+export type D1Client = Pick<D1Database, 'prepare' | 'batch'>;
 
 /**
  * Drizzle over the D1 binding. Every request opens a D1 Session
