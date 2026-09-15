@@ -1,11 +1,12 @@
 /**
- * Sets the one shared store login in the local D1 (spec §7.1): creates it,
- * or resets its password and revokes every session it holds.
+ * Sets the one shared store login (spec §7.1): creates it, or resets its
+ * password and revokes every session it holds.
  *
  *   pnpm auth:seed --email counter@example.test --password 'correct horse battery staple'
+ *   pnpm auth:seed --remote --email … --password …    the production database
  *
- * Production has no script yet; the staff Settings page will own this once
- * per-staff users arrive (ADR 0015).
+ * The staff Settings page will own this once per-staff users arrive
+ * (ADR 0015); until then this is how the login is set anywhere.
  */
 import process from 'node:process';
 import { parseArgs } from 'node:util';
@@ -15,6 +16,7 @@ const { values } = parseArgs({
 	options: {
 		email: { type: 'string' },
 		password: { type: 'string' },
+		remote: { type: 'boolean', default: false },
 	},
 });
 if (!values.email || !values.password) {
@@ -28,5 +30,5 @@ await withLocalBindings(async (env) => {
 	const auth = createAuth({ db: env.DB, secret: 'unused-while-provisioning' });
 	await runAuthMigrations(auth);
 	const { userId } = await provisionStaffLogin(auth, { email: values.email, password: values.password });
-	console.log(`staff login ${values.email} set (user ${userId}); every existing session revoked`);
-});
+	console.log(`staff login ${values.email} set (user ${userId}) ${values.remote ? 'in the production database' : 'locally'}; every existing session revoked`);
+}, { remote: values.remote });

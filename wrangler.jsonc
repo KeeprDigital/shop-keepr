@@ -11,20 +11,20 @@
 	"observability": {
 		"enabled": true
 	},
-	// The store is in Western Europe. Smart Placement with this hint runs the
-	// Worker beside the D1 primary, which is created once with
-	// `wrangler d1 create shop-keepr --location weur` (spec §4.1, Location).
+	// The store is in Australia. Smart Placement with this hint runs the
+	// Worker beside the D1 primary, which was created once with
+	// `wrangler d1 create shop-keepr --location oc` (spec §4.1, Location).
 	"placement": {
 		"mode": "smart",
-		"hint": "weur"
+		"hint": "oc"
 	},
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "shop-keepr",
-			// Placeholder until the database is created; local dev and tests do
-			// not need a real id. Replace with the id `wrangler d1 create` prints.
-			"database_id": "00000000-0000-4000-8000-000000000001",
+			// The production database, region OC; local dev and tests never
+			// touch it (they use the D1 under .wrangler/state).
+			"database_id": "9198a6e2-4e1f-4200-b624-7739b318cced",
 			"migrations_dir": "server/db/migrations"
 		}
 	],

@@ -16,13 +16,13 @@ pnpm db:migrate   # apply the migrations to the local D1 under .wrangler/state
 pnpm auth:seed --email counter@example.test --password 'a long password'   # the shared store login
 ```
 
-The D1 database itself is created once per environment, with the region hint the store trades from (it cannot change later):
+The D1 database itself is created once per environment, with the region hint the store trades from (it cannot change later); the production one exists, in Oceania:
 
 ```bash
-wrangler d1 create shop-keepr --location weur
+wrangler d1 create shop-keepr --location oc
 ```
 
-Paste the printed `database_id` into `wrangler.jsonc`. Local dev and tests never need a real id.
+Its `database_id` is in `wrangler.jsonc`. Local dev and tests never touch it; they use the D1 under `.wrangler/state`.
 
 ## Development
 
@@ -54,7 +54,7 @@ Staff sign in once at `/login` with the one shared store login and land on Looku
 ```bash
 pnpm auth:migrate            # create or update the auth tables in the local D1 (part of `pnpm db:migrate`)
 pnpm auth:migrate --print    # the SQL for a remote database: pipe to `wrangler d1 execute shop-keepr --remote --file`
-pnpm auth:seed --email … --password …   # set the shared login; resets the password and revokes every session
+pnpm auth:seed --email … --password …   # set the shared login; resets the password and revokes every session (--remote: production)
 pnpm auth:check              # the resolved @better-auth/utils is ≥ 0.4.1 (CI runs this)
 ```
 
