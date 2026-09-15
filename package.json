@@ -23,7 +23,10 @@
 		"db:generate": "drizzle-kit generate && node scripts/db-strict.mjs",
 		"db:migrate": "wrangler d1 migrations apply shop-keepr --local",
 		"db:migrate:remote": "wrangler d1 migrations apply shop-keepr --remote",
-		"cf:types": "wrangler types"
+		"cf:types": "wrangler types",
+		"catalogue:contract": "node scripts/catalogue-contract.mjs fetch",
+		"catalogue:contract:generate": "node scripts/catalogue-contract.mjs generate",
+		"catalogue:contract:check": "node scripts/catalogue-contract.mjs check"
 	},
 	"dependencies": {
 		"@nuxt/eslint": "1.17.0",
@@ -32,11 +35,13 @@
 		"nuxt": "^4.5.2",
 		"ulidx": "2.4.1",
 		"vue": "^3.5.42",
-		"vue-router": "^5.3.1"
+		"vue-router": "^5.3.1",
+		"zod": "4.6.5"
 	},
 	"devDependencies": {
 		"@antfu/eslint-config": "^9.5.1",
 		"@cloudflare/vitest-pool-workers": "0.22.0",
+		"@hey-api/openapi-ts": "0.99.0",
 		"@nuxt/test-utils": "^4.2.0",
 		"@nuxt/ui": "^4.11.0",
 		"@playwright/test": "^1.63.0",

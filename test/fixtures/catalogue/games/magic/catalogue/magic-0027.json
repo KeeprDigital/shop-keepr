@@ -1,0 +1,596 @@
+{
+	"records": [
+		{
+			"kind": "printing",
+			"cursor": "magic-0028",
+			"game": "magic",
+			"id": "prt-magic-lea-161",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "lea",
+			"collector_number": "161",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 285000,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0001",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "nonfoil",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-lea-161/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-lea-161/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0029",
+			"game": "magic",
+			"id": "prt-magic-m10-146",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "m10",
+			"collector_number": "146",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 240,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0002",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "nonfoil",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-146/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-146/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0030",
+			"game": "magic",
+			"id": "prt-magic-m10-146-foil",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "m10",
+			"collector_number": "146",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 3900,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0003",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "foil",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-146-foil/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-146-foil/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0031",
+			"game": "magic",
+			"id": "prt-magic-sta-42",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "sta",
+			"collector_number": "42",
+			"rarity": "uncommon",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 650,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0004",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "nonfoil",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-sta-42/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-sta-42/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0032",
+			"game": "magic",
+			"id": "prt-magic-sta-105-etched",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "sta",
+			"collector_number": "105",
+			"rarity": "uncommon",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 2200,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0005",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "etched",
+				"printed_name": "稲妻",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-sta-105-etched/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-sta-105-etched/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0033",
+			"game": "magic",
+			"id": "prt-magic-ptc-161",
+			"card_id": "card-magic-lightning-bolt",
+			"name": "Lightning Bolt",
+			"set_code": "ptc",
+			"collector_number": null,
+			"rarity": "common",
+			"withdrawn": true,
+			"market_price": {
+				"amount": 1800,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0006",
+			"attributes": {
+				"colour_identity": [
+					"R"
+				],
+				"card_type": "instant",
+				"finish": "nonfoil",
+				"mana_cost": "{R}",
+				"mana_value": 1,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-ptc-161/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-ptc-161/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0034",
+			"game": "magic",
+			"id": "prt-magic-m10-15",
+			"card_id": "card-magic-serra-angel",
+			"name": "Serra Angel",
+			"set_code": "m10",
+			"collector_number": "15",
+			"rarity": "rare",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 120,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0007",
+			"attributes": {
+				"colour_identity": [
+					"W"
+				],
+				"card_type": "creature",
+				"finish": "nonfoil",
+				"mana_cost": "{3}{W}{W}",
+				"mana_value": 5,
+				"power": "4",
+				"toughness": "4",
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-15/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-15/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0035",
+			"game": "magic",
+			"id": "prt-magic-m10-11",
+			"card_id": "card-magic-pacifism",
+			"name": "Pacifism",
+			"set_code": "m10",
+			"collector_number": "11",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 15,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0008",
+			"attributes": {
+				"colour_identity": [
+					"W"
+				],
+				"card_type": "enchantment",
+				"finish": "nonfoil",
+				"mana_cost": "{1}{W}",
+				"mana_value": 2,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-11/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-11/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0036",
+			"game": "magic",
+			"id": "prt-magic-m10-58",
+			"card_id": "card-magic-jace-beleren",
+			"name": "Jace Beleren",
+			"set_code": "m10",
+			"collector_number": "58",
+			"rarity": "mythic",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 1350,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0009",
+			"attributes": {
+				"colour_identity": [
+					"U"
+				],
+				"card_type": "planeswalker",
+				"finish": "nonfoil",
+				"mana_cost": "{1}{U}{U}",
+				"mana_value": 3,
+				"loyalty": "3",
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-58/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-58/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0037",
+			"game": "magic",
+			"id": "prt-magic-m10-112",
+			"card_id": "card-magic-sign-in-blood",
+			"name": "Sign in Blood",
+			"set_code": "m10",
+			"collector_number": "112",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 30,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0010",
+			"attributes": {
+				"colour_identity": [
+					"B"
+				],
+				"card_type": "sorcery",
+				"finish": "nonfoil",
+				"mana_cost": "{B}{B}",
+				"mana_value": 2,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-112/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-112/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0038",
+			"game": "magic",
+			"id": "prt-magic-m10-196",
+			"card_id": "card-magic-rampant-growth",
+			"name": "Rampant Growth",
+			"set_code": "m10",
+			"collector_number": "196",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 40,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0011",
+			"attributes": {
+				"colour_identity": [
+					"G"
+				],
+				"card_type": "sorcery",
+				"finish": "nonfoil",
+				"mana_cost": "{1}{G}",
+				"mana_value": 2,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-196/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-196/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0039",
+			"game": "magic",
+			"id": "prt-magic-m10-223",
+			"card_id": "card-magic-dragonskull-summit",
+			"name": "Dragonskull Summit",
+			"set_code": "m10",
+			"collector_number": "223",
+			"rarity": "rare",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 310,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0012",
+			"attributes": {
+				"colour_identity": [],
+				"card_type": "land",
+				"finish": "nonfoil",
+				"mana_cost": null,
+				"mana_value": 0,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-m10-223/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-m10-223/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0040",
+			"game": "magic",
+			"id": "prt-magic-lea-232",
+			"card_id": "card-magic-black-lotus",
+			"name": "Black Lotus",
+			"set_code": "lea",
+			"collector_number": "232",
+			"rarity": "rare",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 1450000000,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0013",
+			"attributes": {
+				"colour_identity": [],
+				"card_type": "artifact",
+				"finish": "nonfoil",
+				"mana_cost": "{0}",
+				"mana_value": 0,
+				"reserved": true
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-lea-232/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-lea-232/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0041",
+			"game": "magic",
+			"id": "prt-magic-sta-12",
+			"card_id": "card-magic-lightning-helix",
+			"name": "Lightning Helix",
+			"set_code": "sta",
+			"collector_number": "12",
+			"rarity": "uncommon",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 95,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0014",
+			"attributes": {
+				"colour_identity": [
+					"R",
+					"W"
+				],
+				"card_type": "instant",
+				"finish": "nonfoil",
+				"mana_cost": "{R}{W}",
+				"mana_value": 2,
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-sta-12/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-sta-12/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0042",
+			"game": "magic",
+			"id": "prt-magic-neo-42",
+			"card_id": "card-magic-the-wandering-emperor",
+			"name": "The Wandering Emperor",
+			"set_code": "neo",
+			"collector_number": "42",
+			"rarity": "mythic",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 2650,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0015",
+			"attributes": {
+				"colour_identity": [
+					"W"
+				],
+				"card_type": "planeswalker",
+				"finish": "nonfoil",
+				"printed_name": "放浪皇",
+				"mana_cost": "{2}{W}{W}",
+				"mana_value": 4,
+				"loyalty": "4",
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-neo-42/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-neo-42/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0043",
+			"game": "magic",
+			"id": "prt-magic-mom-194",
+			"card_id": "card-magic-invasion-of-zendikar",
+			"name": "Invasion of Zendikar // Awakened Skyclave",
+			"set_code": "mom",
+			"collector_number": "194",
+			"rarity": "uncommon",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 20,
+				"currency": "USD"
+			},
+			"market_price_cursor": "magic-price-0016",
+			"attributes": {
+				"colour_identity": [
+					"G"
+				],
+				"card_type": "battle",
+				"finish": "nonfoil",
+				"mana_cost": "{3}{G}",
+				"mana_value": 4,
+				"defense": "3",
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-mom-194/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-mom-194/0/full.jpg"
+				},
+				{
+					"face": 1,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-mom-194/1/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-mom-194/1/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "magic-0044",
+			"game": "magic",
+			"id": "prt-magic-unh-107",
+			"card_id": "card-magic-our-market-research",
+			"name": "Our Market Research Shows That Players Like Really Long Card Names So We Made this Card to Have the Absolute Longest Card Name Ever Elemental",
+			"set_code": "unh",
+			"collector_number": "107",
+			"rarity": "rare",
+			"withdrawn": false,
+			"market_price": null,
+			"market_price_cursor": null,
+			"attributes": {
+				"colour_identity": [
+					"W",
+					"U",
+					"B",
+					"R",
+					"G"
+				],
+				"card_type": "creature",
+				"finish": "nonfoil",
+				"mana_cost": "{W}{U}{B}{R}{G}",
+				"mana_value": 5,
+				"power": "5",
+				"toughness": "5",
+				"reserved": false
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-magic-unh-107/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-magic-unh-107/0/full.jpg"
+				}
+			]
+		}
+	],
+	"next_cursor": "magic-0044",
+	"has_more": false
+}

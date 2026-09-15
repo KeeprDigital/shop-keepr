@@ -11,6 +11,8 @@ export default withNuxt(
 			'server/db/migrations/meta/**',
 			// `wrangler types` output.
 			'worker-configuration.d.ts',
+			// `pnpm catalogue:contract` output (ADR 0013).
+			'server/catalogue/generated/**',
 		],
 		antislop: true,
 		typescript: true,

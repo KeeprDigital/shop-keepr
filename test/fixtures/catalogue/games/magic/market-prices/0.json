@@ -1,0 +1,48 @@
+{
+	"records": [
+		{
+			"cursor": "magic-price-0001",
+			"game": "magic",
+			"printing_id": "prt-magic-lea-161",
+			"market_price": {
+				"amount": 285000,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0002",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-146",
+			"market_price": {
+				"amount": 240,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0003",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-146-foil",
+			"market_price": {
+				"amount": 3900,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0004",
+			"game": "magic",
+			"printing_id": "prt-magic-lea-232",
+			"market_price": {
+				"amount": 1450000000,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0005",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-15",
+			"market_price": null
+		}
+	],
+	"next_cursor": "magic-price-0005",
+	"has_more": false
+}
