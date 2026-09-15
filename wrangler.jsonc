@@ -11,12 +11,13 @@
 	"observability": {
 		"enabled": true
 	},
-	// The store is in Australia. Smart Placement with this hint runs the
-	// Worker beside the D1 primary, which was created once with
-	// `wrangler d1 create shop-keepr --location oc` (spec §4.1, Location).
+	// The store is in Australia and the D1 primary was created there once,
+	// with `wrangler d1 create shop-keepr --location oc` (spec §4.1,
+	// Location). Smart Placement moves the Worker beside it from observed
+	// latency; an explicit `hint` is an Enterprise-only field (API error
+	// 10023 on deploy).
 	"placement": {
-		"mode": "smart",
-		"hint": "oc"
+		"mode": "smart"
 	},
 	"d1_databases": [
 		{
