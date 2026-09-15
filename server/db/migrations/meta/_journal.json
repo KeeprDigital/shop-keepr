@@ -43,6 +43,20 @@
       "when": 1789472302581,
       "tag": "0005_market-price-fx",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789480176181,
+      "tag": "0006_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789480190431,
+      "tag": "0007_seed-pricing",
+      "breakpoints": true
     }
   ]
 }

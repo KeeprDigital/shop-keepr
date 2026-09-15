@@ -1,7 +1,9 @@
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { LedgerKind, LedgerReason, Origin, Surface, Tender } from '../../../shared/domain/ledger';
+import type { PriceSource } from '../../../shared/domain/reprice';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { LEDGER_KINDS, LEDGER_REASONS, ORIGINS, SURFACES, TENDERS } from '../../../shared/domain/ledger';
+import { PRICE_SOURCES } from '../../../shared/domain/reprice';
 import { condition, epochMs, language, minorUnits, storeId, ulid } from '../columns';
 import { printing } from './catalogue';
 import { store } from './store';
@@ -16,9 +18,13 @@ import { store } from './store';
 /**
  * The unit the store counts, prices, holds and transacts. A row appears at
  * the first Adjustment or Buy that touches it, never speculatively; rows
- * are never deleted, and may sit at `on_hand = 0`. The pricing columns
- * (Sell and Buy Price, sources, pins, `priced_at`) arrive with the pricing
- * ticket.
+ * are never deleted, and may sit at `on_hand = 0` to carry a pin.
+ *
+ * Sell Price and Buy Price are stored columns so they sort and filter
+ * (spec §6, _Stored SKU prices_): per side the price, its source and the
+ * pin's provenance; `priced_at` is the reprice watermark. A price is null
+ * until the row is first priced, or while its Printing has no Market
+ * Price or no exchange rate to convert at.
  */
 export const sku = sqliteTable('sku', {
 	id: ulid().primaryKey(),
@@ -30,10 +36,27 @@ export const sku = sqliteTable('sku', {
 	language: language().notNull(),
 	/** `SUM(ledger_line.quantity)` for this SKU, materialised; never negative. */
 	onHand: integer({ mode: 'number' }).notNull(),
+	sellPrice: minorUnits(),
+	sellPriceSource: text({ enum: PRICE_SOURCES }).$type<PriceSource>().notNull().default('rule'),
+	/** The audit pair of the pin (spec §3): the session, and the staff user once per-staff login exists. */
+	sellPinnedSessionId: text(),
+	sellPinnedStaffUserId: text(),
+	/** Load-bearing: the age alert reads it. */
+	sellPinnedAt: epochMs(),
+	/** The pipeline at quantity 1 under the current `on_hand`. */
+	buyPrice: minorUnits(),
+	buyPriceSource: text({ enum: PRICE_SOURCES }).$type<PriceSource>().notNull().default('rule'),
+	buyPinnedSessionId: text(),
+	buyPinnedStaffUserId: text(),
+	buyPinnedAt: epochMs(),
+	/** The last evaluation; the sweep's Market Price scope is `priced_at < printing.market_price_updated_at`. */
+	pricedAt: epochMs(),
 	createdAt: epochMs().notNull(),
 	updatedAt: epochMs().notNull(),
 }, table => [
 	uniqueIndex('sku_key').on(table.storeId, table.printingId, table.condition, table.language),
+	index('sku_store_sell_price').on(table.storeId, table.sellPrice),
+	index('sku_store_buy_price').on(table.storeId, table.buyPrice),
 ]);
 
 /**

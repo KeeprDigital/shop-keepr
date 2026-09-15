@@ -16,10 +16,13 @@
  */
 import type { SyncKind, SyncRunStatus } from '../../../shared/domain/sync-run';
 import type { D1Client } from '../../db/client';
+import type { RepriceQueue } from '../../pricing/sweep';
 import type { CatalogueClient } from '../client';
 import type { Cursor } from '../generated/types.gen';
 import type { Existing, ExistingRow, PageCounts } from './plan';
+import { createDb } from '../../db/client';
 import { literal, packRows } from '../../db/sql';
+import { requestSweep } from '../../pricing/sweep';
 import { heldInSearch, SEARCH_INDEXES } from '../../search/mirror';
 import { newId } from '../../utils/ids';
 import { FIRST_CURSOR } from '../client';
@@ -299,6 +302,12 @@ export interface SyncOptions {
 	now?: () => number;
 	steps?: StepRunner;
 	workflowInstanceId?: string;
+	/**
+	 * Where a Market Price run that moved prices asks for its reprice sweep
+	 * (spec §5, _Price recompute is watermark-driven_). Without one the
+	 * watermark stays behind and the next sweep of any reason catches up.
+	 */
+	reprice?: RepriceQueue;
 }
 
 /** A page of either kind: pull, judge, apply as one `batch()`. */
@@ -318,7 +327,7 @@ export function runMarketPriceSync(options: SyncOptions): Promise<SyncOutcome> {
 }
 
 /** One run of `kind`: claim, every page, finish; failed and unlocked on any error. */
-export async function runSync(kind: SyncKind, { db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId }: SyncOptions): Promise<SyncOutcome> {
+export async function runSync(kind: SyncKind, { db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId, reprice }: SyncOptions): Promise<SyncOutcome> {
 	const walkPage = PAGE_WALKERS[kind];
 	const db: D1Client = binding.withSession('first-primary');
 	const claim = await steps.do('claim', () => claimRun(db, { kind, game, fromCursor, now: now(), workflowInstanceId }));
@@ -341,6 +350,14 @@ export async function runSync(kind: SyncKind, { db: binding, client, game, fromC
 			}
 		}
 		const run = await steps.do('finish', () => finishRun(db, { ...ref, fullWalk, seed, now: now() }));
+		if (kind === 'market_price' && run.counts.written > 0) {
+			if (reprice) {
+				await steps.do('reprice', () => requestSweep(createDb(binding), reprice, { reason: 'market_price', games: [game], watermark: true, now: now() }));
+			}
+			else {
+				console.warn(`[market price sync] ${game}: ${run.counts.written} Market Price(s) moved and no reprice queue was given; the sweep waits for the next one`);
+			}
+		}
 		return { claimed: true, run };
 	}
 	catch (error) {

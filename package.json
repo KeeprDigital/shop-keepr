@@ -30,7 +30,8 @@
 		"catalogue:contract": "node scripts/catalogue-contract.mjs fetch",
 		"catalogue:contract:generate": "node scripts/catalogue-contract.mjs generate",
 		"catalogue:contract:check": "node scripts/catalogue-contract.mjs check",
-		"catalogue:seed": "pnpm db:migrate && node scripts/catalogue-seed.mjs"
+		"catalogue:seed": "pnpm db:migrate && node scripts/catalogue-seed.mjs",
+		"reprice:sweep": "node scripts/reprice-sweep.mjs"
 	},
 	"dependencies": {
 		"@nuxt/eslint": "1.17.0",

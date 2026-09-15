@@ -4,9 +4,10 @@ import { epochMs, language, ulid } from '../columns';
 
 /**
  * The Store: the business shop-keepr runs for. One today, hardcoded
- * (`STORE_ID`), with `store_id` on every other table from day one. Settings
- * (Default Tender, Tender Modifier, Hold expiry period, Pricing Rules) arrive with
- * their own tickets; this is the row the health check reads.
+ * (`STORE_ID`), with `store_id` on every other table from day one. The
+ * Pricing Rules, Default Tender and Tender Modifier live in
+ * `pricing_setting`; the Hold expiry period arrives with its ticket. This
+ * is the row the health check reads.
  */
 export const store = sqliteTable('store', {
 	id: ulid().primaryKey(),

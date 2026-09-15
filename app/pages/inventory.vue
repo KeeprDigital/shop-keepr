@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
  * Inventory (spec §8.2, `/inventory`): "what do we hold". Every SKU with
- * stock on hand, filtered by Game System and name, sorted by any column,
- * with Adjust on the row. Held, prices, pins and the withdrawn-with-stock
- * chip join the table with their tickets.
+ * stock on hand or a pinned price, filtered by Game System and name,
+ * sorted by any column, with Adjust on the row. Sell, Buy and Market
+ * Price come from the stored columns (spec §6); Market Price is a staff
+ * figure and never reaches a customer. Held, the pin actions and the
+ * withdrawn-with-stock chip join the table with their tickets.
  */
 import type { TableColumn } from '@nuxt/ui';
 import type { InventoryPage, InventoryRow, InventorySort } from '#shared/contracts/staff/inventory';
@@ -51,13 +53,24 @@ function sortable(id: InventorySort, label: string): TableColumn<InventoryRow> {
 	};
 }
 
+const numeric = { meta: { class: { td: 'text-right tabular-nums', th: 'text-right' } } };
+
 const columns: TableColumn<InventoryRow>[] = [
 	sortable('name', 'Printing'),
 	sortable('condition', 'Condition'),
 	sortable('language', 'Language'),
-	{ ...sortable('onHand', 'On hand'), meta: { class: { td: 'text-right tabular-nums', th: 'text-right' } } },
+	{ ...sortable('onHand', 'On hand'), ...numeric },
+	{ ...sortable('sellPrice', 'Sell'), ...numeric },
+	{ ...sortable('buyPrice', 'Buy'), ...numeric },
+	{ ...sortable('marketPrice', 'Market'), ...numeric },
 	{ id: 'actions' },
 ];
+
+const currency = computed(() => data.value?.currency ?? 'GBP');
+
+function pricedAtTitle(row: InventoryRow): string | undefined {
+	return row.pricedAt ? `Priced ${new Date(row.pricedAt).toLocaleString()}` : undefined;
+}
 
 const adjusting = ref<InventoryRow | null>(null);
 const adjustOpen = ref(false);
@@ -112,6 +125,21 @@ function adjust(row: InventoryRow) {
 			</template>
 			<template #condition-cell="{ row }">
 				<span :title="CONDITION_LABELS[row.original.condition]">{{ row.original.condition }}</span>
+			</template>
+			<template #sellPrice-cell="{ row }">
+				<span :title="pricedAtTitle(row.original)">
+					{{ formatMoney(row.original.sellPrice, currency) }}
+					<UIcon v-if="row.original.sellPriceSource === 'pinned'" name="i-lucide-pin" class="size-3.5 align-text-top" aria-label="Pinned" />
+				</span>
+			</template>
+			<template #buyPrice-cell="{ row }">
+				<span :title="pricedAtTitle(row.original)">
+					{{ formatMoney(row.original.buyPrice, currency) }}
+					<UIcon v-if="row.original.buyPriceSource === 'pinned'" name="i-lucide-pin" class="size-3.5 align-text-top" aria-label="Pinned" />
+				</span>
+			</template>
+			<template #marketPrice-cell="{ row }">
+				<span class="text-muted">{{ row.original.marketPriceCurrency ? formatMoney(row.original.marketPrice, row.original.marketPriceCurrency) : '–' }}</span>
 			</template>
 			<template #actions-cell="{ row }">
 				<UButton label="Adjust" icon="i-lucide-sliders-horizontal" color="neutral" variant="outline" size="sm" @click="adjust(row.original)" />
