@@ -22,6 +22,13 @@
       "when": 1789448430188,
       "tag": "0002_catalogue-mirror",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789459622472,
+      "tag": "0003_stock",
+      "breakpoints": true
     }
   ]
 }
