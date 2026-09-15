@@ -35,7 +35,11 @@ export const printing = sqliteTable('printing', {
 	finish: text(),
 	/** The Catalogue's CDN URLs, JSON `[{ face, thumbnail, full }]`, nothing copied. */
 	images: text().notNull(),
-	/** Integer minor units of `market_price_currency`; written only when the value moved, never overwritten with null. */
+	/**
+	 * Integer minor units of `market_price_currency`, the Catalogue's currency,
+	 * so not `Money`, which is minor units of the Store's own (spec §6, _FX_).
+	 * Written only when the value moved, never overwritten with null.
+	 */
 	marketPrice: integer({ mode: 'number' }),
 	marketPriceCurrency: text(),
 	/** The Catalogue cursor at which the Market Price last moved. */
@@ -111,6 +115,8 @@ export const syncRun = sqliteTable('sync_run', {
 	cursorFrom: text().notNull(),
 	cursorTo: text().notNull(),
 	recordsSeen: integer({ mode: 'number' }).notNull(),
+	/** Printing records among those seen; a full walk compares it with the rows held to count absence. */
+	printingsSeen: integer({ mode: 'number' }).notNull(),
 	recordsWritten: integer({ mode: 'number' }).notNull(),
 	recordsQuarantined: integer({ mode: 'number' }).notNull(),
 	recordsDrifted: integer({ mode: 'number' }).notNull(),

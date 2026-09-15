@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c1b81037-926f-4e6b-bf3e-95d8585a529a",
+  "id": "6fc9f539-697a-491b-ab39-e004e94eba7d",
   "prevId": "c58d904c-7b5b-4d06-83ab-f07dc257e5fa",
   "tables": {
     "catalogue_quarantine": {
@@ -483,6 +483,13 @@
         },
         "records_seen": {
           "name": "records_seen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "printings_seen": {
+          "name": "printings_seen",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

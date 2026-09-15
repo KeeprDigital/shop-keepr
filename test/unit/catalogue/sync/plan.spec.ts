@@ -37,7 +37,8 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		expect(plan.vocabularies).toHaveLength(20);
 		expect(plan.printings).toHaveLength(17);
 		expect(plan.quarantined).toEqual([]);
-		expect(plan.printings.find(w => w.record.id === bolt.id)).toMatchObject({ decision: 'insert', hash: await contentHash(bolt) });
+		expect(plan.printings.find(w => w.record.id === bolt.id)).toMatchObject({ hash: await contentHash(bolt) });
+		expect(plan.printingsSeen).toBe(17);
 	});
 
 	it('writes nothing when every record hashes the same as the Mirror', async () => {
@@ -52,7 +53,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		const plan = await planPage(ok(page), await mirrorOf(magic), { fullWalk: false });
 		expect(plan.counts).toEqual({ seen: magic.length, written: 1, quarantined: 0, drifted: 0 });
 		expect(plan.printings).toHaveLength(1);
-		expect(plan.printings[0]).toMatchObject({ decision: 'update', record: renamed });
+		expect(plan.printings[0]).toMatchObject({ record: renamed });
 	});
 
 	it('counts a change found by a full walk as drift', async () => {
@@ -78,6 +79,7 @@ describe('planning a page (ADR 0009: hash-compare on every write makes seed, del
 		const issues = [{ code: 'invalid_type', path: ['card_id'], message: 'Required' }];
 		const plan = await planPage([{ ok: false, raw: broken, issues }, ...ok([bolt])], emptyExisting(), { fullWalk: false });
 		expect(plan.counts).toEqual({ seen: 2, written: 1, quarantined: 1, drifted: 0 });
+		expect(plan.printingsSeen).toBe(2);
 		expect(plan.quarantined).toEqual([{
 			reason: 'validation_failed',
 			recordKind: 'printing',

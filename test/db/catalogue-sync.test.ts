@@ -1,5 +1,5 @@
 import type { CataloguePage, Cursor, PrintingRecord } from '../../server/catalogue/generated/types.gen';
-import type { SyncOutcome } from '../../server/catalogue/sync/run';
+import type { StepRunner, SyncOutcome } from '../../server/catalogue/sync/run';
 import type { FixturePages } from '../support/fixture-fetch';
 import { env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
@@ -51,9 +51,15 @@ function magicPrinting(id: string): PrintingRecord {
 let tick = 1_800_000_000_000;
 
 /** One Catalogue run; `from` is a full walk unless told to resume from the stored cursor. */
-function sync(pages: FixturePages = committed, { game = 'magic', from = 'zero' }: { game?: string; from?: 'zero' | 'stored' } = {}) {
+function sync(pages: FixturePages = committed, { game = 'magic', from = 'zero', steps }: { game?: string; from?: 'zero' | 'stored'; steps?: StepRunner } = {}) {
 	const client = createCatalogueClient({ fetch: fixtureFetchFrom(pages, { baseURL, credential }), baseURL, credential });
-	return runCatalogueSync({ db: env.DB, client, game, fromCursor: from === 'zero' ? FIRST_CURSOR : undefined, now: () => (tick += 1_000) });
+	return runCatalogueSync({ db: env.DB, client, game, fromCursor: from === 'zero' ? FIRST_CURSOR : undefined, now: () => (tick += 1_000), steps });
+}
+
+/** The indexes the sync builds on `printing`; the primary key's own is not one of them. */
+async function mirrorIndexes(): Promise<string[]> {
+	const { results } = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'printing' AND name NOT LIKE 'sqlite_autoindex%'`).all<{ name: string }>();
+	return results.map(r => r.name).sort();
 }
 
 function completed(outcome: SyncOutcome) {
@@ -250,9 +256,39 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		expect((await db().query.syncRun.findMany()).map(r => r.status).sort()).toEqual(['abandoned', 'completed']);
 	});
 
-	it('builds the Mirror indexes after the walk', async () => {
+	it('records a Printing the Mirror holds that a full walk did not return as drift, row untouched', async () => {
 		await sync();
-		const { results } = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'printing'`).all<{ name: string }>();
-		expect(results.map(r => r.name)).toEqual(expect.arrayContaining(['printing_card', 'printing_game_set_number']));
+		const withoutBolt = new Map(committed);
+		const page = withoutBolt.get('games/magic/catalogue/magic-0027.json') as CataloguePage;
+		withoutBolt.set('games/magic/catalogue/magic-0027.json', { ...page, records: page.records.filter(r => r.kind !== 'printing' || r.id !== bolt) });
+
+		const run = completed(await sync(withoutBolt));
+		expect(run.status).toBe('completed_with_drift');
+		expect(run.counts).toEqual({ seen: 43, written: 0, quarantined: 0, drifted: 1 });
+		expect(await readBolt()).toMatchObject({ name: 'Lightning Bolt', withdrawn: false });
+		expect(await db().query.syncRun.findFirst({ where: eq(syncRun.id, run.id) })).toMatchObject({ status: 'completed_with_drift', recordsDrifted: 1 });
+	});
+
+	it('fails the run, rather than reporting it complete, when the lock was lost mid-walk', async () => {
+		const stealBeforeSecondPage: StepRunner = {
+			do: async (name, fn) => {
+				if (name === 'page 2') {
+					tick += 3 * 60 * 60 * 1_000;
+					expect((await claimRun(env.DB, { kind: 'catalogue', game: 'pokemon', fromCursor: FIRST_CURSOR, now: tick })).claimed).toBe(true);
+				}
+				return fn();
+			},
+		};
+		await expect(sync(committed, { steps: stealBeforeSecondPage })).rejects.toThrow(/abandoned/);
+		expect((await db().query.syncRun.findMany({ where: eq(syncRun.gameSystem, 'magic') })).map(r => r.status)).toEqual(['abandoned']);
+	});
+
+	it('leaves the Mirror indexes for after the seed, and builds them on the next run', async () => {
+		await sync();
+		await sync(committed, { game: 'pokemon' });
+		expect(await mirrorIndexes()).toEqual([]);
+
+		await sync(committed, { from: 'stored' });
+		expect(await mirrorIndexes()).toEqual(['printing_card', 'printing_game_set_number']);
 	});
 });

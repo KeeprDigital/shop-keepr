@@ -13,16 +13,13 @@
  *   still on the cursor the page started from, so a replayed page cannot
  *   double-count or double-quarantine.
  */
-import type { SyncKind } from '../../../shared/domain/sync-run';
 import type { Cursor, PrintingRecord, SetRecord, VocabularyRecord } from '../generated/types.gen';
 import type { PagePlan, Quarantined, Write } from './plan';
+import type { RunRef } from './run';
 import { displayFinish } from './facets';
 import { literal, packRows, tuple } from './sql';
 
-export interface PageWriteContext {
-	runId: string;
-	kind: SyncKind;
-	game: string;
+export interface PageWriteContext extends RunRef {
 	/** The cursor the page started from: the run's `cursor_to` while this page is unapplied. */
 	cursor: Cursor;
 	nextCursor: Cursor;
@@ -42,11 +39,16 @@ export function pageStatements(plan: PagePlan, ctx: PageWriteContext): string[] 
 	];
 }
 
+/** The tail every synced table's upsert shares: the sync columns, guarded by the row's cursor. */
+function syncedUpsertTail(table: string, key: string[], columns: string): string {
+	return ` ON CONFLICT(${key.join(', ')}) DO UPDATE SET ${columns}, cursor = excluded.cursor, content_hash = excluded.content_hash, synced_at = excluded.synced_at WHERE excluded.cursor >= ${table}.cursor`;
+}
+
 function setStatements(writes: Write<SetRecord>[], { game, now }: PageWriteContext): string[] {
 	return packRows(
 		'INSERT INTO catalogue_set (game_system, code, name, released_on, cursor, content_hash, synced_at) VALUES ',
 		writes.map(({ record, hash }) => tuple([game, record.code, record.name, record.released_on, record.cursor, hash, now])),
-		' ON CONFLICT(game_system, code) DO UPDATE SET name = excluded.name, released_on = excluded.released_on, cursor = excluded.cursor, content_hash = excluded.content_hash, synced_at = excluded.synced_at WHERE excluded.cursor >= catalogue_set.cursor',
+		syncedUpsertTail('catalogue_set', ['game_system', 'code'], 'name = excluded.name, released_on = excluded.released_on'),
 	);
 }
 
@@ -54,7 +56,7 @@ function vocabularyStatements(writes: Write<VocabularyRecord>[], { game, now }: 
 	return packRows(
 		'INSERT INTO catalogue_vocabulary (game_system, facet, code, name, sort_order, cursor, content_hash, synced_at) VALUES ',
 		writes.map(({ record, hash }) => tuple([game, record.facet, record.code, record.name, record.sort_order, record.cursor, hash, now])),
-		' ON CONFLICT(game_system, facet, code) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order, cursor = excluded.cursor, content_hash = excluded.content_hash, synced_at = excluded.synced_at WHERE excluded.cursor >= catalogue_vocabulary.cursor',
+		syncedUpsertTail('catalogue_vocabulary', ['game_system', 'facet', 'code'], 'name = excluded.name, sort_order = excluded.sort_order'),
 	);
 }
 
@@ -97,7 +99,7 @@ function printingDetailStatements(writes: Write<PrintingRecord>[], { now }: Page
 	return packRows(
 		'INSERT INTO printing_detail (printing_id, record, content_hash, cursor, synced_at) VALUES ',
 		writes.map(({ record, hash }) => tuple([record.id, JSON.stringify(record), hash, record.cursor, now])),
-		' ON CONFLICT(printing_id) DO UPDATE SET record = excluded.record, content_hash = excluded.content_hash, cursor = excluded.cursor, synced_at = excluded.synced_at WHERE excluded.cursor >= printing_detail.cursor',
+		syncedUpsertTail('printing_detail', ['printing_id'], 'record = excluded.record'),
 	);
 }
 
@@ -115,9 +117,9 @@ function quarantineStatements(quarantined: Quarantined[], ctx: PageWriteContext)
 	);
 }
 
-function runProgressStatement({ counts }: PagePlan, ctx: PageWriteContext): string {
+function runProgressStatement({ counts, printingsSeen }: PagePlan, ctx: PageWriteContext): string {
 	return `UPDATE sync_run SET cursor_to = ${literal(ctx.nextCursor)},`
-		+ ` records_seen = records_seen + ${counts.seen}, records_written = records_written + ${counts.written},`
+		+ ` records_seen = records_seen + ${counts.seen}, printings_seen = printings_seen + ${printingsSeen}, records_written = records_written + ${counts.written},`
 		+ ` records_quarantined = records_quarantined + ${counts.quarantined}, records_drifted = records_drifted + ${counts.drifted},`
 		+ ` updated_at = ${literal(ctx.now)}`
 		+ ` WHERE id = ${literal(ctx.runId)} AND status = 'running' AND cursor_to = ${literal(ctx.cursor)}`;

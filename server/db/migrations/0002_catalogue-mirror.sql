@@ -73,6 +73,7 @@ CREATE TABLE `sync_run` (
 	`cursor_from` text NOT NULL,
 	`cursor_to` text NOT NULL,
 	`records_seen` integer NOT NULL,
+	`printings_seen` integer NOT NULL,
 	`records_written` integer NOT NULL,
 	`records_quarantined` integer NOT NULL,
 	`records_drifted` integer NOT NULL,

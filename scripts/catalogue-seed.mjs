@@ -25,7 +25,8 @@ const { values } = parseArgs({
 
 const jiti = createJiti(import.meta.url);
 const { createCatalogueClient, FIRST_CURSOR } = await jiti.import('../server/catalogue/client.ts');
-const { runCatalogueSync } = await jiti.import('../server/catalogue/sync/run.ts');
+const { buildMirrorIndexes, runCatalogueSync } = await jiti.import('../server/catalogue/sync/run.ts');
+const { catalogueCredentials } = await jiti.import('../server/catalogue/credentials.ts');
 
 /** The committed fixture, served by path, for every Game System it holds. */
 async function fixtureSource() {
@@ -38,14 +39,13 @@ async function fixtureSource() {
 
 /** Catalogue staging over HTTPS as Consumer #1; the Game Systems must be named. */
 function stagingSource(env) {
-	const baseURL = (process.env.CATALOGUE_BASE_URL || env.CATALOGUE_BASE_URL || '').replace(/\/$/, '');
-	const credential = process.env.CATALOGUE_CREDENTIAL || env.CATALOGUE_CREDENTIAL;
-	if (!baseURL || !credential) {
-		throw new Error('Set CATALOGUE_BASE_URL and CATALOGUE_CREDENTIAL (environment or .dev.vars) to Catalogue staging.');
-	}
 	if (!values.game?.length) {
 		throw new Error('Pass --game <code> for each Game System to walk from staging.');
 	}
+	const { baseURL, credential } = catalogueCredentials({
+		CATALOGUE_BASE_URL: process.env.CATALOGUE_BASE_URL || env.CATALOGUE_BASE_URL,
+		CATALOGUE_CREDENTIAL: process.env.CATALOGUE_CREDENTIAL || env.CATALOGUE_CREDENTIAL,
+	});
 	return { client: createCatalogueClient({ fetch, baseURL, credential }), games: [] };
 }
 
@@ -63,6 +63,8 @@ try {
 		const { status, cursorFrom, cursorTo, counts } = outcome.run;
 		console.log(`${game}: ${status} (${cursorFrom} -> ${cursorTo}) seen ${counts.seen}, written ${counts.written}, quarantined ${counts.quarantined}, drifted ${counts.drifted}`);
 	}
+	// A seed leaves the indexes for after every Game System is in (spec §4.5).
+	await buildMirrorIndexes(proxy.env.DB);
 }
 finally {
 	await proxy.dispose();

@@ -39,12 +39,9 @@ export function vocabularyKey(facet: string, code: string): string {
 	return `${facet}/${code}`;
 }
 
-export type WriteDecision = 'insert' | 'update';
-
 export interface Write<T> {
 	record: T;
 	hash: string;
-	decision: WriteDecision;
 }
 
 export interface Quarantined {
@@ -56,6 +53,7 @@ export interface Quarantined {
 	raw: unknown;
 }
 
+/** The counts `sync_run` accumulates over a run. */
 export interface PageCounts {
 	seen: number;
 	written: number;
@@ -69,6 +67,8 @@ export interface PagePlan {
 	printings: Write<PrintingRecord>[];
 	quarantined: Quarantined[];
 	counts: PageCounts;
+	/** Printing records on the page, applied or quarantined: what a full walk returned of the Mirror's rows. */
+	printingsSeen: number;
 }
 
 export interface PlanOptions {
@@ -77,7 +77,14 @@ export interface PlanOptions {
 }
 
 export async function planPage(records: ParsedRecord<CatalogueRecord>[], existing: Existing, { fullWalk }: PlanOptions): Promise<PagePlan> {
-	const plan: PagePlan = { sets: [], vocabularies: [], printings: [], quarantined: [], counts: { seen: records.length, written: 0, quarantined: 0, drifted: 0 } };
+	const plan: PagePlan = {
+		sets: [],
+		vocabularies: [],
+		printings: [],
+		quarantined: [],
+		counts: { seen: records.length, written: 0, quarantined: 0, drifted: 0 },
+		printingsSeen: 0,
+	};
 
 	async function consider<T extends CatalogueRecord>(record: T, held: ExistingRow | undefined, writes: Write<T>[]) {
 		if (held && record.cursor < held.cursor) {
@@ -87,7 +94,7 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 		if (held?.hash === hash) {
 			return;
 		}
-		writes.push({ record, hash, decision: held ? 'update' : 'insert' });
+		writes.push({ record, hash });
 		plan.counts.written += 1;
 		if (held && fullWalk) {
 			plan.counts.drifted += 1;
@@ -95,8 +102,12 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 	}
 
 	function quarantine(raw: unknown, reason: QuarantineReason, detail: unknown) {
-		plan.quarantined.push({ reason, ...describe(raw), detail, raw });
+		const described = selfDescription(raw);
+		plan.quarantined.push({ reason, ...described, detail, raw });
 		plan.counts.quarantined += 1;
+		if (described.recordKind === 'printing') {
+			plan.printingsSeen += 1;
+		}
 	}
 
 	for (const parsed of records) {
@@ -118,6 +129,7 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 					quarantine(record, 'unknown_facet_value', { facet: judgement.facet, value: judgement.value });
 					break;
 				}
+				plan.printingsSeen += 1;
 				await consider(record, existing.printings.get(record.id), plan.printings);
 			}
 		}
@@ -126,7 +138,7 @@ export async function planPage(records: ParsedRecord<CatalogueRecord>[], existin
 }
 
 /** What a payload says about itself, when it is an object that says anything. */
-function describe(raw: unknown): Pick<Quarantined, 'recordKind' | 'recordId' | 'cursor'> {
+function selfDescription(raw: unknown): Pick<Quarantined, 'recordKind' | 'recordId' | 'cursor'> {
 	const field = (name: string): string | null => {
 		const value = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>)[name] : undefined;
 		return typeof value === 'string' ? value : null;
