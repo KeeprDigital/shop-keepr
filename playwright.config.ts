@@ -13,14 +13,19 @@ const host = 'http://127.0.0.1:8787';
 const command = [
 	'pnpm build',
 	'pnpm db:migrate',
-	`pnpm auth:seed --email ${E2E_STAFF_LOGIN.email} --password '${E2E_STAFF_LOGIN.password}'`,
-	`pnpm exec wrangler dev --port 8787 --var BETTER_AUTH_SECRET:${E2E_AUTH_SECRET}`,
+	'pnpm auth:seed --email "$E2E_STAFF_EMAIL" --password "$E2E_STAFF_PASSWORD"',
+	'pnpm exec wrangler dev --port 8787 --var "BETTER_AUTH_SECRET:$E2E_AUTH_SECRET"',
 ].join(' && ');
 
 export default defineConfig<ConfigOptions>({
 	testDir: './test/e2e',
 	webServer: {
 		command,
+		env: {
+			E2E_STAFF_EMAIL: E2E_STAFF_LOGIN.email,
+			E2E_STAFF_PASSWORD: E2E_STAFF_LOGIN.password,
+			E2E_AUTH_SECRET,
+		},
 		url: `${host}/login`,
 		timeout: 240_000,
 		reuseExistingServer: !process.env.CI,

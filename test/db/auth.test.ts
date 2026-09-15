@@ -50,7 +50,7 @@ describe('staff auth against D1', () => {
 		})).rejects.toMatchObject({ status: 'BAD_REQUEST' });
 	});
 
-	it('logs the user out on the next request once the session row is revoked', async () => {
+	it('logs staff out on the next request once the session row is revoked', async () => {
 		const auth = createTestAuth();
 		const cookie = cookieFrom(await signIn(auth));
 		expect(await auth.api.getSession({ headers: cookie })).not.toBeNull();

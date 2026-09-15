@@ -15,12 +15,16 @@ test.describe('API surfaces (spec §7.1, route protection)', () => {
 	});
 
 	test('an API path on no surface is unreachable', async ({ request, baseURL }) => {
-		const response = await request.get(`${baseURL}api/_nuxt_icon/../staff/health`);
 		const stray = await request.get(`${baseURL}api/health`);
 
 		expect(stray.status()).toBe(404);
 		expect(await stray.json()).toMatchObject({ data: { code: 'NOT_FOUND' } });
-		expect([401, 404]).toContain(response.status());
+	});
+
+	test('a surface is a path prefix ending in a slash, not a string prefix', async ({ request, baseURL }) => {
+		const response = await request.get(`${baseURL}api/staffing`);
+
+		expect(response.status()).toBe(404);
 	});
 
 	test('the Better Auth handler is open', async ({ request, baseURL }) => {

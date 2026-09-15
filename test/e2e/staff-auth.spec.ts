@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { expect, test } from '@nuxt/test-utils/playwright';
 import { STAFF_NAV } from '../../app/utils/staff-nav';
 import { E2E_STAFF_LOGIN } from '../support/staff-login';
-import { signInAsStaff } from './support';
+import { gotoHydrated, signInAsStaff } from './staff-session';
 
 test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 	test('a signed-out visit to any staff page lands on /login', async ({ page }) => {
@@ -12,8 +12,8 @@ test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 		await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
 	});
 
-	test('a wrong password is refused on the login page', async ({ page, goto }) => {
-		await goto('/login', { waitUntil: 'hydration' });
+	test('a wrong password is refused on the login page', async ({ page }) => {
+		await gotoHydrated(page, '/login');
 		await page.getByRole('textbox', { name: 'Email' }).fill(E2E_STAFF_LOGIN.email);
 		await page.getByRole('textbox', { name: 'Password' }).fill('not the password');
 		await page.getByRole('button', { name: 'Sign in' }).click();
@@ -22,8 +22,8 @@ test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 		await expect(page).toHaveURL(/\/login$/);
 	});
 
-	test('signing in lands on Lookup inside the shell with every §8.1 nav item', async ({ page, goto }) => {
-		await signInAsStaff({ page, goto });
+	test('signing in lands on Lookup inside the shell with every §8.1 nav item', async ({ page }) => {
+		await signInAsStaff(page);
 
 		const nav = page.getByRole('navigation', { name: 'Staff navigation' });
 		await expect(nav.getByRole('link')).toHaveText(STAFF_NAV.map(item => item.label));
@@ -32,23 +32,23 @@ test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 		}
 	});
 
-	test('every nav item opens its page', async ({ page, goto }) => {
-		await signInAsStaff({ page, goto });
+	test('every nav item opens its page', async ({ page }) => {
+		await signInAsStaff(page);
 		for (const item of STAFF_NAV.slice(1)) {
 			await page.getByRole('navigation', { name: 'Staff navigation' }).getByRole('link', { name: item.label }).click();
 			await expect(page).toHaveURL(new RegExp(`${item.to}$`));
 		}
 	});
 
-	test('a signed-in visit to /login goes to Lookup', async ({ page, goto }) => {
-		await signInAsStaff({ page, goto });
+	test('a signed-in visit to /login goes to Lookup', async ({ page }) => {
+		await signInAsStaff(page);
 		await page.goto('/login');
 
 		await expect(page).toHaveURL(/\/$/);
 	});
 
-	test('/ focuses the page search box, Cmd+K opens the palette and Esc closes it', async ({ page, goto }) => {
-		await signInAsStaff({ page, goto });
+	test('/ focuses the page search box, Cmd+K opens the palette and Esc closes it', async ({ page }) => {
+		await signInAsStaff(page);
 
 		await page.keyboard.press('/');
 		await expect(page.getByRole('textbox', { name: 'Search' })).toBeFocused();
@@ -62,8 +62,8 @@ test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 		await expect(page.getByRole('dialog')).toBeHidden();
 	});
 
-	test('revoking the session row logs the user out on the next request', async ({ page, goto, baseURL }) => {
-		await signInAsStaff({ page, goto });
+	test('revoking the session row logs staff out on the next request', async ({ page, baseURL }) => {
+		await signInAsStaff(page);
 		expect((await page.request.get(`${baseURL}api/staff/health`)).status()).toBe(200);
 
 		execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'shop-keepr', '--local', '--command', 'DELETE FROM session'], { stdio: 'pipe' });
@@ -73,8 +73,8 @@ test.describe('staff sign-in and the sidebar shell (spec §7.1, §8.1)', () => {
 		await expect(page).toHaveURL(/\/login$/);
 	});
 
-	test('signing out returns to /login and drops the session', async ({ page, goto, baseURL }) => {
-		await signInAsStaff({ page, goto });
+	test('signing out returns to /login and drops the session', async ({ page, baseURL }) => {
+		await signInAsStaff(page);
 		await page.getByRole('button', { name: 'Sign out' }).click();
 
 		await expect(page).toHaveURL(/\/login$/);

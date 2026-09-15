@@ -1,8 +1,8 @@
 import { toWebRequest } from 'h3';
-import { auth, authReady } from '../../auth/instance';
+import { useAuth } from '../../auth/instance';
 
 /** Better Auth's own routes: sign-in, sign-out, get-session (spec §7.1). */
 export default defineEventHandler(async (event) => {
-	await authReady;
+	const auth = await useAuth();
 	return auth.handler(toWebRequest(event));
 });

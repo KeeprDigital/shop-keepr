@@ -52,12 +52,18 @@ export function createAuth({ db, secret }: AuthOptions) {
 export type Auth = ReturnType<typeof createAuth>;
 
 /**
- * Creates or alters the auth tables (`user`, `session`, `account`,
- * `verification`) to match the options. Idempotent: an up-to-date database
- * is a no-op. Programmatic because the Better Auth CLI cannot reach D1.
+ * What it would take to bring the auth tables (`user`, `session`,
+ * `account`, `verification`) up to the options: the plan, its SQL, and
+ * `runMigrations` to apply it. Programmatic because the Better Auth CLI
+ * cannot reach D1.
  */
+export function planAuthMigrations(auth: Auth) {
+	return getMigrations(auth.options);
+}
+
+/** Applies the plan. Idempotent: an up-to-date database is a no-op. */
 export async function runAuthMigrations(auth: Auth): Promise<void> {
-	const { runMigrations } = await getMigrations(auth.options);
+	const { runMigrations } = await planAuthMigrations(auth);
 	await runMigrations();
 }
 

@@ -1,4 +1,4 @@
-import { auth, authReady } from '../auth/instance';
+import { useAuth } from '../auth/instance';
 import { resolveSurface } from '../auth/surface';
 
 /**
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 		case 'kiosk':
 			throw apiError('UNAUTHENTICATED', { message: 'No kiosk key' });
 		case 'staff': {
-			await authReady;
+			const auth = await useAuth();
 			const principal = await auth.api.getSession({ headers: event.headers });
 			if (!principal) {
 				throw apiError('UNAUTHENTICATED', { message: 'Staff session required' });

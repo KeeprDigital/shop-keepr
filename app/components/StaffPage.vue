@@ -6,11 +6,7 @@ defineProps<{ title: string }>();
 <template>
 	<UDashboardPanel :id="title">
 		<template #header>
-			<UDashboardNavbar :title="title">
-				<template #right>
-					<slot name="actions" />
-				</template>
-			</UDashboardNavbar>
+			<UDashboardNavbar :title="title" />
 		</template>
 		<template #body>
 			<slot>

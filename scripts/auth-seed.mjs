@@ -9,8 +9,7 @@
  */
 import process from 'node:process';
 import { parseArgs } from 'node:util';
-import { createJiti } from 'jiti';
-import { getPlatformProxy } from 'wrangler';
+import { jiti, withLocalBindings } from './local-d1.mjs';
 
 const { values } = parseArgs({
 	options: {
@@ -23,16 +22,11 @@ if (!values.email || !values.password) {
 	process.exit(1);
 }
 
-const jiti = createJiti(import.meta.url);
 const { createAuth, provisionStaffLogin, runAuthMigrations } = await jiti.import('../server/auth/auth.ts');
 
-const proxy = await getPlatformProxy({ configPath: 'wrangler.jsonc', persist: true });
-try {
-	const auth = createAuth({ db: proxy.env.DB, secret: 'unused-while-provisioning' });
+await withLocalBindings(async (env) => {
+	const auth = createAuth({ db: env.DB, secret: 'unused-while-provisioning' });
 	await runAuthMigrations(auth);
 	const { userId } = await provisionStaffLogin(auth, { email: values.email, password: values.password });
 	console.log(`staff login ${values.email} set (user ${userId}); every existing session revoked`);
-}
-finally {
-	await proxy.dispose();
-}
+});

@@ -58,9 +58,9 @@ pnpm auth:seed --email … --password …   # set the shared login; resets the p
 pnpm auth:check              # the resolved @better-auth/utils is ≥ 0.4.1 (CI runs this)
 ```
 
-`server/auth/auth.ts` builds an instance over any D1 (`createAuth`, `runAuthMigrations`, `provisionStaffLogin`); `server/auth/instance.ts` is the Worker's singleton, built at module scope from `cloudflare:workers` with its `$context` initialised eagerly (better-auth#10315). `BETTER_AUTH_SECRET` is a Worker secret (`wrangler secret put`), `.dev.vars` locally. Workers Paid is required: the Free plan's CPU budget cannot fit scrypt.
+`server/auth/auth.ts` builds an instance over any D1 (`createAuth`, `runAuthMigrations`, `provisionStaffLogin`); `server/auth/instance.ts` is the Worker's singleton, built at module scope from `cloudflare:workers` with its `$context` initialised eagerly (better-auth#10315) and reached only through `useAuth()`. `BETTER_AUTH_SECRET` is a Worker secret (`wrangler secret put`), `.dev.vars` locally. Workers Paid is required: the Free plan's CPU budget cannot fit scrypt.
 
-Every API request is placed on a surface by `server/middleware/surface.ts` from the table in `server/auth/surface.ts`: `/api/staff/**` admits only a staff session (`useStaff(event)` in a handler), `/api/kiosk/**` admits only a kiosk key (none exists yet, so nothing), `/api/auth/**` and Nuxt Icon's data are open, and any other `/api` path is 404 whatever handler sits behind it. Pages are gated by `app/middleware/auth.global.ts`.
+Every API request is placed on a surface by `server/middleware/surface.ts` from the table in `server/auth/surface.ts`: `/api/staff/**` admits only a staff session (the principal is on `event.context.staff`), `/api/kiosk/**` admits only a kiosk key (none exists yet, so nothing), `/api/auth/**` and Nuxt Icon's data are open, and any other `/api` path is 404 whatever handler sits behind it. Pages are gated by `app/middleware/auth.global.ts`.
 
 The shell is Nuxt UI's dashboard layout (`app/layouts/default.vue`): the sidebar in the spec's nav order (`app/utils/staff-nav.ts`), one banner slot above the page (`useBanner()`), one `UDashboardPanel` per page (`StaffPage`), `Cmd+K` for the page-jump palette and `/` to focus the page's search box (`registerSearchBox`). Every nav item has a page; all but Lookup are empty until their tickets land.
 

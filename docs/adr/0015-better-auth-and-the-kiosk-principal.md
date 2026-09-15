@@ -22,7 +22,7 @@ The surprise this records: **the threat model is a customer at a public touchscr
 
 ## Consequences
 
-**Better Auth's tables live in the same D1 database via its Kysely/D1 path, not the Drizzle adapter** (the adapter hands raw `Date`s to D1). Migrations run programmatically; the epoch-ms timestamp rule does not extend to these tables.
+**Better Auth's tables live in the same D1 database via its Kysely/D1 path, not the Drizzle adapter** (the adapter hands raw `Date`s to D1). Migrations run programmatically, and the tables keep the library's own conventions rather than the application schema's: not `STRICT`, its own ids, `Date` timestamps, no `store_id`. Its schema validation is switched off, since the eager init below would otherwise introspect D1 outside a request on every isolate boot.
 
 **Workers Paid is a hard requirement**: the Free plan's CPU budget cannot fit scrypt. CI asserts the resolved `@better-auth/utils` is at least 0.4.1, below which Workers silently falls to pure-JS scrypt at ~5 s per sign-in.
 

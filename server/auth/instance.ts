@@ -8,19 +8,25 @@
  *
  * A missing `BETTER_AUTH_SECRET` does not stop the Worker booting (pages
  * and assets still serve, and the db test project loads this module
- * without one); every auth call fails instead, with the reason.
+ * without one); `useAuth` rejects instead, with the reason, and the
+ * instance is reachable only through it.
  */
+import type { Auth } from './auth';
 import { env } from 'cloudflare:workers';
 import { createAuth } from './auth';
 
 const secret = env.BETTER_AUTH_SECRET;
 
-export const auth = createAuth({ db: env.DB, secret: secret || 'unset' });
+const auth = createAuth({ db: env.DB, secret: secret || 'unset' });
 
-/** Awaited before any use of `auth`; rejects when the secret is missing. */
-export const authReady: Promise<unknown> = secret
-	? auth.$context
+const ready: Promise<Auth> = secret
+	? auth.$context.then(() => auth)
 	: Promise.reject(new Error('BETTER_AUTH_SECRET is not set; add it to .dev.vars locally or `wrangler secret put` it'));
 
 // The rejection is for the awaiters, not the isolate.
-authReady.catch(() => {});
+ready.catch(() => {});
+
+/** The initialised instance; every auth call goes through here. */
+export function useAuth(): Promise<Auth> {
+	return ready;
+}
