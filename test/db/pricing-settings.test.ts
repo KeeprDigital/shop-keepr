@@ -54,6 +54,9 @@ describe('the Pricing Rules in D1 (spec §6, _Store settings_: seeded, per setti
 		await expect(write('store', { side: 'buy', key: 'floor' }, null)).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
 		await expect(write('magic', { side: 'buy', key: 'tender' }, { def: 'credit', mod: 10 })).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
 		await expect(write('store', { side: 'rows', key: 'rows' }, [])).rejects.toMatchObject({ data: { code: 'VALIDATION_FAILED' } });
+		// Attribute rows key only on the game's Pricing Attribute registry: Pokémon prices by rarity and variant, not finish.
+		await expect(write('pokemon', { side: 'rows', key: 'rows' }, [{ attr: 'finish', value: 'holo', sell: { k: 1, f: 0, floor: null }, buy: { k: 1, f: 0, floor: null } }])).rejects.toMatchObject({ statusCode: 400 });
+		await expect(write('lorcana', { side: 'sell', key: 'floor' }, 10)).rejects.toMatchObject({ statusCode: 400 });
 		expect((await readPricingSettings(db)).store).toEqual(SEEDED_STORE_SETTINGS);
 	});
 });

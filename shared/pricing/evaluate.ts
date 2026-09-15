@@ -79,7 +79,10 @@ function round(p: number, { inc, dir }: Rounding): number {
 	return rounded(p / inc) * inc;
 }
 
-const kf = (k: number, f: number) => `× ${k}${f ? (f < 0 ? ` − ${-f}` : ` + ${f}`) : ''}`;
+/** A signed flat amount in words: ` + 100`, ` − 50`, or nothing for zero. */
+const flatNote = (f: number) => (f ? (f < 0 ? ` − ${-f}` : ` + ${f}`) : '');
+
+const kf = (k: number, f: number) => `× ${k}${flatNote(f)}`;
 
 /** Buy-side settings, on a fold the step list has already established is a Buy. */
 const buyRules = (fold: Fold) => fold.rules as BuySettings;
@@ -95,11 +98,11 @@ const STEPS: Record<Exclude<StepId, 'fx'>, (fold: Fold) => Applied> = {
 	},
 	percentage({ p, converted, rules }) {
 		const b = band(rules.valueBands, converted);
-		return { p: affine(p, b.pct / 100, b.f), note: `band ${b.from}+ → ${b.pct}%${b.f ? ` ${kf(1, b.f).slice(4)}` : ''}` };
+		return { p: affine(p, b.pct / 100, b.f), note: `band ${b.from}+ → ${b.pct}%${flatNote(b.f)}` };
 	},
 	stock(fold) {
 		const b = band(buyRules(fold).stockBands, fold.q.onHand);
-		return { p: affine(fold.p, b.k, b.f), note: `hold ${fold.q.onHand} → band ${b.from}+ ${kf(b.k, b.f)}` };
+		return { p: affine(fold.p, b.k, b.f), note: `${fold.q.onHand} on hand → band ${b.from}+ ${kf(b.k, b.f)}` };
 	},
 	quantity(fold) {
 		const b = band(buyRules(fold).qtyBands, fold.q.quantity);

@@ -10,7 +10,11 @@ import type { Language } from '../../shared/domain/language';
  * row itself is not overwritten with a stale number. A row whose Printing
  * has no Market Price, or no exchange rate to convert at, takes a null
  * price and a fresh `priced_at`: it was evaluated, and there was nothing
- * to say.
+ * to say. `priced_at` is the Market Price watermark, so only a pass that
+ * evaluated the Sell side moves it: a Buy-only recompute after a ledger
+ * append leaves it where it was, and a Market Price that moved meanwhile
+ * still reaches the row on the next watermark sweep (spec §6: a missed
+ * reprice self-heals, the watermark stays behind).
  */
 import type { Money } from '../../shared/domain/money';
 import type { PriceSource } from '../../shared/domain/reprice';
@@ -18,16 +22,31 @@ import type { Side } from '../../shared/pricing/settings';
 import type { Db } from '../db/client';
 import type { PricingAttributes } from '../search/pricing-attributes';
 import type { PricingContext } from './context';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { evaluatePrice } from '../../shared/pricing/evaluate';
 import { printing, sku } from '../db/schema';
 import { prepared } from '../ledger/statement';
 import { readPricingAttributes } from '../search/pricing-attributes';
 import { fxRateFor } from './context';
 
-/** A SKU row with what the evaluator needs from its Printing. */
-export interface SkuPriceRow {
-	id: string;
+/** D1 binds 100 parameters per statement (spec §4.1); an id list is read in slices under it. */
+const ID_SLICE = 90;
+
+function slices<T>(items: readonly T[], size = ID_SLICE): T[][] {
+	const out: T[][] = [];
+	for (let at = 0; at < items.length; at += size) {
+		out.push(items.slice(at, at + size));
+	}
+	return out;
+}
+
+/** A SKU held or pinned: what Inventory lists and the sweep visits (spec §6: scope `on_hand > 0 OR pinned`). */
+export function onHandOrPinned() {
+	return or(gt(sku.onHand, 0), eq(sku.sellPriceSource, 'pinned'), eq(sku.buyPriceSource, 'pinned'));
+}
+
+/** What the evaluator needs of a SKU, held or not: its key, its stock and its Printing's Market Price. */
+export interface PriceInput {
 	printingId: string;
 	gameSystem: string;
 	condition: Condition;
@@ -37,6 +56,11 @@ export interface SkuPriceRow {
 	marketPriceCurrency: string | null;
 	sellPriceSource: PriceSource;
 	buyPriceSource: PriceSource;
+}
+
+/** A stored SKU row with what the evaluator needs from its Printing. */
+export interface SkuPriceRow extends PriceInput {
+	id: string;
 }
 
 export const SKU_PRICE_COLUMNS = {
@@ -65,8 +89,13 @@ export async function attributesFor(db: Db, rows: readonly { printingId: string;
 	return readPricingAttributes(db.$client, byGame);
 }
 
-/** One side's price for a row through the evaluator, at quantity 1 under its on-hand; null when nothing converts. */
-export function priceSide(ctx: PricingContext, row: SkuPriceRow, attributes: PricingAttributes, side: Side, quantity = 1): Money | null {
+/** The SKU rows with their Printings, the base every reprice reads from. */
+export function skuPriceRows(db: Db) {
+	return db.select(SKU_PRICE_COLUMNS).from(sku).innerJoin(printing, eq(printing.id, sku.printingId));
+}
+
+/** One side's price through the evaluator, at quantity 1 under the on-hand given; null when nothing converts. */
+export function priceSide(ctx: PricingContext, row: PriceInput, attributes: PricingAttributes, side: Side, quantity = 1): Money | null {
 	const fxRate = fxRateFor(ctx, row.marketPriceCurrency);
 	if (row.marketPrice === null || fxRate === null) {
 		return null;
@@ -90,17 +119,22 @@ export interface RepriceWrite {
 	buyPrice?: Money | null;
 }
 
-/** The guarded update per row, for the sides asked for that the rules still own; nothing for a row pinned on every side asked. */
+/**
+ * The guarded update per row, for the sides asked for that the rules
+ * still own; nothing for a row pinned on every side asked. The watermark
+ * moves only when the Sell side was evaluated.
+ */
 export function repriceStatement(db: Db, { row, sellPrice, buyPrice }: RepriceWrite, now: number) {
 	const sets = [
 		...(sellPrice !== undefined && row.sellPriceSource === 'rule' ? [sql`sell_price = ${sellPrice}`] : []),
 		...(buyPrice !== undefined && row.buyPriceSource === 'rule' ? [sql`buy_price = ${buyPrice}`] : []),
+		...(sellPrice !== undefined ? [sql`priced_at = ${now}`] : []),
 	];
 	if (sets.length === 0) {
 		return undefined;
 	}
 	return prepared(db, sql`
-		UPDATE sku SET ${sql.join(sets, sql`, `)}, priced_at = ${now}
+		UPDATE sku SET ${sql.join(sets, sql`, `)}
 		WHERE id = ${row.id} AND on_hand = ${row.onHand} AND sell_price_source = ${row.sellPriceSource} AND buy_price_source = ${row.buyPriceSource}
 	`);
 }
@@ -130,14 +164,6 @@ export async function repriceRows(db: Db, ctx: PricingContext, rows: readonly Sk
 	return results.filter(result => result.meta.changes === 1).length;
 }
 
-/** The rows the ids name, with their Printings, in id order. */
-export async function readSkuPriceRows(db: Db, skuIds: readonly string[]): Promise<SkuPriceRow[]> {
-	if (skuIds.length === 0) {
-		return [];
-	}
-	return db.select(SKU_PRICE_COLUMNS).from(sku).innerJoin(printing, eq(printing.id, sku.printingId)).where(inArray(sku.id, [...skuIds])).orderBy(sku.id);
-}
-
 /**
  * The inline recompute after a ledger append (spec §6: every ledger
  * append for a SKU recomputes that SKU's Buy Price, one row, in the
@@ -145,7 +171,9 @@ export async function readSkuPriceRows(db: Db, skuIds: readonly string[]): Promi
  * sides: that is when a never-held card gets a stored price.
  */
 export async function repriceAfterLedger(db: Db, ctx: PricingContext, skuIds: readonly string[], now = Date.now()): Promise<void> {
-	const rows = await db.select({ ...SKU_PRICE_COLUMNS, pricedAt: sku.pricedAt }).from(sku).innerJoin(printing, eq(printing.id, sku.printingId)).where(inArray(sku.id, [...skuIds]));
+	const rows = (await Promise.all(slices(skuIds).map(ids =>
+		db.select({ ...SKU_PRICE_COLUMNS, pricedAt: sku.pricedAt }).from(sku).innerJoin(printing, eq(printing.id, sku.printingId)).where(inArray(sku.id, ids)),
+	))).flat();
 	const fresh = rows.filter(row => row.pricedAt === null);
 	const held = rows.filter(row => row.pricedAt !== null);
 	await Promise.all([

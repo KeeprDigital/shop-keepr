@@ -7,14 +7,15 @@
  * none for Tender.
  */
 import type { PricingSettingsView, PricingSettingWrite, PricingSettingWriteOutcome } from '../../shared/contracts/staff/pricing-settings';
-import type { BuySettings, GameScope, PricingSettings, SellSettings, SettingChange } from '../../shared/pricing/settings';
+import type { AttributeRow, BuySettings, GameScope, PricingSettings, SellSettings, SettingChange } from '../../shared/pricing/settings';
 import type { Db } from '../db/client';
 import type { RepriceQueue } from './sweep';
 import { and, eq, sql } from 'drizzle-orm';
 import { zPricingSettingWrite } from '../../shared/contracts/staff/pricing-settings';
 import { affectedGames, BUY_SETTING_KEYS, ROWS_KEY, SELL_SETTING_KEYS, STORE_SCOPE } from '../../shared/pricing/settings';
-import { pricingSetting, store } from '../db/schema';
-import { GAME_SYSTEMS } from '../search/games';
+import { pricingSetting } from '../db/schema';
+import { GAME_SYSTEMS, gameSystem } from '../search/games';
+import { readStoreSettings } from '../services/store';
 import { apiError } from '../utils/api-error';
 import { STORE_ID } from '../utils/store';
 import { estimateSweep, requestSweep } from './sweep';
@@ -55,30 +56,35 @@ export async function readPricingSettings(db: Db): Promise<PricingSettings> {
 }
 
 export async function readPricingSettingsView(db: Db): Promise<PricingSettingsView> {
-	const [settings, row] = await Promise.all([
-		readPricingSettings(db),
-		db.query.store.findFirst({ columns: { currency: true }, where: eq(store.id, STORE_ID) }),
-	]);
-	if (!row) {
-		throw apiError('INTERNAL', { message: 'Store row missing; run the migrations' });
-	}
-	return { settings, games: [...TRADED_GAMES], currency: row.currency };
+	const [settings, { currency }] = await Promise.all([readPricingSettings(db), readStoreSettings(db)]);
+	return { settings, games: [...TRADED_GAMES], currency };
+}
+
+/** Attribute rows key only on the game's Pricing Attribute registry (spec §5: rule rows validated against it); a row on anything else would never match. */
+function unknownAttributes(game: string, rows: AttributeRow[]): string[] {
+	const known = Object.keys(gameSystem(game)?.pricingAttributes ?? {});
+	return [...new Set(rows.map(row => row.attr).filter(attr => !known.includes(attr)))];
 }
 
 /**
  * Lands one setting and asks for the sweep it needs. The value is checked
- * against the setting's own shape first, so a bad number never reaches
- * the evaluator. A Game System holds a row only where it overrides, so a
- * revert deletes the row and a scope with nothing left simply vanishes.
+ * here, once, against the setting's own shape and the game's Pricing
+ * Attribute registry, so nothing the evaluator cannot fold is stored. A
+ * Game System holds a row only where it overrides, so a revert deletes
+ * the row and a scope with nothing left simply vanishes.
  */
-export async function writePricingSetting(db: Db, input: PricingSettingWrite, { queue, now = Date.now() }: { queue: RepriceQueue; now?: number }): Promise<PricingSettingWriteOutcome> {
+export async function writePricingSetting(db: Db, input: unknown, { queue, now = Date.now() }: { queue: RepriceQueue; now?: number }): Promise<PricingSettingWriteOutcome> {
 	const parsed = zPricingSettingWrite.safeParse(input);
 	if (!parsed.success) {
 		throw apiError('VALIDATION_FAILED', { details: { issues: parsed.error.issues } });
 	}
-	const write = parsed.data;
+	const write: PricingSettingWrite = parsed.data;
 	if (write.scope !== STORE_SCOPE && !TRADED_GAMES.includes(write.scope)) {
 		throw apiError('VALIDATION_FAILED', { message: `${write.scope} is not a Game System the store trades`, details: { issues: [] } });
+	}
+	const unknown = write.ref.side === ROWS_KEY ? unknownAttributes(write.scope, write.value as AttributeRow[]) : [];
+	if (unknown.length > 0) {
+		throw apiError('VALIDATION_FAILED', { message: `${write.scope} has no Pricing Attribute ${unknown.join(', ')}`, details: { issues: [] } });
 	}
 	const before = await readPricingSettings(db);
 	const clearing = write.value === null || (write.ref.side === ROWS_KEY && (write.value as unknown[]).length === 0);
@@ -92,7 +98,7 @@ export async function writePricingSetting(db: Db, input: PricingSettingWrite, { 
 			.values({ ...key, value, updatedAt: now })
 			.onConflictDoUpdate({ target: [pricingSetting.storeId, pricingSetting.scope, pricingSetting.side, pricingSetting.key], set: { value: sql`excluded.value`, updatedAt: sql`excluded.updated_at` } });
 	}
-	const change: SettingChange = { scope: write.scope, side: write.ref.side === ROWS_KEY ? 'sell' : write.ref.side, key: write.ref.key };
+	const change: SettingChange = { scope: write.scope, side: write.ref.side, key: write.ref.key };
 	// Inheritance is judged against the settings as they stood: a Store default just written reaches the games that did not override it.
 	const games = affectedGames(before, change, TRADED_GAMES);
 	const skus = games.length > 0 ? await estimateSweep(db, { games, watermark: false }) : 0;

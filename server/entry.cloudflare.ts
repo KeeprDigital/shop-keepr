@@ -50,7 +50,13 @@ const handler: ExportedHandler<Env> = {
 		const db = createDb(env.DB);
 		const queue = repriceQueue(env);
 		for (const message of batch.messages) {
-			const { sweepId } = message.body as RepriceMessage;
+			const body = message.body as Partial<RepriceMessage> | null;
+			if (typeof body?.sweepId !== 'string') {
+				console.error('[reprice] a message with no sweep id was dropped', message.body);
+				message.ack();
+				continue;
+			}
+			const { sweepId } = body;
 			try {
 				const outcome = await runSweepChunk(db, { sweepId });
 				if (!outcome.finished) {

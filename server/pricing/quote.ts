@@ -13,7 +13,7 @@ import type { Money } from '../../shared/domain/money';
 import type { PriceSource } from '../../shared/domain/reprice';
 import type { Db } from '../db/client';
 import type { PricingContext } from './context';
-import type { SkuPriceRow } from './reprice';
+import type { PriceInput } from './reprice';
 import { and, eq } from 'drizzle-orm';
 import { printing, sku } from '../db/schema';
 import { apiError } from '../utils/api-error';
@@ -54,8 +54,7 @@ export async function quotePrinting(db: Db, { printingId, condition, language, q
 		where: and(eq(sku.storeId, STORE_ID), eq(sku.printingId, printingId), eq(sku.condition, condition), eq(sku.language, language)),
 	});
 	const context = ctx ?? await loadPricingContext(db);
-	const row: SkuPriceRow = {
-		id: held?.id ?? '',
+	const row: PriceInput = {
 		printingId,
 		gameSystem: found.gameSystem,
 		condition,

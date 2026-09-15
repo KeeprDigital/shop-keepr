@@ -54,6 +54,13 @@ describe('the inline recompute (spec §6: every ledger append recomputes that SK
 		expect(await row('LP')).toMatchObject({ onHand: 0, buyPrice: 75 });
 	});
 
+	it('leaves the Market Price watermark where it was on a Buy-only recompute, so a moved price still reaches the row', async () => {
+		await adjust(1);
+		const { pricedAt } = await row();
+		await adjust(2);
+		expect(await row()).toMatchObject({ onHand: 3, pricedAt });
+	});
+
 	it('leaves a pinned Buy Price alone and does not touch the Sell Price of a row already priced', async () => {
 		await adjust(1);
 		await db.update(sku).set({ buyPrice: 77 as never, buyPriceSource: 'pinned', buyPinnedSessionId: 'sess_counter_1', buyPinnedAt: now(), sellPrice: 999 as never }).where(eq(sku.id, (await row()).id));

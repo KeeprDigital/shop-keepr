@@ -198,10 +198,10 @@ export function attributeRows(settings: PricingSettings, game: string): Attribut
 	return settings.games[game]?.rows ?? [];
 }
 
-/** Where a change lands: the Store defaults, or one Game System. */
+/** Where a change lands: the Store defaults, or one Game System; attribute rows are a Game System's, on both sides. */
 export interface SettingChange {
 	scope: string;
-	side: Side;
+	side: Side | typeof ROWS_KEY;
 	key: SettingKey | typeof ROWS_KEY;
 }
 
@@ -215,11 +215,12 @@ export function affectedGames(settings: PricingSettings, change: SettingChange, 
 	if (STORE_ONLY_KEYS.includes(change.key as SettingKey)) {
 		return [];
 	}
-	if (change.scope !== STORE_SCOPE) {
+	if (change.scope !== STORE_SCOPE || change.side === ROWS_KEY) {
 		return games.includes(change.scope) ? [change.scope] : [];
 	}
+	const { side, key } = change;
 	return games.filter((game) => {
-		const own = settings.games[game]?.[change.side] as Partial<SideSettings> | undefined;
-		return own?.[change.key as keyof SideSettings] === undefined;
+		const own = settings.games[game]?.[side] as Partial<SideSettings> | undefined;
+		return own?.[key as keyof SideSettings] === undefined;
 	});
 }

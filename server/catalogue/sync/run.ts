@@ -20,7 +20,7 @@ import type { RepriceQueue } from '../../pricing/sweep';
 import type { CatalogueClient } from '../client';
 import type { Cursor } from '../generated/types.gen';
 import type { Existing, ExistingRow, PageCounts } from './plan';
-import { createDb } from '../../db/client';
+import { createDbOn } from '../../db/client';
 import { literal, packRows } from '../../db/sql';
 import { requestSweep } from '../../pricing/sweep';
 import { heldInSearch, SEARCH_INDEXES } from '../../search/mirror';
@@ -352,7 +352,7 @@ export async function runSync(kind: SyncKind, { db: binding, client, game, fromC
 		const run = await steps.do('finish', () => finishRun(db, { ...ref, fullWalk, seed, now: now() }));
 		if (kind === 'market_price' && run.counts.written > 0) {
 			if (reprice) {
-				await steps.do('reprice', () => requestSweep(createDb(binding), reprice, { reason: 'market_price', games: [game], watermark: true, now: now() }));
+				await steps.do('reprice', () => requestSweep(createDbOn(db), reprice, { reason: 'market_price', games: [game], watermark: true, now: now() }));
 			}
 			else {
 				console.warn(`[market price sync] ${game}: ${run.counts.written} Market Price(s) moved and no reprice queue was given; the sweep waits for the next one`);

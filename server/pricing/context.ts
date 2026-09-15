@@ -7,8 +7,8 @@
 import type { PricingSettings } from '../../shared/pricing/settings';
 import type { Db } from '../db/client';
 import { and, eq, isNotNull } from 'drizzle-orm';
-import { exchangeRate, store } from '../db/schema';
-import { apiError } from '../utils/api-error';
+import { exchangeRate } from '../db/schema';
+import { readStoreSettings } from '../services/store';
 import { STORE_ID } from '../utils/store';
 import { readPricingSettings } from './settings';
 
@@ -21,15 +21,12 @@ export interface PricingContext {
 }
 
 export async function loadPricingContext(db: Db): Promise<PricingContext> {
-	const [settings, row, rates] = await Promise.all([
+	const [settings, { currency }, rates] = await Promise.all([
 		readPricingSettings(db),
-		db.query.store.findFirst({ columns: { currency: true }, where: eq(store.id, STORE_ID) }),
+		readStoreSettings(db),
 		db.select({ baseCurrency: exchangeRate.baseCurrency, rate: exchangeRate.rate }).from(exchangeRate).where(and(eq(exchangeRate.storeId, STORE_ID), isNotNull(exchangeRate.rate))),
 	]);
-	if (!row) {
-		throw apiError('INTERNAL', { message: 'Store row missing; run the migrations' });
-	}
-	return { settings, currency: row.currency, fxRates: new Map(rates.map(r => [r.baseCurrency, r.rate!])) };
+	return { settings, currency, fxRates: new Map(rates.map(r => [r.baseCurrency, r.rate!])) };
 }
 
 /** The rate a Market Price in `currency` converts at, or null when no step has put one in force yet. */

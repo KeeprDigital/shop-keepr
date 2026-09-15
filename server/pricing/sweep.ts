@@ -17,14 +17,13 @@
  */
 import type { RepriceReason, RepriceStatus } from '../../shared/domain/reprice';
 import type { Db } from '../db/client';
-import type { SkuPriceRow } from './reprice';
 import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { printing, repriceSweep, sku } from '../db/schema';
 import { prepared } from '../ledger/statement';
 import { newId } from '../utils/ids';
 import { STORE_ID } from '../utils/store';
 import { loadPricingContext } from './context';
-import { repriceRows, SKU_PRICE_COLUMNS } from './reprice';
+import { onHandOrPinned, repriceRows, skuPriceRows } from './reprice';
 
 export interface RepriceMessage {
 	sweepId: string;
@@ -59,12 +58,10 @@ export interface SweepRequested {
 	folded: boolean;
 }
 
-export interface RepriceProgress {
+export interface RepriceProgress extends SweepScope {
 	id: string;
 	status: RepriceStatus;
 	reason: RepriceReason;
-	games: string[] | null;
-	watermark: boolean;
 	total: number;
 	done: number;
 	error: string | null;
@@ -75,12 +72,17 @@ export interface RepriceProgress {
 
 const ACTIVE: readonly RepriceStatus[] = ['queued', 'running'];
 
+/** The scope a job row holds, its games parsed from JSON. */
+function scopeOf(job: Pick<typeof repriceSweep.$inferSelect, 'games' | 'watermark'>): SweepScope {
+	return { games: job.games === null ? null : JSON.parse(job.games) as string[], watermark: job.watermark };
+}
+
 /** The rows a sweep visits, from `after` on: on hand or pinned on one side, in scope, behind the watermark when asked. */
 function scopeWhere({ games, watermark }: SweepScope, after = '') {
 	return and(
 		eq(sku.storeId, STORE_ID),
 		gt(sku.id, after),
-		or(gt(sku.onHand, 0), eq(sku.sellPriceSource, 'pinned'), eq(sku.buyPriceSource, 'pinned')),
+		onHandOrPinned(),
 		or(eq(sku.sellPriceSource, 'rule'), eq(sku.buyPriceSource, 'rule')),
 		games === null ? undefined : inArray(printing.gameSystem, [...games]),
 		watermark ? or(isNull(sku.pricedAt), lt(sku.pricedAt, printing.marketPriceUpdatedAt)) : undefined,
@@ -102,7 +104,7 @@ function unionScope(a: SweepScope, b: SweepScope): SweepScope {
 
 /** Widens the active job to cover `asked` too and sends it back to the start; false when it settled first. */
 async function foldInto(db: Db, active: typeof repriceSweep.$inferSelect, asked: SweepScope, now: number): Promise<boolean> {
-	const scope = unionScope({ games: active.games === null ? null : JSON.parse(active.games) as string[], watermark: active.watermark }, asked);
+	const scope = unionScope(scopeOf(active), asked);
 	const total = await estimateSweep(db, scope);
 	const folded = await prepared(db, sql`
 		UPDATE reprice_sweep SET games = ${scope.games === null ? null : JSON.stringify(scope.games)}, watermark = ${scope.watermark}, cursor = '', done = 0, total = ${total}, updated_at = ${now}
@@ -184,10 +186,9 @@ export async function runSweepChunk(db: Db, { sweepId, now = Date.now(), chunk =
 	if (!taken) {
 		return { sweepId, status: job.status, done: job.done, total: job.total, finished: true };
 	}
-	const scope: SweepScope = { games: job.games === null ? null : JSON.parse(job.games) as string[], watermark: job.watermark };
 	try {
 		const ctx = await loadPricingContext(db);
-		const rows: SkuPriceRow[] = await db.select(SKU_PRICE_COLUMNS).from(sku).innerJoin(printing, eq(printing.id, sku.printingId)).where(scopeWhere(scope, job.cursor)).orderBy(asc(sku.id)).limit(chunk);
+		const rows = await skuPriceRows(db).where(scopeWhere(scopeOf(job), job.cursor)).orderBy(asc(sku.id)).limit(chunk);
 		await repriceRows(db, ctx, rows, { sides: ['sell', 'buy'], now });
 		const exhausted = rows.length < chunk;
 		const advanced = await advanceCursor(db, { sweepId, from: job.cursor, to: rows.at(-1)?.id ?? job.cursor, count: rows.length, exhausted, now });
@@ -234,8 +235,7 @@ export async function readRepriceProgress(db: Db): Promise<RepriceProgress | nul
 		id: row.id,
 		status: row.status,
 		reason: row.reason,
-		games: row.games === null ? null : JSON.parse(row.games) as string[],
-		watermark: row.watermark,
+		...scopeOf(row),
 		total: row.total,
 		done: row.done,
 		error: row.error,

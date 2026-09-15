@@ -8,10 +8,11 @@ import type { SQL } from 'drizzle-orm';
  */
 import type { InventoryPage, InventoryQuery, InventoryRow, InventorySort } from '../../shared/contracts/staff/inventory';
 import type { Db } from '../db/client';
-import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { CONDITIONS } from '../../shared/domain/condition';
-import { printing, sku, store } from '../db/schema';
-import { apiError } from '../utils/api-error';
+import { printing, sku } from '../db/schema';
+import { onHandOrPinned } from '../pricing/reprice';
+import { readStoreSettings } from '../services/store';
 import { STORE_ID } from '../utils/store';
 
 /** Condition sorts in grade order (NM first), not alphabetically. */
@@ -47,7 +48,7 @@ function nameContains(q: string | undefined): SQL | undefined {
 const TIE_BREAK = [asc(printing.name), asc(printing.setCode), asc(printing.collectorNumber), asc(conditionRank), asc(sku.language)];
 
 export async function listInventory(db: Db, query: InventoryQuery): Promise<InventoryPage> {
-	const inStock = and(eq(sku.storeId, STORE_ID), or(gt(sku.onHand, 0), eq(sku.sellPriceSource, 'pinned'), eq(sku.buyPriceSource, 'pinned')));
+	const inStock = and(eq(sku.storeId, STORE_ID), onHandOrPinned());
 	const filters = [
 		inStock,
 		query.game ? eq(printing.gameSystem, query.game) : undefined,
@@ -91,9 +92,6 @@ export async function listInventory(db: Db, query: InventoryQuery): Promise<Inve
 		.innerJoin(printing, eq(printing.id, sku.printingId))
 		.where(inStock)
 		.orderBy(asc(printing.gameSystem));
-	const settings = await db.query.store.findFirst({ columns: { currency: true }, where: eq(store.id, STORE_ID) });
-	if (!settings) {
-		throw apiError('INTERNAL', { message: 'Store row missing; run the migrations' });
-	}
-	return { rows, games: games.map(row => row.gameSystem), currency: settings.currency };
+	const { currency } = await readStoreSettings(db);
+	return { rows, games: games.map(row => row.gameSystem), currency };
 }

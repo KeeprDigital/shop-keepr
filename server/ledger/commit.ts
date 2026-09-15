@@ -145,6 +145,12 @@ export async function commitEntry(db: Db, plan: CommitPlan): Promise<CommitOutco
 	if (dependents.some(count => count !== 1)) {
 		throw apiError('INTERNAL', { message: `Ledger entry ${plan.header.id} landed with a dependent statement missed: ${dependents.join(',')}` });
 	}
-	await repriceAfterLedger(db, await loadPricingContext(db), [...new Set(plan.lines.map(line => line.skuId))]);
+	// The entry has landed; a recompute that fails leaves the previous price, and the next sweep catches up.
+	try {
+		await repriceAfterLedger(db, await loadPricingContext(db), [...new Set(plan.lines.map(line => line.skuId))]);
+	}
+	catch (error) {
+		console.error(`[reprice] ledger entry ${plan.header.id} landed but its SKUs could not be repriced inline`, error);
+	}
 	return { landed: true };
 }
