@@ -1,8 +1,11 @@
 import { expect, test } from '@nuxt/test-utils/playwright';
 import { STORE_ID } from '../../server/utils/store';
+import { signInAsStaff } from './staff-session';
 
-test('the staff health route reads the Store from D1', async ({ request, baseURL }) => {
-	const response = await request.get(`${baseURL}api/staff/health`);
+test('the staff health route reads the Store from D1 for a signed-in staff session', async ({ page, baseURL }) => {
+	await signInAsStaff(page);
+
+	const response = await page.request.get(`${baseURL}api/staff/health`);
 
 	expect(response.status()).toBe(200);
 	const body = await response.json();

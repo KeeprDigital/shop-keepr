@@ -12,8 +12,7 @@
  */
 import process from 'node:process';
 import { parseArgs } from 'node:util';
-import { createJiti } from 'jiti';
-import { getPlatformProxy } from 'wrangler';
+import { jiti, withLocalBindings } from './local-d1.mjs';
 
 const { values } = parseArgs({
 	options: {
@@ -23,7 +22,6 @@ const { values } = parseArgs({
 	},
 });
 
-const jiti = createJiti(import.meta.url);
 const { createCatalogueClient, FIRST_CURSOR } = await jiti.import('../server/catalogue/client.ts');
 const { buildMirrorIndexes, runCatalogueSync } = await jiti.import('../server/catalogue/sync/run.ts');
 const { catalogueCredentials } = await jiti.import('../server/catalogue/credentials.ts');
@@ -49,12 +47,11 @@ function stagingSource(env) {
 	return { client: createCatalogueClient({ fetch, baseURL, credential }), games: [] };
 }
 
-const proxy = await getPlatformProxy({ configPath: 'wrangler.jsonc', persist: true });
-try {
-	const source = values.from === 'staging' ? stagingSource(proxy.env) : await fixtureSource();
+await withLocalBindings(async (env) => {
+	const source = values.from === 'staging' ? stagingSource(env) : await fixtureSource();
 	const games = values.game?.length ? values.game : source.games;
 	for (const game of games) {
-		const outcome = await runCatalogueSync({ db: proxy.env.DB, client: source.client, game, fromCursor: values.resume ? undefined : FIRST_CURSOR });
+		const outcome = await runCatalogueSync({ db: env.DB, client: source.client, game, fromCursor: values.resume ? undefined : FIRST_CURSOR });
 		if (!outcome.claimed) {
 			console.error(`${game}: refused, a run is already ${outcome.reason}`);
 			process.exitCode = 1;
@@ -64,8 +61,5 @@ try {
 		console.log(`${game}: ${status} (${cursorFrom} -> ${cursorTo}) seen ${counts.seen}, written ${counts.written}, quarantined ${counts.quarantined}, drifted ${counts.drifted}`);
 	}
 	// A seed leaves the indexes for after every Game System is in (spec §4.5).
-	await buildMirrorIndexes(proxy.env.DB);
-}
-finally {
-	await proxy.dispose();
-}
+	await buildMirrorIndexes(env.DB);
+});

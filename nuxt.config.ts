@@ -14,6 +14,15 @@ export default defineNuxtConfig({
 		},
 	},
 
+	css: ['~/assets/css/main.css'],
+
+	// Icons ship in the bundles, so the Worker never fetches icon data at
+	// runtime and the page never calls /api/_nuxt_icon for one it uses.
+	icon: {
+		serverBundle: { collections: ['lucide'] },
+		clientBundle: { scan: true, sizeLimitKb: 256 },
+	},
+
 	devtools: {
 		enabled: true,
 	},
