@@ -18,7 +18,7 @@ const { createAuth, planAuthMigrations } = await jiti.import('../server/auth/aut
 // `--print` plans against an empty in-memory D1 so the SQL is the whole
 // schema, whatever the local database already holds.
 await withLocalBindings(async (env) => {
-	const auth = createAuth({ db: env.DB, secret: 'unused-while-migrating' });
+	const auth = createAuth({ db: env.DB, secret: 'unused-while-migrating-nothing-is-signed-here' });
 	const plan = await planAuthMigrations(auth);
 	if (values.print) {
 		const sql = await plan.compileMigrations();
