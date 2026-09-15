@@ -301,21 +301,25 @@ export interface SyncOptions {
 	workflowInstanceId?: string;
 }
 
-/** The whole Catalogue run for one Game System: claim, every page, finish. */
-export function runCatalogueSync(options: SyncOptions): Promise<SyncOutcome> {
-	return runWalk('catalogue', syncPage, options);
-}
-
-/** The whole Market Price run for one Game System, on its own cursor and its own lock (ADR 0009: run isolation is the point of two runs). */
-export function runMarketPriceSync(options: SyncOptions): Promise<SyncOutcome> {
-	return runWalk('market_price', marketPricePage, options);
-}
-
 /** A page of either kind: pull, judge, apply as one `batch()`. */
 type PageWalker = (db: D1Client, client: CatalogueClient, options: PageOptions) => Promise<PageResult>;
 
-/** One run of `kind`: claim, every page through `walkPage`, finish; failed and unlocked on any error. */
-async function runWalk(kind: SyncKind, walkPage: PageWalker, { db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId }: SyncOptions): Promise<SyncOutcome> {
+/** Each kind walks its own endpoint; both share the claim, the loop and the finish (ADR 0009: run isolation is the point of two runs). */
+const PAGE_WALKERS: Record<SyncKind, PageWalker> = { catalogue: syncPage, market_price: marketPricePage };
+
+/** The whole Catalogue run for one Game System: claim, every page, finish. */
+export function runCatalogueSync(options: SyncOptions): Promise<SyncOutcome> {
+	return runSync('catalogue', options);
+}
+
+/** The whole Market Price run for one Game System, on its own cursor and its own lock. */
+export function runMarketPriceSync(options: SyncOptions): Promise<SyncOutcome> {
+	return runSync('market_price', options);
+}
+
+/** One run of `kind`: claim, every page, finish; failed and unlocked on any error. */
+export async function runSync(kind: SyncKind, { db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId }: SyncOptions): Promise<SyncOutcome> {
+	const walkPage = PAGE_WALKERS[kind];
 	const db: D1Client = binding.withSession('first-primary');
 	const claim = await steps.do('claim', () => claimRun(db, { kind, game, fromCursor, now: now(), workflowInstanceId }));
 	if (!claim.claimed) {

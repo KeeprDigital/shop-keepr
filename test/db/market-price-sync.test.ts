@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createCatalogueClient, FIRST_CURSOR } from '../../server/catalogue/client';
 import { claimRun, failRun, runMarketPriceSync, storedCursor } from '../../server/catalogue/sync/run';
 import { createDb } from '../../server/db/client';
-import { printing, printingDetail, syncRun } from '../../server/db/schema';
+import { catalogueQuarantine, printing, printingDetail, syncRun } from '../../server/db/schema';
 import { fixtureFetchFrom } from '../support/fixture-fetch';
 import { committedPages, fixturePrinting, syncFixture } from '../support/fixture-mirror';
 
@@ -54,8 +54,9 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 		const before = new Map((await db().query.printing.findMany()).map(r => [r.id, r]));
 
 		const run = completed(await walkPrices());
-		expect(run).toMatchObject({ kind: 'market_price', gameSystem: 'magic', status: 'completed', cursorFrom: '0', cursorTo: LAST_MAGIC_PRICE_CURSOR });
-		expect(run.counts).toEqual({ seen: 17, written: 1, quarantined: 0, drifted: 0, skipped: 1 });
+		// The fixture's last movement is a null for m10-15: quarantined, so the run says so.
+		expect(run).toMatchObject({ kind: 'market_price', gameSystem: 'magic', status: 'completed_with_drift', cursorFrom: '0', cursorTo: LAST_MAGIC_PRICE_CURSOR });
+		expect(run.counts).toEqual({ seen: 17, written: 1, quarantined: 1, drifted: 0, skipped: 0 });
 
 		for (const row of await db().query.printing.findMany()) {
 			if (row.id === 'prt-magic-m10-15') {
@@ -66,7 +67,7 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 				expect(row).toEqual(before.get(row.id));
 			}
 		}
-		expect(await db().query.syncRun.findFirst({ where: eq(syncRun.id, run.id) })).toMatchObject({ kind: 'market_price', recordsWritten: 1, recordsSkipped: 1 });
+		expect(await db().query.syncRun.findFirst({ where: eq(syncRun.id, run.id) })).toMatchObject({ kind: 'market_price', recordsWritten: 1, recordsQuarantined: 1, recordsSkipped: 0 });
 	});
 
 	it('applies a delta to the row whose rate moved and leaves every other row as it was', async () => {
@@ -89,17 +90,20 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 		}
 	});
 
-	it('leaves the stored rate alone on a null, counts it, and logs loudly', async () => {
+	it('leaves the stored Market Price alone on a null, quarantines the record, and logs loudly', async () => {
 		await syncFixture('magic');
-		await walkPrices();
+		await walkPrices(priceDelta([movement(bolt, 240, 'magic-price-0002')], FIRST_CURSOR));
 		const before = (await readPrinting(bolt))!;
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		try {
-			const run = completed(await walkPrices(priceDelta([movement(bolt, null)]), { from: 'stored' }));
-			expect(run).toMatchObject({ status: 'completed', cursorTo: 'magic-price-0099' });
-			expect(run.counts).toEqual({ seen: 1, written: 0, quarantined: 0, drifted: 0, skipped: 1 });
+			const run = completed(await walkPrices(priceDelta([movement(bolt, null)], 'magic-price-0002'), { from: 'stored' }));
+			expect(run).toMatchObject({ status: 'completed_with_drift', cursorTo: 'magic-price-0099' });
+			expect(run.counts).toEqual({ seen: 1, written: 0, quarantined: 1, drifted: 0, skipped: 0 });
 			expect(await readPrinting(bolt)).toEqual(before);
-			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/null rate.*prt-magic-m10-146/));
+			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/null Market Price.*prt-magic-m10-146/));
+			const [quarantined] = await db().query.catalogueQuarantine.findMany();
+			expect(quarantined).toMatchObject({ syncRunId: run.id, kind: 'market_price', recordId: bolt, cursor: 'magic-price-0099', reason: 'null_market_price' });
+			expect(JSON.parse(quarantined!.detail)).toEqual({ heldMarketPrice: 240, heldCurrency: 'USD' });
 		}
 		finally {
 			warn.mockRestore();
@@ -135,7 +139,7 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 		const run = completed(await walkPrices(priceDelta([raw as never]), { from: 'stored' }));
 		expect(run.status).toBe('completed_with_drift');
 		expect(run.counts).toEqual({ seen: 1, written: 0, quarantined: 1, drifted: 0, skipped: 0 });
-		const quarantined = (await db().query.catalogueQuarantine.findMany()).map(q => ({ ...q, raw: JSON.parse(q.raw) }));
+		const quarantined = (await db().query.catalogueQuarantine.findMany({ where: eq(catalogueQuarantine.syncRunId, run.id) })).map(q => ({ ...q, raw: JSON.parse(q.raw) }));
 		expect(quarantined).toEqual([expect.objectContaining({ syncRunId: run.id, kind: 'market_price', gameSystem: 'magic', recordKind: null, recordId: bolt, cursor: 'magic-price-0099', reason: 'validation_failed', raw })]);
 		expect(await readPrinting(bolt)).toMatchObject({ marketPrice: 240 });
 	});
@@ -168,14 +172,14 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 		expect(held.claimed).toBe(true);
 
 		const run = completed(await walkPrices());
-		expect(run).toMatchObject({ kind: 'market_price', status: 'completed', cursorTo: LAST_MAGIC_PRICE_CURSOR });
+		expect(run).toMatchObject({ kind: 'market_price', status: 'completed_with_drift', cursorTo: LAST_MAGIC_PRICE_CURSOR });
 
 		await failRun(env.DB, { runId: (held as { runId: string }).runId, now: tick, error: 'the Catalogue is down' });
 		const again = completed(await walkPrices(priceDelta([movement(bolt, 260)]), { from: 'stored' }));
 		expect(again).toMatchObject({ status: 'completed', cursorFrom: LAST_MAGIC_PRICE_CURSOR, cursorTo: 'magic-price-0099' });
 
 		const statuses = (await db().query.syncRun.findMany()).map(r => `${r.kind}:${r.status}`).sort();
-		expect(statuses).toEqual(['catalogue:completed', 'catalogue:failed', 'market_price:completed', 'market_price:completed']);
+		expect(statuses).toEqual(['catalogue:completed', 'catalogue:failed', 'market_price:completed', 'market_price:completed_with_drift']);
 		expect(await storedCursor(env.DB, 'catalogue', 'magic')).toBe('magic-0044');
 	});
 

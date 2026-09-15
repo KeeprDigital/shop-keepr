@@ -1,7 +1,8 @@
 /**
  * The one rule of the stepped exchange rate (ADR 0003; spec §6, _FX: the
  * stepped rate_): a fetched rate replaces the one in force only when it
- * has moved at least the store's step threshold away from it; between
+ * has moved past the store's step threshold; a move of exactly the
+ * threshold is not past it. Between
  * steps the rate does not move at all. Pure, so the threshold arithmetic
  * is tested on its own and the service only records what this decides.
  */
@@ -28,7 +29,7 @@ export function judgeStep({ stored, fetched, thresholdPct }: StepInput): StepJud
 	}
 	// Rounded to a millionth of a percent, far below any rate's precision, so float noise cannot decide a step.
 	const movedPct = Math.round((Math.abs(fetched - stored) / stored) * 100 * 1e6) / 1e6;
-	if (movedPct < thresholdPct) {
+	if (movedPct <= thresholdPct) {
 		return { step: false, reason: 'within_threshold', movedPct };
 	}
 	return { step: true, from: stored, to: fetched, movedPct };

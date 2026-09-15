@@ -7,17 +7,22 @@
  * movements and what the Mirror holds for those Printings, decide what
  * moved.
  *
- * - A movement applies only when the rate differs from the one held, so
- *   `market_price_updated_at` means _moved_ and the reprice sweep's
- *   watermark is exact.
- * - A null rate never overwrites a good one; it is skipped, counted, and
- *   named so the run can log it loudly.
+ * - A movement applies only when the Market Price differs from the one
+ *   held, so `market_price_updated_at` means _moved_ and the reprice
+ *   sweep's watermark is exact.
+ * - A null Market Price never overwrites a good one: the record is
+ *   quarantined with its own reason, so it is a durable row the System
+ *   page can show and the run says `completed_with_drift` (spec §6,
+ *   _Market Price storage and null handling_: logged loudly).
  * - A movement for a Printing the Mirror lacks is skipped and counted:
- *   the Printing record carries its price, so the Catalogue walk brings it.
+ *   the Printing record carries its Market Price, so the Catalogue walk
+ *   brings it.
  * - A movement behind the price cursor held is left alone.
- * - The verbatim record in `printing_detail` takes the new price and cursor
- *   too, so the Mirror stays what the Catalogue would return and the next
- *   full walk finds no drift.
+ * - The verbatim record in `printing_detail` takes the new Market Price
+ *   and cursor too, so the Mirror stays what the Catalogue would return
+ *   and the next full walk finds no drift. This leans on the contract that
+ *   the Printing record's `market_price_cursor` is the cursor of the price
+ *   walk (`docs/catalogue-requirements.md`, _Market Price per Printing_).
  */
 import type { D1Client } from '../../db/client';
 import type { CatalogueClient, ParsedRecord } from '../client';
@@ -32,7 +37,7 @@ import { contentHash } from './hash';
 import { quarantined } from './plan';
 import { quarantineStatements, runProgressStatement } from './statements';
 
-/** What the Mirror holds for one Printing a page names: its rate columns and its verbatim record. */
+/** What the Mirror holds for one Printing a page names: its Market Price columns and its verbatim record. */
 export interface HeldPrice {
 	marketPrice: number | null;
 	marketPriceCurrency: string | null;
@@ -49,8 +54,6 @@ export interface PriceWrite {
 
 export interface MarketPricePlan {
 	moved: PriceWrite[];
-	/** Printings whose movement carried a null rate, left as they were. */
-	nulls: string[];
 	/** Printings the Mirror does not hold. */
 	missing: string[];
 	quarantined: Quarantined[];
@@ -60,7 +63,6 @@ export interface MarketPricePlan {
 export async function planMarketPricePage(records: ParsedRecord<MarketPriceRecord>[], held: ReadonlyMap<string, HeldPrice>): Promise<MarketPricePlan> {
 	const plan: MarketPricePlan = {
 		moved: [],
-		nulls: [],
 		missing: [],
 		quarantined: [],
 		counts: { seen: records.length, written: 0, quarantined: 0, drifted: 0, skipped: 0 },
@@ -79,8 +81,8 @@ export async function planMarketPricePage(records: ParsedRecord<MarketPriceRecor
 			continue;
 		}
 		if (record.market_price === null) {
-			plan.nulls.push(record.printing_id);
-			plan.counts.skipped += 1;
+			plan.quarantined.push(quarantined(record, 'null_market_price', { heldMarketPrice: current.marketPrice, heldCurrency: current.marketPriceCurrency }));
+			plan.counts.quarantined += 1;
 			continue;
 		}
 		if (current.marketPriceCursor !== null && record.cursor < current.marketPriceCursor) {
@@ -99,11 +101,11 @@ export async function planMarketPricePage(records: ParsedRecord<MarketPriceRecor
 /**
  * The D1 half: pull one page of movements, judge it against the Mirror,
  * apply it as one `batch()`. Every dependent statement carries its own
- * guard in SQL (spec §4.1; ADR 0011): a rate applies only when it differs
- * from the one held and is not behind the price cursor held, so a replayed
- * page moves no watermark twice; the detail record follows only once the
- * row holds that price cursor; the search table's copy is read back from
- * `printing`. The run's progress row is the last statement, and whether it
+ * guard in SQL (spec §4.1; ADR 0011): a Market Price applies only when it
+ * differs from the one held and is not behind the price cursor held, so a
+ * replayed page moves no watermark twice; the detail record follows only
+ * once the row holds that price cursor; the search table's copy is read
+ * back from `printing`. The run's progress row is the last statement, and whether it
  * changed is what the caller checks the lock by.
  */
 export async function marketPricePage(db: D1Client, client: CatalogueClient, options: PageOptions): Promise<PageResult> {
@@ -113,19 +115,21 @@ export async function marketPricePage(db: D1Client, client: CatalogueClient, opt
 	const statements = marketPriceStatements(plan, { ...options, nextCursor: page.nextCursor, newId });
 	const results = await db.batch(statements.map(sql => db.prepare(sql)));
 	const prefix = `[market price sync] ${options.game}`;
-	if (plan.nulls.length > 0) {
-		console.warn(`${prefix}: the Catalogue sent a null rate for ${plan.nulls.length} Printing(s) at cursor ${options.cursor}; last known rate kept for each: ${plan.nulls.join(', ')}`);
+	const nulls = plan.quarantined.filter(q => q.reason === 'null_market_price').map(q => q.recordId);
+	if (nulls.length > 0) {
+		console.warn(`${prefix}: the Catalogue sent a null Market Price for ${nulls.length} Printing(s) at cursor ${options.cursor}; the last known Market Price stands where there is one, and the record is quarantined: ${nulls.join(', ')}`);
 	}
 	if (plan.missing.length > 0) {
 		console.warn(`${prefix}: skipped ${plan.missing.length} movement(s) for Printing(s) the Mirror does not hold: ${plan.missing.join(', ')}`);
 	}
-	if (plan.quarantined.length > 0) {
-		console.warn(`${prefix}: quarantined ${plan.quarantined.length} record(s) at cursor ${options.cursor}:`, plan.quarantined.map(q => `${q.recordId ?? '?'} (${q.reason})`).join(', '));
+	const malformed = plan.quarantined.filter(q => q.reason !== 'null_market_price');
+	if (malformed.length > 0) {
+		console.warn(`${prefix}: quarantined ${malformed.length} record(s) at cursor ${options.cursor}:`, malformed.map(q => `${q.recordId ?? '?'} (${q.reason})`).join(', '));
 	}
 	return { nextCursor: page.nextCursor, hasMore: page.hasMore, applied: results.at(-1)!.meta.changes === 1 };
 }
 
-/** The rate columns and verbatim record of every Printing of `game` the page names, in one `batch()`. */
+/** The Market Price columns and verbatim record of every Printing of `game` the page names, in one `batch()`. */
 async function readHeldPrices(db: D1Client, game: string, printingIds: string[]): Promise<Map<string, HeldPrice>> {
 	const held = new Map<string, HeldPrice>();
 	if (printingIds.length === 0) {

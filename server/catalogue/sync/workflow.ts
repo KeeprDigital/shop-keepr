@@ -6,9 +6,8 @@
  * instance fails halfway. The class is exported from the Worker by
  * `server/entry.cloudflare.ts` and bound as `CATALOGUE_SYNC`.
  *
- * The Workflow only frames the run: `runCatalogueSync` and
- * `runMarketPriceSync` do the work, so `pnpm catalogue:seed` and the db
- * tests run the same code inline.
+ * The Workflow only frames the run: `runSync` does the work, so
+ * `pnpm catalogue:seed` and the db tests run the same code inline.
  */
 import type { WorkflowEvent, WorkflowStep, WorkflowStepConfig } from 'cloudflare:workers';
 import type { SyncKind } from '../../../shared/domain/sync-run';
@@ -17,7 +16,7 @@ import type { StepRunner, SyncOutcome } from './run';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { createCatalogueClient } from '../client';
 import { catalogueCredentials } from '../credentials';
-import { runCatalogueSync, runMarketPriceSync } from './run';
+import { runSync } from './run';
 
 /** The Workflow's input: `{ kind, game, fromCursor }`; omit `fromCursor` to resume from the stored cursor. */
 export interface CatalogueSyncParams {
@@ -42,8 +41,7 @@ export class CatalogueSyncWorkflow extends WorkflowEntrypoint<Env, CatalogueSync
 	override async run(event: Readonly<WorkflowEvent<CatalogueSyncParams>>, step: WorkflowStep): Promise<SyncOutcome> {
 		const { kind, game, fromCursor } = event.payload;
 		const client = createCatalogueClient({ fetch: globalThis.fetch.bind(globalThis), ...catalogueCredentials(this.env) });
-		const run = kind === 'market_price' ? runMarketPriceSync : runCatalogueSync;
-		return run({
+		return runSync(kind, {
 			db: this.env.DB,
 			client,
 			game,

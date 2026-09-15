@@ -23,16 +23,15 @@ const handler: ExportedHandler<Env> = {
 	 */
 	async scheduled(_controller, env) {
 		const db = createDb(env.DB);
-		await Promise.allSettled([
+		const results = await Promise.allSettled([
 			reconcileOnHand(db),
 			refreshExchangeRates(db, { source: createFrankfurterRates({ fetch: globalThis.fetch.bind(globalThis) }) }),
-		]).then((results) => {
-			for (const result of results) {
-				if (result.status === 'rejected') {
-					console.error('[cron] a scheduled job failed', result.reason);
-				}
+		]);
+		for (const result of results) {
+			if (result.status === 'rejected') {
+				console.error('[cron] a scheduled job failed', result.reason);
 			}
-		});
+		}
 	},
 };
 

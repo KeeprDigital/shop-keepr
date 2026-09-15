@@ -68,7 +68,7 @@ export interface PageCounts {
 	written: number;
 	quarantined: number;
 	drifted: number;
-	/** Market Price runs only: movements left unapplied because the Mirror lacks the Printing or the rate was null. */
+	/** Market Price runs only: movements for a Printing the Mirror lacks, left unapplied. */
 	skipped: number;
 }
 

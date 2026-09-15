@@ -10,7 +10,8 @@
  * One rate per currency the Mirror prices in, each against the Store's
  * trading currency; the Catalogue's currency is not named anywhere, so it
  * is read from the Printings rather than assumed. The Store's own currency
- * needs no fetch and holds rate 1.
+ * needs no rate at all: the pipeline converts nothing, and no row or step
+ * is written for it.
  *
  * Every dependent write carries its own guard in SQL (spec §4.1; ADR
  * 0011): the step lands only while the rate in force is still the one it
@@ -20,7 +21,8 @@ import type { ExchangeRateView } from '../../shared/contracts/staff/exchange-rat
 import type { ExchangeRateStepSource } from '../../shared/domain/exchange-rate';
 import type { Db } from '../db/client';
 import type { RateSource } from './frankfurter';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import type { StepJudgement } from './step';
+import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import { exchangeRate, exchangeRateStep, printing, store } from '../db/schema';
 import { prepared } from '../ledger/statement';
 import { apiError } from '../utils/api-error';
@@ -28,72 +30,76 @@ import { newId } from '../utils/ids';
 import { STORE_ID } from '../utils/store';
 import { judgeStep } from './step';
 
-export interface RefreshOutcome {
+/** A currency the Catalogue prices in against the one the Store trades in. */
+export interface Pair {
 	baseCurrency: string;
 	quoteCurrency: string;
+}
+
+export interface RefreshOutcome extends Pair {
 	/** What the source said, or null when it failed. */
 	fetched: number | null;
 	/** The rate in force after the refresh. */
 	rate: number | null;
 	stepped: boolean;
-	reason?: 'no_rate' | 'within_threshold';
+	reason?: Extract<StepJudgement, { step: false }>['reason'];
 }
 
 /** The scheduled fetch: every pair the Mirror needs, judged, recorded, stepped where the threshold says. */
 export async function refreshExchangeRates(db: Db, { source, now = Date.now() }: { source: RateSource; now?: number }): Promise<RefreshOutcome[]> {
-	const { currency: quote, fxStepThresholdPct } = await readFxSettings(db);
-	const bases = await db
-		.selectDistinct({ currency: printing.marketPriceCurrency })
-		.from(printing)
-		.where(isNotNull(printing.marketPriceCurrency))
-		.orderBy(printing.marketPriceCurrency);
+	const { currency: quoteCurrency, fxStepThresholdPct } = await readFxSettings(db);
 	const outcomes: RefreshOutcome[] = [];
-	for (const { currency: base } of bases) {
-		if (base === null) {
-			continue;
-		}
-		const held = await readPair(db, base);
-		const fetched = await fetchRate(source, base, quote);
+	for (const baseCurrency of await pricedCurrencies(db, quoteCurrency)) {
+		const pair: Pair = { baseCurrency, quoteCurrency };
+		const held = await readPair(db, baseCurrency);
+		const fetched = await fetchRate(source, pair);
 		const judgement = judgeStep({ stored: held?.rate ?? null, fetched, thresholdPct: fxStepThresholdPct });
-		if (fetched === null || !judgement.step) {
+		if (!judgement.step) {
 			if (fetched !== null) {
-				await recordFetch(db, { base, quote, fetched, now });
+				await pairUpsert(db, { ...pair, fetched, now }).run();
 			}
-			outcomes.push({ baseCurrency: base, quoteCurrency: quote, fetched, rate: held?.rate ?? null, stepped: false, reason: judgement.step ? 'within_threshold' : judgement.reason });
+			outcomes.push({ ...pair, fetched, rate: held?.rate ?? null, stepped: false, reason: judgement.reason });
 			continue;
 		}
-		const stepped = await step(db, { base, quote, from: judgement.from, to: judgement.to, fetched, source: 'fetched', sessionId: null, now });
+		const stepped = await recordStep(db, { ...pair, from: judgement.from, to: judgement.to, fetched, source: 'fetched', sessionId: null, now });
 		if (stepped) {
-			console.warn(`[fx] ${base}/${quote} stepped ${judgement.from ?? 'nothing'} -> ${judgement.to} (fetched ${fetched}, threshold ${fxStepThresholdPct}%)`);
+			console.warn(`[fx] ${baseCurrency}/${quoteCurrency} stepped ${judgement.from ?? 'nothing'} -> ${judgement.to} (fetched ${fetched}, threshold ${fxStepThresholdPct}%)`);
 		}
-		outcomes.push({ baseCurrency: base, quoteCurrency: quote, fetched, rate: stepped ? judgement.to : held?.rate ?? null, stepped });
+		outcomes.push({ ...pair, fetched, rate: stepped ? judgement.to : held?.rate ?? null, stepped });
 	}
 	return outcomes;
 }
 
-/** Set manually, from the System page: a step whatever the threshold, recorded with the session that made it. */
+/**
+ * Set manually, from the System page: a step whatever the threshold,
+ * recorded with the session that made it. Only for a currency the Mirror
+ * prices in, or one already held; the Store's own needs no rate.
+ */
 export async function setExchangeRateManually(db: Db, { baseCurrency, rate, sessionId, now = Date.now() }: { baseCurrency: string; rate: number; sessionId: string; now?: number }): Promise<ExchangeRateView> {
-	const { currency: quote } = await readFxSettings(db);
+	const { currency: quoteCurrency } = await readFxSettings(db);
 	const held = await readPair(db, baseCurrency);
-	const stepped = await step(db, { base: baseCurrency, quote, from: held?.rate ?? null, to: rate, fetched: null, source: 'manual', sessionId, now });
-	if (!stepped) {
-		throw apiError('CONFLICT', { message: `The ${baseCurrency}/${quote} rate moved while it was being set; read it again` });
+	if (!held && !(await pricedCurrencies(db, quoteCurrency)).includes(baseCurrency)) {
+		throw apiError('VALIDATION_FAILED', { message: `No Market Price is stated in ${baseCurrency}; nothing to convert`, details: { issues: [] } });
 	}
-	console.warn(`[fx] ${baseCurrency}/${quote} set manually ${held?.rate ?? 'nothing'} -> ${rate} by session ${sessionId}`);
-	const view = (await readExchangeRates(db)).find(v => v.baseCurrency === baseCurrency);
+	const stepped = await recordStep(db, { baseCurrency, quoteCurrency, from: held?.rate ?? null, to: rate, fetched: null, source: 'manual', sessionId, now });
+	if (!stepped) {
+		throw apiError('CONFLICT', { message: `The ${baseCurrency}/${quoteCurrency} rate moved while it was being set; read it again` });
+	}
+	console.warn(`[fx] ${baseCurrency}/${quoteCurrency} set manually ${held?.rate ?? 'nothing'} -> ${rate} by session ${sessionId}`);
+	const [view] = await readExchangeRates(db, baseCurrency);
 	if (!view) {
-		throw apiError('INTERNAL', { message: `The ${baseCurrency}/${quote} rate was set but cannot be read back` });
+		throw apiError('INTERNAL', { message: `The ${baseCurrency}/${quoteCurrency} rate was set but cannot be read back` });
 	}
 	return view;
 }
 
-/** Every pair the Store holds a rate for, with the step that put it in force, base currency ascending. */
-export async function readExchangeRates(db: Db): Promise<ExchangeRateView[]> {
+/** Every pair the Store holds a rate for (or the one named), with the step that put it in force, base currency ascending. */
+export async function readExchangeRates(db: Db, baseCurrency?: string): Promise<ExchangeRateView[]> {
 	const rows = await db
 		.select({ pair: exchangeRate, step: exchangeRateStep })
 		.from(exchangeRate)
 		.leftJoin(exchangeRateStep, eq(exchangeRateStep.id, exchangeRate.rateStepId))
-		.where(eq(exchangeRate.storeId, STORE_ID))
+		.where(and(eq(exchangeRate.storeId, STORE_ID), baseCurrency === undefined ? undefined : eq(exchangeRate.baseCurrency, baseCurrency)))
 		.orderBy(exchangeRate.baseCurrency);
 	return rows.map(({ pair, step }) => ({
 		baseCurrency: pair.baseCurrency,
@@ -107,6 +113,16 @@ export async function readExchangeRates(db: Db): Promise<ExchangeRateView[]> {
 	}));
 }
 
+/** The currencies the Mirror states a Market Price in, other than the Store's own, ascending. */
+async function pricedCurrencies(db: Db, quoteCurrency: string): Promise<string[]> {
+	const rows = await db
+		.selectDistinct({ currency: printing.marketPriceCurrency })
+		.from(printing)
+		.where(and(isNotNull(printing.marketPriceCurrency), ne(printing.marketPriceCurrency, quoteCurrency)))
+		.orderBy(printing.marketPriceCurrency);
+	return rows.flatMap(row => (row.currency === null ? [] : [row.currency]));
+}
+
 async function readFxSettings(db: Db): Promise<{ currency: string; fxStepThresholdPct: number }> {
 	const row = await db.query.store.findFirst({ columns: { currency: true, fxStepThresholdPct: true }, where: eq(store.id, STORE_ID) });
 	if (!row) {
@@ -115,33 +131,26 @@ async function readFxSettings(db: Db): Promise<{ currency: string; fxStepThresho
 	return row;
 }
 
-function readPair(db: Db, base: string) {
-	return db.query.exchangeRate.findFirst({ where: and(eq(exchangeRate.storeId, STORE_ID), eq(exchangeRate.baseCurrency, base)) });
+function readPair(db: Db, baseCurrency: string) {
+	return db.query.exchangeRate.findFirst({ where: and(eq(exchangeRate.storeId, STORE_ID), eq(exchangeRate.baseCurrency, baseCurrency)) });
 }
 
-/** The candidate rate, or null with the failure logged; the Store's own currency is 1 without asking. */
-async function fetchRate(source: RateSource, base: string, quote: string): Promise<number | null> {
-	if (base === quote) {
-		return 1;
-	}
+/** The candidate rate, or null with the failure logged. */
+async function fetchRate(source: RateSource, { baseCurrency, quoteCurrency }: Pair): Promise<number | null> {
 	try {
-		return (await source.latest(base, quote)).rate;
+		return (await source.latest(baseCurrency, quoteCurrency)).rate;
 	}
 	catch (error) {
-		console.error(`[fx] ${base}/${quote}: the rate could not be fetched; the rate in force stands`, error);
+		console.error(`[fx] ${baseCurrency}/${quoteCurrency}: the rate could not be fetched; the rate in force stands`, error);
 		return null;
 	}
 }
 
-/** The pair row made to exist with this fetch on it; the rate in force is not touched. */
-async function recordFetch(db: Db, { base, quote, fetched, now }: { base: string; quote: string; fetched: number; now: number }): Promise<void> {
-	await pairUpsert(db, { base, quote, fetched, now }).run();
-}
-
-function pairUpsert(db: Db, { base, quote, fetched, now }: { base: string; quote: string; fetched: number | null; now: number }) {
+/** The pair row made to exist, with this fetch on it when there was one; the rate in force is not touched. */
+function pairUpsert(db: Db, { baseCurrency, quoteCurrency, fetched, now }: Pair & { fetched: number | null; now: number }) {
 	return prepared(db, sql`
 		INSERT INTO exchange_rate (store_id, base_currency, quote_currency, rate, rate_step_id, fetched_rate, fetched_at, updated_at)
-		VALUES (${STORE_ID}, ${base}, ${quote}, NULL, NULL, ${fetched}, ${fetched === null ? null : now}, ${now})
+		VALUES (${STORE_ID}, ${baseCurrency}, ${quoteCurrency}, NULL, NULL, ${fetched}, ${fetched === null ? null : now}, ${now})
 		ON CONFLICT(store_id, base_currency) DO UPDATE SET
 			fetched_rate = COALESCE(excluded.fetched_rate, exchange_rate.fetched_rate),
 			fetched_at = COALESCE(excluded.fetched_at, exchange_rate.fetched_at),
@@ -149,9 +158,7 @@ function pairUpsert(db: Db, { base, quote, fetched, now }: { base: string; quote
 	`);
 }
 
-interface StepInput {
-	base: string;
-	quote: string;
+interface StepWrite extends Pair {
 	from: number | null;
 	to: number;
 	fetched: number | null;
@@ -161,18 +168,18 @@ interface StepInput {
 }
 
 /** One step, atomically: the pair row, its step, the rate moved; false when the rate in force was no longer `from`. */
-async function step(db: Db, { base, quote, from, to, fetched, source, sessionId, now }: StepInput): Promise<boolean> {
+async function recordStep(db: Db, { baseCurrency, quoteCurrency, from, to, fetched, source, sessionId, now }: StepWrite): Promise<boolean> {
 	const stepId = newId();
 	const [, inserted] = await db.$client.batch([
-		pairUpsert(db, { base, quote, fetched, now }),
+		pairUpsert(db, { baseCurrency, quoteCurrency, fetched, now }),
 		prepared(db, sql`
 			INSERT INTO exchange_rate_step (id, store_id, base_currency, quote_currency, rate_from, rate_to, fetched_rate, source, session_id, stepped_at)
-			SELECT ${stepId}, ${STORE_ID}, ${base}, ${quote}, ${from}, ${to}, ${fetched}, ${source}, ${sessionId}, ${now}
-			WHERE EXISTS (SELECT 1 FROM exchange_rate WHERE store_id = ${STORE_ID} AND base_currency = ${base} AND rate IS ${from})
+			SELECT ${stepId}, ${STORE_ID}, ${baseCurrency}, ${quoteCurrency}, ${from}, ${to}, ${fetched}, ${source}, ${sessionId}, ${now}
+			WHERE EXISTS (SELECT 1 FROM exchange_rate WHERE store_id = ${STORE_ID} AND base_currency = ${baseCurrency} AND rate IS ${from})
 		`),
 		prepared(db, sql`
-			UPDATE exchange_rate SET rate = ${to}, rate_step_id = ${stepId}, quote_currency = ${quote}, updated_at = ${now}
-			WHERE store_id = ${STORE_ID} AND base_currency = ${base} AND EXISTS (SELECT 1 FROM exchange_rate_step WHERE id = ${stepId})
+			UPDATE exchange_rate SET rate = ${to}, rate_step_id = ${stepId}, quote_currency = ${quoteCurrency}, updated_at = ${now}
+			WHERE store_id = ${STORE_ID} AND base_currency = ${baseCurrency} AND EXISTS (SELECT 1 FROM exchange_rate_step WHERE id = ${stepId})
 		`),
 	]);
 	return inserted!.meta.changes === 1;

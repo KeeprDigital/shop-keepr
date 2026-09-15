@@ -102,17 +102,22 @@ describe('the stepped exchange rate (ADR 0003: fetched on a schedule, held as a 
 		expect(view.step).toMatchObject({ source: 'manual', rateFrom: null, rateTo: 0.8 });
 	});
 
-	it('fetches one rate per currency the Mirror prices in, and none for the Store\'s own', async () => {
+	it('fetches one rate per currency the Mirror prices in, and holds nothing for the Store\'s own', async () => {
 		await seedPrinting(db, { id: 'prt-pokemon-base1-4', marketPrice: 41000, marketPriceCurrency: 'GBP' });
 		await seedPrinting(db, { id: 'prt-pokemon-base1-88', marketPrice: 180, marketPriceCurrency: 'USD' });
+		await seedPrinting(db, { id: 'prt-pokemon-sv3pt5-25', marketPrice: 20, marketPriceCurrency: 'EUR' });
 		const asked: string[] = [];
 		const outcome = await refresh(0.79, asked);
-		expect(asked).toEqual(['USD/GBP']);
-		expect(outcome).toEqual(expect.arrayContaining([
-			{ baseCurrency: 'GBP', quoteCurrency: 'GBP', fetched: 1, rate: 1, stepped: true },
-			{ baseCurrency: 'USD', quoteCurrency: 'GBP', fetched: 0.79, rate: 0.79, stepped: true },
-		]));
-		expect((await readExchangeRates(db)).map(v => v.baseCurrency)).toEqual(['GBP', 'USD']);
+		expect(asked).toEqual(['EUR/GBP', 'USD/GBP']);
+		expect(outcome.map(o => o.baseCurrency)).toEqual(['EUR', 'USD']);
+		expect((await readExchangeRates(db)).map(v => v.baseCurrency)).toEqual(['EUR', 'USD']);
+		expect(await steps()).toHaveLength(2);
+	});
+
+	it('refuses a manual set for a currency nothing is priced in', async () => {
+		await expect(setExchangeRateManually(db, { baseCurrency: 'JPY', rate: 0.005, sessionId: 'sess_counter_1', now: tick })).rejects.toMatchObject({ statusCode: 400 });
+		await expect(setExchangeRateManually(db, { baseCurrency: 'GBP', rate: 1, sessionId: 'sess_counter_1', now: tick })).rejects.toMatchObject({ statusCode: 400 });
+		expect(await readExchangeRates(db)).toEqual([]);
 	});
 
 	it('fetches nothing when the Mirror prices nothing', async () => {

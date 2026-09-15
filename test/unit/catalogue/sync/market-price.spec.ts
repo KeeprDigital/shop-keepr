@@ -41,11 +41,11 @@ describe('planning a Market Price page (ADR 0009: the run only ever carries move
 		expect(plan.moved).toEqual([]);
 	});
 
-	it('leaves a null rate unapplied and names the Printing, so the run can log it loudly', async () => {
+	it('quarantines a null Market Price with the one held, and leaves the row alone', async () => {
 		const plan = await planMarketPricePage(ok([movement(bolt.id, null)]), held(magic));
-		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 0, drifted: 0, skipped: 1 });
+		expect(plan.counts).toEqual({ seen: 1, written: 0, quarantined: 1, drifted: 0, skipped: 0 });
 		expect(plan.moved).toEqual([]);
-		expect(plan.nulls).toEqual([bolt.id]);
+		expect(plan.quarantined).toEqual([expect.objectContaining({ reason: 'null_market_price', recordId: bolt.id, cursor: 'magic-price-0099', detail: { heldMarketPrice: 240, heldCurrency: 'USD' } })]);
 	});
 
 	it('skips and counts a movement for a Printing the Mirror does not hold', async () => {

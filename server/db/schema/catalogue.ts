@@ -120,7 +120,7 @@ export const syncRun = sqliteTable('sync_run', {
 	recordsWritten: integer({ mode: 'number' }).notNull(),
 	recordsQuarantined: integer({ mode: 'number' }).notNull(),
 	recordsDrifted: integer({ mode: 'number' }).notNull(),
-	/** Market Price runs: movements for a Printing the Mirror lacks, and null rates, both left unapplied and counted (ADR 0009). */
+	/** Market Price runs: movements for a Printing the Mirror lacks, left unapplied and counted (ADR 0009). */
 	recordsSkipped: integer({ mode: 'number' }).notNull().default(0),
 	error: text(),
 	workflowInstanceId: text(),

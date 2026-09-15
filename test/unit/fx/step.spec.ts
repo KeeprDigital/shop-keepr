@@ -10,9 +10,11 @@ describe('judging a fetched exchange rate against the one in force (ADR 0003: th
 		expect(judgeStep({ stored: 0.8, fetched: 0.82, thresholdPct: 2 })).toEqual({ step: true, from: 0.8, to: 0.82, movedPct: 2.5 });
 	});
 
-	it('steps on a move of exactly the threshold, in either direction', () => {
-		expect(judgeStep({ stored: 0.8, fetched: 0.784, thresholdPct: 2 })).toMatchObject({ step: true, to: 0.784 });
-		expect(judgeStep({ stored: 0.8, fetched: 0.816, thresholdPct: 2 })).toMatchObject({ step: true, to: 0.816 });
+	it('does not step on a move of exactly the threshold: past means past, in either direction', () => {
+		expect(judgeStep({ stored: 0.8, fetched: 0.784, thresholdPct: 2 })).toEqual({ step: false, reason: 'within_threshold', movedPct: 2 });
+		expect(judgeStep({ stored: 0.8, fetched: 0.816, thresholdPct: 2 })).toEqual({ step: false, reason: 'within_threshold', movedPct: 2 });
+		expect(judgeStep({ stored: 0.8, fetched: 0.7839, thresholdPct: 2 })).toMatchObject({ step: true, to: 0.7839 });
+		expect(judgeStep({ stored: 0.8, fetched: 0.8161, thresholdPct: 2 })).toMatchObject({ step: true, to: 0.8161 });
 	});
 
 	it('takes the first rate a pair ever fetches', () => {

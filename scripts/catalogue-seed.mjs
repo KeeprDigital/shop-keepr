@@ -28,7 +28,7 @@ if (!['catalogue', 'market_price'].includes(values.kind)) {
 }
 
 const { createCatalogueClient, FIRST_CURSOR } = await jiti.import('../server/catalogue/client.ts');
-const { buildMirrorIndexes, runCatalogueSync, runMarketPriceSync } = await jiti.import('../server/catalogue/sync/run.ts');
+const { buildMirrorIndexes, runSync } = await jiti.import('../server/catalogue/sync/run.ts');
 const { catalogueCredentials } = await jiti.import('../server/catalogue/credentials.ts');
 
 /** The committed fixture, served by path, for every Game System it holds. */
@@ -56,8 +56,7 @@ await withLocalBindings(async (env) => {
 	const source = values.from === 'staging' ? stagingSource(env) : await fixtureSource();
 	const games = values.game?.length ? values.game : source.games;
 	for (const game of games) {
-		const run = values.kind === 'market_price' ? runMarketPriceSync : runCatalogueSync;
-		const outcome = await run({ db: env.DB, client: source.client, game, fromCursor: values.resume ? undefined : FIRST_CURSOR });
+		const outcome = await runSync(values.kind, { db: env.DB, client: source.client, game, fromCursor: values.resume ? undefined : FIRST_CURSOR });
 		if (!outcome.claimed) {
 			console.error(`${game}: refused, a run is already ${outcome.reason}`);
 			process.exitCode = 1;

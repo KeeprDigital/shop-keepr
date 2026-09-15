@@ -24,6 +24,8 @@ Note that "a live rate would force an expensive sweep" is _not_ a reason. A swee
 
 **Price provenance depends on the rate version.** Reconstructing why a price was what it was needs the exchange rate in force at the time, not today's. Historical _transacted_ prices are safe regardless: every Transaction snapshots the price it used.
 
+**The source is Frankfurter, behind a seam.** _(Added by [#58](https://github.com/KeeprDigital/shop-keepr/issues/58).)_ No ticket named a rate source. The fetch reads the European Central Bank's daily reference rates through Frankfurter (`server/fx/frankfurter.ts`): no key, no rate limit worth planning around, and both the Catalogue's price currency and the store's trading currency on its list. It sits behind `{ fetch, baseURL }` as the Catalogue client does, so swapping the source, or self-hosting it, changes one adapter. The step rule and the log are the decision; the source is a detail of it.
+
 **The threshold is a store setting, and sizing it is [#8](https://github.com/KeeprDigital/shop-keepr/issues/8)'s call.** Too tight and the stability this buys evaporates; too loose and shelf prices drift away from the market. It is a number to tune, not a constant to hardcode.
 
 **Revisit if the assumptions change.** This holds because the store trades in one currency, margins are wide, and daily moves are small. Multiple trading currencies, a volatile pair, or thin margins on high-value singles would each undermine it — though high-value cards are hand-priced anyway, which is the existing escape hatch.
