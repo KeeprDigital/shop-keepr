@@ -3,3 +3,6 @@
 # In every other environment they are Worker secrets (`wrangler secret put`).
 CATALOGUE_BASE_URL=
 CATALOGUE_CREDENTIAL=
+# Signs the staff session cookie (spec §7.1). Any long random string locally;
+# `wrangler secret put BETTER_AUTH_SECRET` everywhere else.
+BETTER_AUTH_SECRET=

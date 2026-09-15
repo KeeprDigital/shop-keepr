@@ -11,7 +11,9 @@ A Nuxt 4 application deployed as one Cloudflare Worker with one D1 database. The
 
 ```bash
 pnpm install      # also runs `nuxt prepare` and `wrangler types`
+cp .dev.vars.example .dev.vars   # then set BETTER_AUTH_SECRET to any long random string
 pnpm db:migrate   # apply the migrations to the local D1 under .wrangler/state
+pnpm auth:seed --email counter@example.test --password 'a long password'   # the shared store login
 ```
 
 The D1 database itself is created once per environment, with the region hint the store trades from (it cannot change later):
@@ -30,7 +32,7 @@ pnpm build        # production build: a Worker in .output/server, assets in .out
 pnpm preview      # preview the production build
 ```
 
-`GET /api/staff/health` reads the Store row from D1 and is the first thing to check when a binding looks wrong.
+`GET /api/staff/health` reads the Store row from D1 and is the first thing to check when a binding looks wrong; it needs a staff session, so sign in at `/login` first.
 
 ## Database
 
@@ -44,6 +46,23 @@ pnpm cf:types            # regenerate worker-configuration.d.ts after editing wr
 ```
 
 Conventions (spec §4.1): every table is `STRICT`; ids are opaque ULIDs from `newId()`; `store_id` is on every store-owned table; timestamps are epoch-ms integers; money is an integer of minor units. Condition, Language, `Money` and the error codes are defined once in `shared/` and imported by the schema through the column builders in `server/db/columns.ts`.
+
+## Staff auth and the shell
+
+Staff sign in once at `/login` with the one shared store login and land on Lookup inside the sidebar shell (spec §7.1, §8.1; ADR 0015). Better Auth email + password with a DB-backed session and `cookieCache` off, so deleting the `session` row logs that browser out on its next request. The auth tables (`user`, `session`, `account`, `verification`) live in the same D1 database through Better Auth's own Kysely/D1 path, not the Drizzle adapter, and are migrated programmatically:
+
+```bash
+pnpm auth:migrate            # create or update the auth tables in the local D1 (part of `pnpm db:migrate`)
+pnpm auth:migrate --print    # the SQL for a remote database: pipe to `wrangler d1 execute shop-keepr --remote --file`
+pnpm auth:seed --email … --password …   # set the shared login; resets the password and revokes every session
+pnpm auth:check              # the resolved @better-auth/utils is ≥ 0.4.1 (CI runs this)
+```
+
+`server/auth/auth.ts` builds an instance over any D1 (`createAuth`, `runAuthMigrations`, `provisionStaffLogin`); `server/auth/instance.ts` is the Worker's singleton, built at module scope from `cloudflare:workers` with its `$context` initialised eagerly (better-auth#10315). `BETTER_AUTH_SECRET` is a Worker secret (`wrangler secret put`), `.dev.vars` locally. Workers Paid is required: the Free plan's CPU budget cannot fit scrypt.
+
+Every API request is placed on a surface by `server/middleware/surface.ts` from the table in `server/auth/surface.ts`: `/api/staff/**` admits only a staff session (`useStaff(event)` in a handler), `/api/kiosk/**` admits only a kiosk key (none exists yet, so nothing), `/api/auth/**` and Nuxt Icon's data are open, and any other `/api` path is 404 whatever handler sits behind it. Pages are gated by `app/middleware/auth.global.ts`.
+
+The shell is Nuxt UI's dashboard layout (`app/layouts/default.vue`): the sidebar in the spec's nav order (`app/utils/staff-nav.ts`), one banner slot above the page (`useBanner()`), one `UDashboardPanel` per page (`StaffPage`), `Cmd+K` for the page-jump palette and `/` to focus the page's search box (`registerSearchBox`). Every nav item has a page; all but Lookup are empty until their tickets land.
 
 ## Catalogue contract
 
@@ -87,9 +106,9 @@ pnpm test         # vitest: `unit` (Nuxt environment) and `db` (workerd + local 
 pnpm test:e2e     # playwright against the built Worker served by `wrangler dev`
 ```
 
-`pnpm test:e2e` builds first, applies the migrations, then starts `wrangler dev` on port 8787; set `CI=1` to refuse an already-running server. Every db test starts from an empty D1 with the migrations applied.
+`pnpm test:e2e` builds first, applies the migrations, seeds the e2e store login (`test/support/staff-login.ts`), then starts `wrangler dev` on port 8787; set `CI=1` to refuse an already-running server. Every db test starts from an empty D1 with the migrations applied.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs only `pnpm catalogue:contract:check` so far; the rest of the pipeline is deployment fog (spec §10.1).
+GitHub Actions (`.github/workflows/ci.yml`) runs `pnpm catalogue:contract:check` and `pnpm auth:check` so far; the rest of the pipeline is deployment fog (spec §10.1).
 
 ## Agents
 

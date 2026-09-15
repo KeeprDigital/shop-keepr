@@ -36,6 +36,10 @@ export default defineConfig({
 						miniflare: {
 							bindings: {
 								TEST_MIGRATIONS: migrations,
+								// The built Worker (wrangler.jsonc `main`) is this
+								// project's entry once `.output` exists; its auth
+								// singleton wants a secret. The tests build their own.
+								BETTER_AUTH_SECRET: 'vitest-only-secret-never-deployed-0123456789',
 							},
 						},
 					}),

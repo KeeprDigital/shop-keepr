@@ -20,3 +20,18 @@ jobs:
       # Regenerates from the committed document and fails if the committed
       # output differs (ADR 0013).
       - run: pnpm catalogue:contract:check
+
+  better-auth-utils-floor:
+    name: '@better-auth/utils is at or above 0.4.1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Below 0.4.1 Workers silently falls to pure-JS scrypt at ~5 s per
+      # sign-in (spec §7.1, ADR 0015).
+      - run: pnpm auth:check
