@@ -24,7 +24,7 @@ The boundary that decides what belongs here at all is [ADR 0005](adr/0005-catalo
 
 **Stable, CDN-served image URLs on every Printing**, in at least two sizes — a thumbnail for lists and a full image for detail — and one URL per face for multi-faced Printings. shop-keepr renders from the Catalogue's host and stores nothing ([#15](https://github.com/KeeprDigital/shop-keepr/issues/15)); a URL that changes or expires breaks the kiosk.
 
-**A generated OpenAPI document, served at a stable path in every environment.** Generated from the implementation rather than hand-maintained, so it cannot drift from what the API does. Served per environment so "which contract is staging running?" is answerable rather than assumed. shop-keepr commits a fetched copy, making contract change visible as a reviewable diff.
+**A generated OpenAPI document, served at a stable path in every environment.** Generated from the implementation rather than hand-maintained, so it cannot drift from what the API does. Served per environment so "which contract is staging running?" is answerable rather than assumed. shop-keepr commits a fetched copy, making contract change visible as a reviewable diff. The path is `/openapi.json` under the API root, and a refused or failed request answers with RFC 9457 problem details, so one client handles every failure the same way.
 
 **The document describes the walked records as well as the routes.** Record shapes are part of the same OpenAPI document, not a separate artefact, so one committed file and one generator cover everything shop-keepr consumes. shop-keepr generates its types _and_ its runtime validators from it and validates every pulled record against them ([#9](https://github.com/KeeprDigital/shop-keepr/issues/9)).
 

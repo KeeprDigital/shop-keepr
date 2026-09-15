@@ -1,0 +1,156 @@
+{
+	"records": [
+		{
+			"cursor": "magic-price-0001",
+			"game": "magic",
+			"printing_id": "prt-magic-lea-161",
+			"market_price": {
+				"amount": 285000,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0002",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-146",
+			"market_price": {
+				"amount": 240,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0003",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-146-foil",
+			"market_price": {
+				"amount": 3900,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0004",
+			"game": "magic",
+			"printing_id": "prt-magic-sta-42",
+			"market_price": {
+				"amount": 650,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0005",
+			"game": "magic",
+			"printing_id": "prt-magic-sta-105-etched",
+			"market_price": {
+				"amount": 2200,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0006",
+			"game": "magic",
+			"printing_id": "prt-magic-ptc-161",
+			"market_price": {
+				"amount": 1800,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0007",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-15",
+			"market_price": {
+				"amount": 120,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0008",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-11",
+			"market_price": {
+				"amount": 15,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0009",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-58",
+			"market_price": {
+				"amount": 1350,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0010",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-112",
+			"market_price": {
+				"amount": 30,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0011",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-196",
+			"market_price": {
+				"amount": 40,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0012",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-223",
+			"market_price": {
+				"amount": 310,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0013",
+			"game": "magic",
+			"printing_id": "prt-magic-lea-232",
+			"market_price": {
+				"amount": 1450000000,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0014",
+			"game": "magic",
+			"printing_id": "prt-magic-sta-12",
+			"market_price": {
+				"amount": 95,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0015",
+			"game": "magic",
+			"printing_id": "prt-magic-neo-42",
+			"market_price": {
+				"amount": 2650,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0016",
+			"game": "magic",
+			"printing_id": "prt-magic-mom-194",
+			"market_price": {
+				"amount": 20,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "magic-price-0017",
+			"game": "magic",
+			"printing_id": "prt-magic-m10-15",
+			"market_price": null
+		}
+	],
+	"next_cursor": "magic-price-0017",
+	"has_more": false
+}

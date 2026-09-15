@@ -1,0 +1,242 @@
+{
+	"records": [
+		{
+			"kind": "set",
+			"cursor": "magic-0001",
+			"game": "magic",
+			"code": "lea",
+			"name": "Limited Edition Alpha",
+			"released_on": "1993-08-05"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0002",
+			"game": "magic",
+			"code": "m10",
+			"name": "Magic 2010",
+			"released_on": "2009-07-17"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0003",
+			"game": "magic",
+			"code": "unh",
+			"name": "Unhinged",
+			"released_on": "2004-11-19"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0004",
+			"game": "magic",
+			"code": "sta",
+			"name": "Strixhaven Mystical Archive",
+			"released_on": "2021-04-23"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0005",
+			"game": "magic",
+			"code": "neo",
+			"name": "Kamigawa: Neon Dynasty",
+			"released_on": "2022-02-18"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0006",
+			"game": "magic",
+			"code": "mom",
+			"name": "March of the Machine",
+			"released_on": "2023-04-21"
+		},
+		{
+			"kind": "set",
+			"cursor": "magic-0007",
+			"game": "magic",
+			"code": "ptc",
+			"name": "Pro Tour Collector Set",
+			"released_on": null
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0008",
+			"game": "magic",
+			"facet": "rarity",
+			"code": "common",
+			"name": "Common",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0009",
+			"game": "magic",
+			"facet": "rarity",
+			"code": "uncommon",
+			"name": "Uncommon",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0010",
+			"game": "magic",
+			"facet": "rarity",
+			"code": "rare",
+			"name": "Rare",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0011",
+			"game": "magic",
+			"facet": "rarity",
+			"code": "mythic",
+			"name": "Mythic Rare",
+			"sort_order": 3
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0012",
+			"game": "magic",
+			"facet": "colour_identity",
+			"code": "W",
+			"name": "White",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0013",
+			"game": "magic",
+			"facet": "colour_identity",
+			"code": "U",
+			"name": "Blue",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0014",
+			"game": "magic",
+			"facet": "colour_identity",
+			"code": "B",
+			"name": "Black",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0015",
+			"game": "magic",
+			"facet": "colour_identity",
+			"code": "R",
+			"name": "Red",
+			"sort_order": 3
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0016",
+			"game": "magic",
+			"facet": "colour_identity",
+			"code": "G",
+			"name": "Green",
+			"sort_order": 4
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0017",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "creature",
+			"name": "Creature",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0018",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "instant",
+			"name": "Instant",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0019",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "sorcery",
+			"name": "Sorcery",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0020",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "artifact",
+			"name": "Artifact",
+			"sort_order": 3
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0021",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "enchantment",
+			"name": "Enchantment",
+			"sort_order": 4
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0022",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "planeswalker",
+			"name": "Planeswalker",
+			"sort_order": 5
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0023",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "land",
+			"name": "Land",
+			"sort_order": 6
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0024",
+			"game": "magic",
+			"facet": "card_type",
+			"code": "battle",
+			"name": "Battle",
+			"sort_order": 7
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0025",
+			"game": "magic",
+			"facet": "finish",
+			"code": "nonfoil",
+			"name": "Non-foil",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0026",
+			"game": "magic",
+			"facet": "finish",
+			"code": "foil",
+			"name": "Foil",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "magic-0027",
+			"game": "magic",
+			"facet": "finish",
+			"code": "etched",
+			"name": "Etched foil",
+			"sort_order": 2
+		}
+	],
+	"next_cursor": "magic-0027",
+	"has_more": true
+}

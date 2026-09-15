@@ -45,6 +45,20 @@ pnpm cf:types            # regenerate worker-configuration.d.ts after editing wr
 
 Conventions (spec §4.1): every table is `STRICT`; ids are opaque ULIDs from `newId()`; `store_id` is on every store-owned table; timestamps are epoch-ms integers; money is an integer of minor units. Condition, Language, `Money` and the error codes are defined once in `shared/` and imported by the schema through the column builders in `server/db/columns.ts`.
 
+## Catalogue contract
+
+The Catalogue is reached over HTTPS as a named consumer; its generated OpenAPI document is the contract (ADR 0013, spec §5). The document is committed at `server/catalogue/openapi.json` and one pinned generator (`@hey-api/openapi-ts`) turns it into TypeScript types and Zod 4 schemas under `server/catalogue/generated/`, both committed so the build tests offline and contract change lands as a reviewable diff.
+
+```bash
+pnpm catalogue:contract            # fetch staging's document, regenerate, then commit both
+pnpm catalogue:contract:generate   # regenerate from the committed document
+pnpm catalogue:contract:check      # fail if the committed output is stale (CI runs this)
+```
+
+`catalogue:contract` reads `CATALOGUE_BASE_URL` and `CATALOGUE_CREDENTIAL` (see `.env.example`). Until the Catalogue has a staging environment serving a document, the committed copy is authored from `docs/catalogue-requirements.md`; the first fetch replaces it and the diff is the contract change.
+
+`server/catalogue/client.ts` is the one code path across the seam: `createCatalogueClient({ fetch, baseURL, credential })`. Production passes the Worker's `fetch`; tests pass `fixtureFetch` from `test/support/catalogue-fixture.ts`, which serves the committed fixture under `test/fixtures/catalogue/` by path. Every fixture record validates against the generated schemas, and a test pins what the fixture must hold (spec §5.6).
+
 ## Checks
 
 ```bash
@@ -56,6 +70,8 @@ pnpm test:e2e     # playwright against the built Worker served by `wrangler dev`
 ```
 
 `pnpm test:e2e` builds first, applies the migrations, then starts `wrangler dev` on port 8787; set `CI=1` to refuse an already-running server.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs only `pnpm catalogue:contract:check` so far; the rest of the pipeline is deployment fog (spec §10.1).
 
 ## Agents
 

@@ -1,0 +1,239 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"title": "Catalogue read API",
+		"version": "0.0.0-requirements",
+		"description": "The contract shop-keepr builds against (ADR 0013). This copy is authored from docs/catalogue-requirements.md because the Catalogue has no staging environment serving a generated document yet. `pnpm catalogue:contract` replaces it with staging's document once one exists; the resulting diff is the contract change."
+	},
+	"security": [{ "consumerKey": [] }],
+	"paths": {
+		"/games/{game}/catalogue": {
+			"get": {
+				"operationId": "walkCatalogue",
+				"summary": "Walk one Game System's Catalogue changes from a cursor",
+				"description": "Every record shop-keepr mirrors (sets, vocabularies, Printings), ordered by an opaque, monotonic, exhaustive cursor the Catalogue issues. Walking from cursor `0` returns everything. A withdrawn Printing arrives as a record flagged `withdrawn`, never as absence.",
+				"parameters": [{ "$ref": "#/components/parameters/game" }, { "$ref": "#/components/parameters/cursorQuery" }],
+				"responses": {
+					"200": {
+						"description": "One page of records at or after the cursor.",
+						"content": { "application/json": { "schema": { "$ref": "#/components/schemas/CataloguePage" } } }
+					},
+					"default": { "$ref": "#/components/responses/Problem" }
+				}
+			}
+		},
+		"/games/{game}/market-prices": {
+			"get": {
+				"operationId": "walkMarketPrices",
+				"summary": "Walk one Game System's Market Price movements from a cursor",
+				"description": "Price movements only, on the same cursor rules as the Catalogue walk, so prices refresh on their own cadence without re-reading card facts.",
+				"parameters": [{ "$ref": "#/components/parameters/game" }, { "$ref": "#/components/parameters/cursorQuery" }],
+				"responses": {
+					"200": {
+						"description": "One page of price movements at or after the cursor.",
+						"content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarketPricePage" } } }
+					},
+					"default": { "$ref": "#/components/responses/Problem" }
+				}
+			}
+		}
+	},
+	"components": {
+		"securitySchemes": {
+			"consumerKey": {
+				"type": "http",
+				"scheme": "bearer",
+				"description": "An API key belonging to a named Consumer. shop-keepr is Consumer #1; one key per environment."
+			}
+		},
+		"parameters": {
+			"game": {
+				"name": "game",
+				"in": "path",
+				"required": true,
+				"description": "Game System code.",
+				"schema": { "$ref": "#/components/schemas/GameCode" }
+			},
+			"cursorQuery": {
+				"name": "cursor",
+				"in": "query",
+				"required": true,
+				"description": "Resume from this cursor; `0` walks from the beginning.",
+				"schema": { "$ref": "#/components/schemas/Cursor" }
+			}
+		},
+		"responses": {
+			"Problem": {
+				"description": "The request failed.",
+				"content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+			}
+		},
+		"schemas": {
+			"GameCode": {
+				"type": "string",
+				"minLength": 1,
+				"description": "Opaque code for a Game System, e.g. `magic`, `pokemon`."
+			},
+			"Cursor": {
+				"type": "string",
+				"minLength": 1,
+				"description": "Opaque, monotonic, exhaustive: stored and returned verbatim, never parsed."
+			},
+			"CataloguePage": {
+				"type": "object",
+				"required": ["records", "next_cursor", "has_more"],
+				"properties": {
+					"records": { "type": "array", "items": { "$ref": "#/components/schemas/CatalogueRecord" } },
+					"next_cursor": { "$ref": "#/components/schemas/Cursor" },
+					"has_more": { "type": "boolean" }
+				}
+			},
+			"CatalogueRecord": {
+				"oneOf": [
+					{ "$ref": "#/components/schemas/SetRecord" },
+					{ "$ref": "#/components/schemas/VocabularyRecord" },
+					{ "$ref": "#/components/schemas/PrintingRecord" }
+				],
+				"discriminator": {
+					"propertyName": "kind",
+					"mapping": {
+						"set": "#/components/schemas/SetRecord",
+						"vocabulary": "#/components/schemas/VocabularyRecord",
+						"printing": "#/components/schemas/PrintingRecord"
+					}
+				}
+			},
+			"SetRecord": {
+				"type": "object",
+				"required": ["kind", "cursor", "game", "code", "name", "released_on"],
+				"properties": {
+					"kind": { "type": "string", "const": "set" },
+					"cursor": { "$ref": "#/components/schemas/Cursor" },
+					"game": { "$ref": "#/components/schemas/GameCode" },
+					"code": { "type": "string", "minLength": 1 },
+					"name": { "type": "string", "minLength": 1 },
+					"released_on": { "type": ["string", "null"], "format": "date" }
+				}
+			},
+			"VocabularyRecord": {
+				"type": "object",
+				"description": "One value of one Facet's value list for one Game System.",
+				"required": ["kind", "cursor", "game", "facet", "code", "name", "sort_order"],
+				"properties": {
+					"kind": { "type": "string", "const": "vocabulary" },
+					"cursor": { "$ref": "#/components/schemas/Cursor" },
+					"game": { "$ref": "#/components/schemas/GameCode" },
+					"facet": { "type": "string", "minLength": 1, "description": "The attribute key this value belongs to, e.g. `rarity`." },
+					"code": { "type": "string", "minLength": 1 },
+					"name": { "type": "string", "minLength": 1 },
+					"sort_order": { "type": "integer" }
+				}
+			},
+			"PrintingRecord": {
+				"type": "object",
+				"description": "The full record of one Printing. `set_code` and `rarity` are Facets for every Game System; per-game attributes live in `attributes` and are matched by string compare, never interpreted.",
+				"required": [
+					"kind",
+					"cursor",
+					"game",
+					"id",
+					"card_id",
+					"name",
+					"set_code",
+					"collector_number",
+					"rarity",
+					"withdrawn",
+					"market_price",
+					"market_price_cursor",
+					"attributes",
+					"images"
+				],
+				"properties": {
+					"kind": { "type": "string", "const": "printing" },
+					"cursor": { "$ref": "#/components/schemas/Cursor" },
+					"game": { "$ref": "#/components/schemas/GameCode" },
+					"id": { "type": "string", "minLength": 1, "description": "Opaque Printing identifier; the sole origin of a Printing." },
+					"card_id": { "type": "string", "minLength": 1, "description": "Opaque Card identifier shared by every Printing of one Card." },
+					"name": { "type": "string", "minLength": 1 },
+					"set_code": { "type": "string", "minLength": 1 },
+					"collector_number": { "type": ["string", "null"] },
+					"rarity": { "type": ["string", "null"], "description": "Normalised rarity code; absent values are normal." },
+					"withdrawn": { "type": "boolean" },
+					"market_price": {
+						"oneOf": [{ "$ref": "#/components/schemas/MarketPrice" }, { "type": "null" }],
+						"description": "Current Market Price, or null when the Catalogue has none."
+					},
+					"market_price_cursor": {
+						"oneOf": [{ "$ref": "#/components/schemas/Cursor" }, { "type": "null" }],
+						"description": "The cursor at which the Market Price last moved."
+					},
+					"attributes": { "$ref": "#/components/schemas/Attributes" },
+					"images": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/Image" } }
+				}
+			},
+			"MarketPrice": {
+				"type": "object",
+				"required": ["amount", "currency"],
+				"properties": {
+					"amount": { "type": "integer", "minimum": 0, "description": "Integer minor units of `currency`." },
+					"currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217 code." }
+				}
+			},
+			"AttributeValue": {
+				"description": "Facets and Pricing Attributes are matched on string values, a multi-valued one as a list of codes, never a joined string. Numeric and boolean values are gameplay attributes (mana value, HP): stored and rendered verbatim, never matched.",
+				"oneOf": [
+					{ "type": "string" },
+					{ "type": "array", "items": { "type": "string" } },
+					{ "type": "number" },
+					{ "type": "boolean" },
+					{ "type": "null" }
+				]
+			},
+			"Attributes": {
+				"type": "object",
+				"description": "Every per-game attribute of the Printing, verbatim; Facets and Pricing Attributes are chosen from these by shop-keepr.",
+				"additionalProperties": { "$ref": "#/components/schemas/AttributeValue" }
+			},
+			"Image": {
+				"type": "object",
+				"required": ["face", "thumbnail", "full"],
+				"properties": {
+					"face": { "type": "integer", "minimum": 0, "description": "Face index; multi-faced Printings carry one entry per face." },
+					"thumbnail": { "type": "string", "format": "uri" },
+					"full": { "type": "string", "format": "uri" }
+				}
+			},
+			"MarketPricePage": {
+				"type": "object",
+				"required": ["records", "next_cursor", "has_more"],
+				"properties": {
+					"records": { "type": "array", "items": { "$ref": "#/components/schemas/MarketPriceRecord" } },
+					"next_cursor": { "$ref": "#/components/schemas/Cursor" },
+					"has_more": { "type": "boolean" }
+				}
+			},
+			"MarketPriceRecord": {
+				"type": "object",
+				"required": ["cursor", "game", "printing_id", "market_price"],
+				"properties": {
+					"cursor": { "$ref": "#/components/schemas/Cursor" },
+					"game": { "$ref": "#/components/schemas/GameCode" },
+					"printing_id": { "type": "string", "minLength": 1 },
+					"market_price": {
+						"oneOf": [{ "$ref": "#/components/schemas/MarketPrice" }, { "type": "null" }]
+					}
+				}
+			},
+			"Problem": {
+				"type": "object",
+				"required": ["title", "status"],
+				"properties": {
+					"type": { "type": "string" },
+					"title": { "type": "string" },
+					"status": { "type": "integer" },
+					"detail": { "type": "string" }
+				}
+			}
+		}
+	}
+}

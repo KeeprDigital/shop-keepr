@@ -1,0 +1,390 @@
+{
+	"records": [
+		{
+			"kind": "set",
+			"cursor": "pokemon-0001",
+			"game": "pokemon",
+			"code": "base1",
+			"name": "Base Set",
+			"released_on": "1999-01-09"
+		},
+		{
+			"kind": "set",
+			"cursor": "pokemon-0002",
+			"game": "pokemon",
+			"code": "sv3pt5",
+			"name": "Scarlet & Violet 151",
+			"released_on": "2023-09-22"
+		},
+		{
+			"kind": "set",
+			"cursor": "pokemon-0003",
+			"game": "pokemon",
+			"code": "sv2a",
+			"name": "ポケモンカード151",
+			"released_on": "2023-06-16"
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0004",
+			"game": "pokemon",
+			"facet": "rarity",
+			"code": "common",
+			"name": "Common",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0005",
+			"game": "pokemon",
+			"facet": "rarity",
+			"code": "uncommon",
+			"name": "Uncommon",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0006",
+			"game": "pokemon",
+			"facet": "rarity",
+			"code": "rare",
+			"name": "Rare",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0007",
+			"game": "pokemon",
+			"facet": "rarity",
+			"code": "rare_holo",
+			"name": "Rare Holo",
+			"sort_order": 3
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0008",
+			"game": "pokemon",
+			"facet": "card_kind",
+			"code": "pokemon",
+			"name": "Pokémon",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0009",
+			"game": "pokemon",
+			"facet": "card_kind",
+			"code": "trainer",
+			"name": "Trainer",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0010",
+			"game": "pokemon",
+			"facet": "card_kind",
+			"code": "energy",
+			"name": "Energy",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0011",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "grass",
+			"name": "Grass",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0012",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "fire",
+			"name": "Fire",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0013",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "water",
+			"name": "Water",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0014",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "lightning",
+			"name": "Lightning",
+			"sort_order": 3
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0015",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "psychic",
+			"name": "Psychic",
+			"sort_order": 4
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0016",
+			"game": "pokemon",
+			"facet": "energy_type",
+			"code": "colorless",
+			"name": "Colorless",
+			"sort_order": 5
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0017",
+			"game": "pokemon",
+			"facet": "stage",
+			"code": "basic",
+			"name": "Basic",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0018",
+			"game": "pokemon",
+			"facet": "stage",
+			"code": "stage_1",
+			"name": "Stage 1",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0019",
+			"game": "pokemon",
+			"facet": "stage",
+			"code": "stage_2",
+			"name": "Stage 2",
+			"sort_order": 2
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0020",
+			"game": "pokemon",
+			"facet": "variant",
+			"code": "normal",
+			"name": "Normal",
+			"sort_order": 0
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0021",
+			"game": "pokemon",
+			"facet": "variant",
+			"code": "holo",
+			"name": "Holofoil",
+			"sort_order": 1
+		},
+		{
+			"kind": "vocabulary",
+			"cursor": "pokemon-0022",
+			"game": "pokemon",
+			"facet": "variant",
+			"code": "reverse_holo",
+			"name": "Reverse Holofoil",
+			"sort_order": 2
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0023",
+			"game": "pokemon",
+			"id": "prt-pokemon-base1-58",
+			"card_id": "card-pokemon-pikachu-base1-58",
+			"name": "Pikachu",
+			"set_code": "base1",
+			"collector_number": "58",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 325,
+				"currency": "USD"
+			},
+			"market_price_cursor": "pokemon-price-0001",
+			"attributes": {
+				"card_kind": "pokemon",
+				"energy_type": "lightning",
+				"stage": "basic",
+				"variant": "normal",
+				"hp": 40,
+				"national_dex": 25
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-base1-58/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-base1-58/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0024",
+			"game": "pokemon",
+			"id": "prt-pokemon-sv3pt5-25",
+			"card_id": "card-pokemon-pikachu-sv3pt5-25",
+			"name": "Pikachu",
+			"set_code": "sv3pt5",
+			"collector_number": "25",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 20,
+				"currency": "USD"
+			},
+			"market_price_cursor": "pokemon-price-0002",
+			"attributes": {
+				"card_kind": "pokemon",
+				"energy_type": "lightning",
+				"stage": "basic",
+				"variant": "normal",
+				"hp": 60,
+				"national_dex": 25
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-sv3pt5-25/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-sv3pt5-25/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0025",
+			"game": "pokemon",
+			"id": "prt-pokemon-sv3pt5-25-rh",
+			"card_id": "card-pokemon-pikachu-sv3pt5-25",
+			"name": "Pikachu",
+			"set_code": "sv3pt5",
+			"collector_number": "25",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 55,
+				"currency": "USD"
+			},
+			"market_price_cursor": "pokemon-price-0003",
+			"attributes": {
+				"card_kind": "pokemon",
+				"energy_type": "lightning",
+				"stage": "basic",
+				"variant": "reverse_holo",
+				"hp": 60,
+				"national_dex": 25
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-sv3pt5-25-rh/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-sv3pt5-25-rh/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0026",
+			"game": "pokemon",
+			"id": "prt-pokemon-sv2a-25",
+			"card_id": "card-pokemon-pikachu-sv2a-25",
+			"name": "ピカチュウ",
+			"set_code": "sv2a",
+			"collector_number": "025",
+			"rarity": "common",
+			"withdrawn": false,
+			"market_price": null,
+			"market_price_cursor": null,
+			"attributes": {
+				"card_kind": "pokemon",
+				"energy_type": "lightning",
+				"stage": "basic",
+				"variant": "normal",
+				"hp": 60,
+				"national_dex": 25
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-sv2a-25/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-sv2a-25/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0027",
+			"game": "pokemon",
+			"id": "prt-pokemon-base1-4",
+			"card_id": "card-pokemon-charizard-base1-4",
+			"name": "Charizard",
+			"set_code": "base1",
+			"collector_number": "4",
+			"rarity": "rare_holo",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 41000,
+				"currency": "USD"
+			},
+			"market_price_cursor": "pokemon-price-0004",
+			"attributes": {
+				"card_kind": "pokemon",
+				"energy_type": "fire",
+				"stage": "stage_2",
+				"variant": "holo",
+				"hp": 120,
+				"national_dex": 6
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-base1-4/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-base1-4/0/full.jpg"
+				}
+			]
+		},
+		{
+			"kind": "printing",
+			"cursor": "pokemon-0028",
+			"game": "pokemon",
+			"id": "prt-pokemon-base1-88",
+			"card_id": "card-pokemon-professor-oak-base1-88",
+			"name": "Professor Oak",
+			"set_code": "base1",
+			"collector_number": "88",
+			"rarity": "uncommon",
+			"withdrawn": false,
+			"market_price": {
+				"amount": 180,
+				"currency": "USD"
+			},
+			"market_price_cursor": "pokemon-price-0005",
+			"attributes": {
+				"card_kind": "trainer",
+				"energy_type": null,
+				"stage": null,
+				"variant": "normal",
+				"hp": null,
+				"national_dex": null
+			},
+			"images": [
+				{
+					"face": 0,
+					"thumbnail": "https://images.catalogue.test/printings/prt-pokemon-base1-88/0/thumbnail.jpg",
+					"full": "https://images.catalogue.test/printings/prt-pokemon-base1-88/0/full.jpg"
+				}
+			]
+		}
+	],
+	"next_cursor": "pokemon-0028",
+	"has_more": false
+}

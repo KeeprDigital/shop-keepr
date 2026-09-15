@@ -1,0 +1,51 @@
+{
+	"records": [
+		{
+			"cursor": "pokemon-price-0001",
+			"game": "pokemon",
+			"printing_id": "prt-pokemon-base1-58",
+			"market_price": {
+				"amount": 325,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "pokemon-price-0002",
+			"game": "pokemon",
+			"printing_id": "prt-pokemon-sv3pt5-25",
+			"market_price": {
+				"amount": 20,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "pokemon-price-0003",
+			"game": "pokemon",
+			"printing_id": "prt-pokemon-sv3pt5-25-rh",
+			"market_price": {
+				"amount": 55,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "pokemon-price-0004",
+			"game": "pokemon",
+			"printing_id": "prt-pokemon-base1-4",
+			"market_price": {
+				"amount": 41000,
+				"currency": "USD"
+			}
+		},
+		{
+			"cursor": "pokemon-price-0005",
+			"game": "pokemon",
+			"printing_id": "prt-pokemon-base1-88",
+			"market_price": {
+				"amount": 180,
+				"currency": "USD"
+			}
+		}
+	],
+	"next_cursor": "pokemon-price-0005",
+	"has_more": false
+}
