@@ -5,7 +5,13 @@ import withNuxt from './.nuxt/eslint.config.mjs';
 export default withNuxt(
 	antfu({
 		// Throwaway spikes (issues #4, #13, #18, #19); not app code.
-		ignores: ['spike/**'],
+		ignores: [
+			'spike/**',
+			// drizzle-kit's snapshot and journal files.
+			'server/db/migrations/meta/**',
+			// `wrangler types` output.
+			'worker-configuration.d.ts',
+		],
 		antislop: true,
 		typescript: true,
 		vue: true,

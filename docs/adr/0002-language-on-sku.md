@@ -16,7 +16,7 @@ Rejected because it makes the entire Catalogue carry a language dimension for ev
 
 ## Consequences
 
-**This is a bet on rarity, and it has an exit.** If non-default-language stock stops being rare, language belongs on the Printing after all, and moving it means re-pointing existing stock *and its ledger history* at different printings. The append-only ledger makes that fiddlier than a normal migration. Recorded here so that whoever reaches that point knows it was a deliberate bet rather than an oversight.
+**This is a bet on rarity, and it has an exit.** If non-default-language stock stops being rare, language belongs on the Printing after all, and moving it means re-pointing existing stock _and its ledger history_ at different printings. The append-only ledger makes that fiddlier than a normal migration. Recorded here so that whoever reaches that point knows it was a deliberate bet rather than an oversight.
 
 **Non-English stock displays English card data.** The Catalogue holds one Printing per card, so the name, rules text and image all come from it. A Japanese copy shows English artwork with a language label attached. Staff will read it correctly; a kiosk customer may not.
 

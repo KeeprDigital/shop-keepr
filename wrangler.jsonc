@@ -1,0 +1,31 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "shop-keepr",
+	"main": ".output/server/index.mjs",
+	"compatibility_date": "2026-08-22",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": ".output/public",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	// The store is in Western Europe. Smart Placement with this hint runs the
+	// Worker beside the D1 primary, which is created once with
+	// `wrangler d1 create shop-keepr --location weur` (spec §4.1, Location).
+	"placement": {
+		"mode": "smart",
+		"hint": "weur"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "shop-keepr",
+			// Placeholder until the database is created; local dev and tests do
+			// not need a real id. Replace with the id `wrangler d1 create` prints.
+			"database_id": "00000000-0000-4000-8000-000000000001",
+			"migrations_dir": "server/db/migrations"
+		}
+	]
+}

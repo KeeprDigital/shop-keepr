@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789104459546,
+      "tag": "0000_store",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789104459887,
+      "tag": "0001_seed-store",
+      "breakpoints": true
+    }
+  ]
+}
