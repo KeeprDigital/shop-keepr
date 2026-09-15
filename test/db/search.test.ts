@@ -68,7 +68,7 @@ describe('the search read model written by the sync (spec §4.2, §5 _Write shap
 		expect(await search('lightning bolt')).toEqual({ answeredBy: null, rows: [] });
 
 		const run = await syncFixture('magic');
-		expect(run.counts).toEqual({ seen: 44, written: 17, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 44, written: 17, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(ids(await search('lightning bolt'))).toEqual(BOLTS);
 		expect((await syncFixture('magic')).counts.written).toBe(0);
 	});
@@ -77,7 +77,7 @@ describe('the search read model written by the sync (spec §4.2, §5 _Write shap
 		await env.DB.prepare(`UPDATE mtg_printing SET keys_version = 0 WHERE id = 'prt-magic-m10-146'`).run();
 
 		const run = await syncFixture('magic');
-		expect(run.counts).toEqual({ seen: 44, written: 1, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 44, written: 1, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(await env.DB.prepare(`SELECT keys_version FROM mtg_printing WHERE id = 'prt-magic-m10-146'`).first()).toEqual({ keys_version: 1 });
 		expect(ids(await search('lightning bolt'))).toEqual(BOLTS);
 		await expect(env.DB.prepare(`INSERT INTO mtg_printing_fts(mtg_printing_fts) VALUES('integrity-check')`).run()).resolves.toBeDefined();

@@ -102,3 +102,21 @@ export const SEARCH_INDEXES: readonly string[] = GAME_SYSTEMS.flatMap(({ table }
 	`CREATE INDEX IF NOT EXISTS ${table}_set_number ON ${table} (set_code, collector_number)`,
 	`CREATE INDEX IF NOT EXISTS ${table}_card ON ${table} (card_id)`,
 ]);
+
+/**
+ * The statements that bring the search table's Market Price copy back
+ * level with `printing` for `ids`, after the Market Price run moved them;
+ * none for a game with no module. Read back rather than restated, so the
+ * two copies cannot disagree.
+ */
+export function searchPriceStatements(game: string, ids: readonly string[]): string[] {
+	const module = gameSystem(game);
+	if (!module || ids.length === 0) {
+		return [];
+	}
+	return packRows(
+		`UPDATE ${module.table} SET market_price = (SELECT market_price FROM printing WHERE printing.id = ${module.table}.id) WHERE id IN (`,
+		ids.map(literal),
+		')',
+	);
+}

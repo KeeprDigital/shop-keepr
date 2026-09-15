@@ -92,9 +92,16 @@ In production the run is the `CatalogueSyncWorkflow` Cloudflare Workflow (bindin
 pnpm catalogue:seed                                  # full walk of every Game System in the fixture into the local D1
 pnpm catalogue:seed --from staging --game magic      # the same against Catalogue staging (needs .dev.vars)
 pnpm catalogue:seed --resume                         # a delta from the stored cursor
+pnpm catalogue:seed --kind market_price              # the Market Price walk instead (see below)
 ```
 
 The seed drives the same sync module inline against the D1 under `.wrangler/state` that `pnpm dev` uses. The module's hash-compare, cursor ordering and quarantine rules are unit-tested against the fixture (`test/unit/catalogue/sync/`); the whole run is tested inside workerd against a real D1 (`test/db/catalogue-sync.test.ts`).
+
+## Market Price and the stepped exchange rate
+
+The Market Price run (`runMarketPriceSync`, kind `market_price`) is the Catalogue's second walk on the same cursor rules: price movements only, per Game System, on a cursor and a lock of its own, so a failed or quarantining Catalogue run never stalls it. It writes `printing.market_price` only when the value differs from the one held, so `market_price_updated_at` means _moved_ and is the reprice sweep's watermark; the game's search-table copy and the verbatim `printing_detail` record follow in the same batch, so a full Catalogue walk afterwards finds no drift. A null Market Price never overwrites a good one: the record is quarantined with reason `null_market_price`, the run finishes `completed_with_drift`, and the gap is logged loudly. A movement for a Printing the Mirror does not hold is skipped and counted in `sync_run.records_skipped`, since the Printing record carries its own Market Price and the Catalogue walk brings it. Tested in `test/db/market-price-sync.test.ts` and `test/unit/catalogue/sync/market-price.spec.ts`.
+
+The exchange rate (ADR 0003) converts a Market Price into the Store's currency in the pipeline's first step and is held as a discrete, versioned value. The hourly cron fetches each pair the Mirror prices in (`printing.market_price_currency` against `store.currency`) from Frankfurter (`server/fx/frankfurter.ts`, the ECB's reference rates, no key, behind a `{ fetch, baseURL }` seam) and judges it against the rate in force: it replaces it only when it has moved past `store.fx_step_threshold_pct` (seed 2 %), and a fetch that fails leaves everything as it was and logs loudly. Every step, fetched or set by hand, is a row in `exchange_rate_step`, the logged event a reprice sweep hangs off. `GET /api/staff/exchange-rate` reads the rates for the System page and `POST /api/staff/exchange-rate` sets one manually (#74 gives it a screen). Tested in `test/db/exchange-rate.test.ts` and `test/unit/fx/`.
 
 ## Search
 

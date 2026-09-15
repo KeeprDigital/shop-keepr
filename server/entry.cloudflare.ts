@@ -7,15 +7,31 @@
  */
 import nitro from 'nitropack/presets/cloudflare/runtime/cloudflare-module';
 import { createDb } from './db/client';
+import { refreshExchangeRates } from './fx/exchange-rate';
+import { createFrankfurterRates } from './fx/frankfurter';
 import { reconcileOnHand } from './ledger/reconcile';
 
 export { CatalogueSyncWorkflow } from './catalogue/sync/workflow';
 
 const handler: ExportedHandler<Env> = {
 	...nitro,
-	/** The hourly reconcile (spec §3, _Reconcile job_): heals `on_hand` from the ledger, logs every heal. */
+	/**
+	 * Hourly: the reconcile (spec §3, _Reconcile job_) heals `on_hand` from
+	 * the ledger and logs every heal; then the exchange rate is fetched and
+	 * judged against the one in force (ADR 0003), stepping only past the
+	 * threshold. Each is its own job: one failing never stops the other.
+	 */
 	async scheduled(_controller, env) {
-		await reconcileOnHand(createDb(env.DB));
+		const db = createDb(env.DB);
+		const results = await Promise.allSettled([
+			reconcileOnHand(db),
+			refreshExchangeRates(db, { source: createFrankfurterRates({ fetch: globalThis.fetch.bind(globalThis) }) }),
+		]);
+		for (const result of results) {
+			if (result.status === 'rejected') {
+				console.error('[cron] a scheduled job failed', result.reason);
+			}
+		}
 	},
 };
 

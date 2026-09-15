@@ -24,6 +24,7 @@ import { heldInSearch, SEARCH_INDEXES } from '../../search/mirror';
 import { newId } from '../../utils/ids';
 import { FIRST_CURSOR } from '../client';
 import { MIRROR_INDEXES } from './indexes';
+import { marketPricePage } from './market-price';
 import { emptyExisting, planPage, vocabularyKey } from './plan';
 import { pageStatements } from './statements';
 
@@ -98,8 +99,8 @@ export async function claimRun(db: D1Client, { kind, game, fromCursor, now, work
 	const [, inserted] = await db.batch([
 		db.prepare(`UPDATE sync_run SET status = 'abandoned', error = ?1, finished_at = ?2, updated_at = ?2 WHERE kind = ?3 AND status = 'running' AND updated_at < ?4`)
 			.bind(`abandoned: no progress for ${STALE_RUNNING_AFTER_MS} ms`, now, kind, now - STALE_RUNNING_AFTER_MS),
-		db.prepare(`INSERT INTO sync_run (id, kind, game_system, status, cursor_from, cursor_to, records_seen, printings_seen, records_written, records_quarantined, records_drifted, error, workflow_instance_id, started_at, updated_at, finished_at)`
-			+ ` SELECT ?1, ?2, ?3, 'running', ?4, ?4, 0, 0, 0, 0, 0, NULL, ?5, ?6, ?6, NULL`
+		db.prepare(`INSERT INTO sync_run (id, kind, game_system, status, cursor_from, cursor_to, records_seen, printings_seen, records_written, records_quarantined, records_drifted, records_skipped, error, workflow_instance_id, started_at, updated_at, finished_at)`
+			+ ` SELECT ?1, ?2, ?3, 'running', ?4, ?4, 0, 0, 0, 0, 0, 0, NULL, ?5, ?6, ?6, NULL`
 			+ ` WHERE NOT EXISTS (SELECT 1 FROM sync_run WHERE kind = ?2 AND status = 'running')`)
 			.bind(runId, kind, game, cursorFrom, workflowInstanceId ?? null, now),
 	]);
@@ -132,13 +133,17 @@ export interface PageOptions extends RunRef {
 export interface PageResult {
 	nextCursor: Cursor;
 	hasMore: boolean;
+	/**
+	 * Whether the run's progress row advanced. False means the page was
+	 * already applied (a replay) or the run lost the lock; the walk tells
+	 * the two apart and only the second is an error.
+	 */
+	applied: boolean;
 }
 
 /**
  * Pulls one page, judges it against the Mirror, applies it as one
- * `batch()`. The run's progress row is the batch's last statement; when it
- * changes nothing the page was already applied (a replay) or the run lost
- * the lock, and only the second is an error.
+ * `batch()`. The run's progress row is the batch's last statement.
  */
 export async function syncPage(db: D1Client, client: CatalogueClient, options: PageOptions): Promise<PageResult> {
 	const page = await client.walkCatalogue(options.game, options.cursor);
@@ -146,13 +151,10 @@ export async function syncPage(db: D1Client, client: CatalogueClient, options: P
 	const plan = await planPage(page.records, existing, { fullWalk: options.fullWalk });
 	const statements = pageStatements(plan, { ...options, nextCursor: page.nextCursor, newId });
 	const results = await db.batch(statements.map(sql => db.prepare(sql)));
-	if (results.at(-1)!.meta.changes === 0) {
-		await assertRunning(db, options.runId);
-	}
 	if (plan.quarantined.length > 0) {
 		console.warn(`[catalogue sync] ${options.game}: quarantined ${plan.quarantined.length} record(s) at cursor ${options.cursor}:`, plan.quarantined.map(q => `${q.recordKind ?? '?'} ${q.recordId ?? '?'} (${q.reason})`).join(', '));
 	}
-	return { nextCursor: page.nextCursor, hasMore: page.hasMore };
+	return { nextCursor: page.nextCursor, hasMore: page.hasMore, applied: results.at(-1)!.meta.changes === 1 };
 }
 
 async function assertRunning(db: D1Client, runId: string): Promise<void> {
@@ -196,16 +198,18 @@ export interface FinishOptions extends RunRef {
 }
 
 /**
- * Settles the run. A full walk counts the Printings the Mirror holds that
- * the walk did not return as drift, rows untouched (absence is not
- * withdrawal, ADR 0009), and clears the quarantine earlier runs left. The
- * status follows the counts. The Mirror and search indexes are built here unless the
- * run was a seed, when they wait for the next run so every Game System
- * seeds bare (spec §4.5).
+ * Settles the run. A full Catalogue walk counts the Printings the Mirror
+ * holds that the walk did not return as drift, rows untouched (absence is
+ * not withdrawal, ADR 0009); a full walk of either kind clears the
+ * quarantine earlier runs of the kind left. The status follows the counts.
+ * A Catalogue run builds the Mirror and search indexes here unless it was
+ * a seed, when they wait for the next run so every Game System seeds bare
+ * (spec §4.5). A Market Price run returns only movements, so it neither
+ * counts absence nor builds anything.
  */
 export async function finishRun(db: D1Client, { runId, kind, game, fullWalk, seed, now }: FinishOptions): Promise<SyncRunSummary> {
 	const row = await readRun(db, runId);
-	const absent = fullWalk ? await absentPrintings(db, game, row.printingsSeen) : 0;
+	const absent = fullWalk && kind === 'catalogue' ? await absentPrintings(db, game, row.printingsSeen) : 0;
 	if (absent > 0) {
 		console.warn(`[catalogue sync] ${game}: the Mirror holds ${absent} Printing(s) the full walk did not return; recorded as drift, rows untouched`);
 	}
@@ -216,7 +220,7 @@ export async function finishRun(db: D1Client, { runId, kind, game, fullWalk, see
 			? db.prepare(`DELETE FROM catalogue_quarantine WHERE kind = ?1 AND game_system = ?2 AND sync_run_id <> ?3`).bind(kind, game, runId)
 			: db.prepare(`SELECT 1`),
 		db.prepare(`UPDATE sync_run SET status = ?1, records_drifted = ?2, finished_at = ?3, updated_at = ?3 WHERE id = ?4 AND status = 'running'`).bind(status, drifted, now, runId),
-		...(seed ? [] : [...MIRROR_INDEXES, ...SEARCH_INDEXES].map(sql => db.prepare(sql))),
+		...(seed || kind !== 'catalogue' ? [] : [...MIRROR_INDEXES, ...SEARCH_INDEXES].map(sql => db.prepare(sql))),
 	]);
 	if (finished!.meta.changes === 0) {
 		await assertRunning(db, runId);
@@ -255,11 +259,12 @@ interface SyncRunRow {
 	records_written: number;
 	records_quarantined: number;
 	records_drifted: number;
+	records_skipped: number;
 }
 
 async function readRun(db: D1Client, runId: string): Promise<SyncRunSummary & { printingsSeen: number }> {
 	const row = await db
-		.prepare(`SELECT id, kind, game_system, status, cursor_from, cursor_to, records_seen, printings_seen, records_written, records_quarantined, records_drifted FROM sync_run WHERE id = ?1`)
+		.prepare(`SELECT id, kind, game_system, status, cursor_from, cursor_to, records_seen, printings_seen, records_written, records_quarantined, records_drifted, records_skipped FROM sync_run WHERE id = ?1`)
 		.bind(runId)
 		.first<SyncRunRow>();
 	if (!row) {
@@ -272,7 +277,7 @@ async function readRun(db: D1Client, runId: string): Promise<SyncRunSummary & { 
 		status: row.status,
 		cursorFrom: row.cursor_from,
 		cursorTo: row.cursor_to,
-		counts: { seen: row.records_seen, written: row.records_written, quarantined: row.records_quarantined, drifted: row.records_drifted },
+		counts: { seen: row.records_seen, written: row.records_written, quarantined: row.records_quarantined, drifted: row.records_drifted, skipped: row.records_skipped },
 		printingsSeen: row.printings_seen,
 	};
 }
@@ -296,9 +301,25 @@ export interface SyncOptions {
 	workflowInstanceId?: string;
 }
 
+/** A page of either kind: pull, judge, apply as one `batch()`. */
+type PageWalker = (db: D1Client, client: CatalogueClient, options: PageOptions) => Promise<PageResult>;
+
+/** Each kind walks its own endpoint; both share the claim, the loop and the finish (ADR 0009: run isolation is the point of two runs). */
+const PAGE_WALKERS: Record<SyncKind, PageWalker> = { catalogue: syncPage, market_price: marketPricePage };
+
 /** The whole Catalogue run for one Game System: claim, every page, finish. */
-export async function runCatalogueSync({ db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId }: SyncOptions): Promise<SyncOutcome> {
-	const kind: SyncKind = 'catalogue';
+export function runCatalogueSync(options: SyncOptions): Promise<SyncOutcome> {
+	return runSync('catalogue', options);
+}
+
+/** The whole Market Price run for one Game System, on its own cursor and its own lock. */
+export function runMarketPriceSync(options: SyncOptions): Promise<SyncOutcome> {
+	return runSync('market_price', options);
+}
+
+/** One run of `kind`: claim, every page, finish; failed and unlocked on any error. */
+export async function runSync(kind: SyncKind, { db: binding, client, game, fromCursor, now = Date.now, steps = inlineSteps, workflowInstanceId }: SyncOptions): Promise<SyncOutcome> {
+	const walkPage = PAGE_WALKERS[kind];
 	const db: D1Client = binding.withSession('first-primary');
 	const claim = await steps.do('claim', () => claimRun(db, { kind, game, fromCursor, now: now(), workflowInstanceId }));
 	if (!claim.claimed) {
@@ -310,7 +331,10 @@ export async function runCatalogueSync({ db: binding, client, game, fromCursor, 
 	try {
 		let cursor = cursorFrom;
 		for (let n = 1; ; n += 1) {
-			const page = await steps.do(`page ${n}`, () => syncPage(db, client, { ...ref, cursor, fullWalk, now: now() }));
+			const page = await steps.do(`page ${n}`, () => walkPage(db, client, { ...ref, cursor, fullWalk, now: now() }));
+			if (!page.applied) {
+				await assertRunning(db, runId);
+			}
 			cursor = page.nextCursor;
 			if (!page.hasMore) {
 				break;

@@ -78,7 +78,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		const run = completed(await sync());
 
 		expect(run).toMatchObject({ kind: 'catalogue', gameSystem: 'magic', status: 'completed', cursorFrom: '0', cursorTo: LAST_MAGIC_CURSOR });
-		expect(run.counts).toEqual({ seen: 44, written: 44, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 44, written: 44, quarantined: 0, drifted: 0, skipped: 0 });
 
 		const rows = await db().query.printing.findMany();
 		expect(rows).toHaveLength(17);
@@ -123,7 +123,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		await sync();
 		const run = completed(await sync(committed, { game: 'pokemon' }));
 		expect(run).toMatchObject({ gameSystem: 'pokemon', status: 'completed', cursorTo: 'pokemon-0028' });
-		expect(run.counts).toEqual({ seen: 28, written: 28, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 28, written: 28, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(await db().query.printing.findMany()).toHaveLength(23);
 	});
 
@@ -134,7 +134,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		const again = completed(await sync());
 		expect(again.id).not.toBe(first.id);
 		expect(again).toMatchObject({ status: 'completed', cursorFrom: '0', cursorTo: LAST_MAGIC_CURSOR });
-		expect(again.counts).toEqual({ seen: 44, written: 0, quarantined: 0, drifted: 0 });
+		expect(again.counts).toEqual({ seen: 44, written: 0, quarantined: 0, drifted: 0, skipped: 0 });
 		expect(await db().query.printing.findMany()).toEqual(before);
 	});
 
@@ -142,7 +142,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		await sync();
 		const run = completed(await sync(committed, { from: 'stored' }));
 		expect(run).toMatchObject({ status: 'completed', cursorFrom: LAST_MAGIC_CURSOR, cursorTo: LAST_MAGIC_CURSOR });
-		expect(run.counts).toEqual({ seen: 0, written: 0, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 0, written: 0, quarantined: 0, drifted: 0, skipped: 0 });
 	});
 
 	it('applies a delta to exactly the row whose record changed', async () => {
@@ -151,7 +151,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 
 		const run = completed(await sync(delta([{ ...magicPrinting(bolt), name: 'Lightning Bolt (misprint)', cursor: 'magic-0045' }]), { from: 'stored' }));
 		expect(run).toMatchObject({ status: 'completed', cursorFrom: LAST_MAGIC_CURSOR, cursorTo: 'magic-0045' });
-		expect(run.counts).toEqual({ seen: 1, written: 1, quarantined: 0, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 1, written: 1, quarantined: 0, drifted: 0, skipped: 0 });
 
 		for (const row of await db().query.printing.findMany()) {
 			if (row.id === bolt) {
@@ -170,7 +170,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 		await sync();
 		const run = completed(await sync(withPrinting(bolt, r => ({ ...r, rarity: 'uncommon' }))));
 		expect(run.status).toBe('completed_with_drift');
-		expect(run.counts).toEqual({ seen: 44, written: 1, quarantined: 0, drifted: 1 });
+		expect(run.counts).toEqual({ seen: 44, written: 1, quarantined: 0, drifted: 1, skipped: 0 });
 		expect(await readBolt()).toMatchObject({ rarity: 'uncommon' });
 	});
 
@@ -188,7 +188,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 
 		const run = completed(await sync(pages));
 		expect(run.status).toBe('completed_with_drift');
-		expect(run.counts).toEqual({ seen: 44, written: 42, quarantined: 2, drifted: 0 });
+		expect(run.counts).toEqual({ seen: 44, written: 42, quarantined: 2, drifted: 0, skipped: 0 });
 
 		const quarantined = (await db().query.catalogueQuarantine.findMany())
 			.map(q => ({ ...q, raw: JSON.parse(q.raw), detail: JSON.parse(q.detail) }));
@@ -264,7 +264,7 @@ describe('the Catalogue walk (ADR 0009: seed, delta and reconcile are one run)',
 
 		const run = completed(await sync(withoutBolt));
 		expect(run.status).toBe('completed_with_drift');
-		expect(run.counts).toEqual({ seen: 43, written: 0, quarantined: 0, drifted: 1 });
+		expect(run.counts).toEqual({ seen: 43, written: 0, quarantined: 0, drifted: 1, skipped: 0 });
 		expect(await readBolt()).toMatchObject({ name: 'Lightning Bolt', withdrawn: false });
 		expect(await db().query.syncRun.findFirst({ where: eq(syncRun.id, run.id) })).toMatchObject({ status: 'completed_with_drift', recordsDrifted: 1 });
 	});

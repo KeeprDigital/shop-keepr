@@ -30,7 +30,12 @@ export function isSyncRunStatus(value: unknown): value is SyncRunStatus {
 	return isOneOf(SYNC_RUN_STATUSES, value);
 }
 
-/** Why a Catalogue record sits in quarantine instead of the Mirror. */
-export const QUARANTINE_REASONS = ['validation_failed', 'unknown_facet_value'] as const;
+/**
+ * Why a Catalogue record sits in quarantine instead of the Mirror. A
+ * `null_market_price` is a movement the Catalogue sent with no rate: the
+ * last known Market Price stands and the record is kept, so the run says
+ * `completed_with_drift` and the gap is visible rather than silent.
+ */
+export const QUARANTINE_REASONS = ['validation_failed', 'unknown_facet_value', 'null_market_price'] as const;
 
 export type QuarantineReason = (typeof QUARANTINE_REASONS)[number];
