@@ -1,5 +1,5 @@
 /**
- * The Catalogue contract layer (ADR 0013, spec §5.3). One pinned generator
+ * The Catalogue contract layer (ADR 0013; spec §5, _The contract layer_). One pinned generator
  * turns the committed OpenAPI document into TypeScript types and Zod 4
  * schemas; both are committed so the build tests offline and contract
  * change lands as a reviewable diff.
@@ -24,7 +24,7 @@ const OUTPUT = fileURLToPath(new URL('server/catalogue/generated', root));
 const DOCUMENT_PATH = '/openapi.json';
 
 /** Fetches the document as Consumer #1 and returns it pretty-printed. */
-export async function fetchDocument({ fetch, baseURL, credential }) {
+async function fetchDocument({ fetch, baseURL, credential }) {
 	const response = await fetch(`${baseURL}${DOCUMENT_PATH}`, {
 		headers: { accept: 'application/json', authorization: `Bearer ${credential}` },
 	});
@@ -60,8 +60,7 @@ async function check() {
 		const stale = [...new Set([...Object.keys(expected), ...Object.keys(committed)])]
 			.filter(name => expected[name] !== committed[name]);
 		if (stale.length > 0) {
-			console.error(`Catalogue contract output is stale: ${stale.join(', ')}\nRun \`pnpm catalogue:contract:generate\` and commit the result.`);
-			process.exit(1);
+			throw new Error(`Catalogue contract output is stale: ${stale.join(', ')}\nRun \`pnpm catalogue:contract:generate\` and commit the result.`);
 		}
 		console.log('Catalogue contract output is fresh.');
 	}
@@ -95,6 +94,4 @@ async function main(mode) {
 	}
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	await main(process.argv[2] ?? 'fetch');
-}
+await main(process.argv[2] ?? 'fetch');

@@ -31,18 +31,21 @@ function problem(status: number, title: string): Response {
 }
 
 /**
- * A `fetch` that serves the committed fixture by path: `GET /games/{game}/
- * {walk}?cursor={cursor}` reads `games/{game}/{walk}/{cursor}.json`. It
- * demands the given bearer credential, as the Catalogue does.
+ * A `fetch` that serves the committed fixture by path: `GET {baseURL}/games/
+ * {game}/{walk}?cursor={cursor}` reads `games/{game}/{walk}/{cursor}.json`.
+ * It demands the given bearer credential, as the Catalogue does.
  */
-export function fixtureFetch({ credential }: { credential: string }): typeof fetch {
+export function fixtureFetch({ baseURL, credential }: { baseURL: string; credential: string }): typeof fetch {
 	return async (input, init) => {
 		const request = new Request(input, init);
 		const url = new URL(request.url);
+		if (!url.href.startsWith(`${baseURL}/`)) {
+			return problem(404, 'not_found');
+		}
 		if (request.headers.get('authorization') !== `Bearer ${credential}`) {
 			return problem(401, 'authentication_required');
 		}
-		const match = /^\/games\/([^/]+)\/(catalogue|market-prices)$/.exec(url.pathname.replace(/^\/api/, ''));
+		const match = /^\/games\/([^/]+)\/(catalogue|market-prices)$/.exec(url.href.slice(baseURL.length).split('?')[0]!);
 		const cursor = url.searchParams.get('cursor');
 		if (!match || !cursor || request.method !== 'GET') {
 			return problem(404, 'not_found');

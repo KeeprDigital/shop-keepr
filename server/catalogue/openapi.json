@@ -180,7 +180,7 @@
 				}
 			},
 			"AttributeValue": {
-				"description": "Multi-valued attributes are a list of codes, never a joined string.",
+				"description": "Facets and Pricing Attributes are matched on string values, a multi-valued one as a list of codes, never a joined string. Numeric and boolean values are gameplay attributes (mana value, HP): stored and rendered verbatim, never matched.",
 				"oneOf": [
 					{ "type": "string" },
 					{ "type": "array", "items": { "type": "string" } },

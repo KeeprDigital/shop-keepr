@@ -100,7 +100,7 @@ export type MarketPrice = {
 };
 
 /**
- * Multi-valued attributes are a list of codes, never a joined string.
+ * Facets and Pricing Attributes are matched on string values, a multi-valued one as a list of codes, never a joined string. Numeric and boolean values are gameplay attributes (mana value, HP): stored and rendered verbatim, never matched.
  */
 export type AttributeValue = string | Array<string> | number | boolean | null;
 

@@ -71,6 +71,8 @@ pnpm test:e2e     # playwright against the built Worker served by `wrangler dev`
 
 `pnpm test:e2e` builds first, applies the migrations, then starts `wrangler dev` on port 8787; set `CI=1` to refuse an already-running server.
 
+GitHub Actions (`.github/workflows/ci.yml`) runs only `pnpm catalogue:contract:check` so far; the rest of the pipeline is deployment fog (spec §10.1).
+
 ## Agents
 
 Conventions for AI agents working in this repo live in `AGENTS.md` and `docs/agents/`.

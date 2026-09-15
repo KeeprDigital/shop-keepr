@@ -1,14 +1,18 @@
 /**
- * The one code path across the Catalogue seam (ADR 0013, spec §5.3). The
+ * The one code path across the Catalogue seam (ADR 0013; spec §5, _The
+ * contract layer_). The
  * client takes `{ fetch, baseURL, credential }`: production passes the
  * Worker's `fetch`; tests pass one that serves the committed fixture by
  * path. Every record is validated against the generated Zod schema and
  * handed back with the outcome, so a caller can quarantine a failure with
- * its raw payload and carry on (spec §5.3 item 5).
+ * its raw payload and carry on (spec §5, _The contract layer_, item 5).
  */
 import type { CatalogueRecord, Cursor, GameCode, MarketPriceRecord, Problem } from './generated/types.gen';
 import { z } from 'zod';
 import { zCataloguePage, zCatalogueRecord, zMarketPriceRecord, zProblem } from './generated/zod.gen';
+
+/** The cursor that walks a Game System from the beginning. */
+export const FIRST_CURSOR: Cursor = '0';
 
 export interface CatalogueClientOptions {
 	fetch: typeof globalThis.fetch;
@@ -73,10 +77,10 @@ export function createCatalogueClient({ fetch, baseURL, credential }: CatalogueC
 	}
 
 	return {
-		/** One page of a Game System's Catalogue changes at or after `cursor`; `'0'` walks from the beginning. */
+		/** One page of a Game System's Catalogue changes after `cursor`; `FIRST_CURSOR` walks from the beginning. */
 		walkCatalogue: (game: GameCode, cursor: Cursor): Promise<Page<CatalogueRecord>> =>
 			walk(`/games/${encodeURIComponent(game)}/catalogue`, cursor, zCatalogueRecord),
-		/** One page of a Game System's Market Price movements at or after `cursor`. */
+		/** One page of a Game System's Market Price movements after `cursor`. */
 		walkMarketPrices: (game: GameCode, cursor: Cursor): Promise<Page<MarketPriceRecord>> =>
 			walk(`/games/${encodeURIComponent(game)}/market-prices`, cursor, zMarketPriceRecord),
 	};

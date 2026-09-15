@@ -31,7 +31,7 @@ describe('generated schemas against the fixture', () => {
 	});
 });
 
-describe('what the fixture holds (spec §5.6)', () => {
+describe('what the fixture holds (spec §5, _Environments and test tiers_)', () => {
 	const all = printings();
 
 	it('covers more than one Game System', () => {
@@ -76,6 +76,17 @@ describe('what the fixture holds (spec §5.6)', () => {
 	it('holds a Printing with and without a Market Price', () => {
 		expect(all.some(p => p.market_price !== null && p.market_price_cursor !== null)).toBe(true);
 		expect(all.some(p => p.market_price === null && p.market_price_cursor === null)).toBe(true);
+	});
+
+	it('walks every price movement the Printings cite, exhaustively from cursor zero', () => {
+		const movements = pages
+			.filter(page => /market-prices\/0\.json$/.test(page.path))
+			.flatMap(page => zMarketPricePage.parse(page.body).records);
+		for (const p of all.filter(p => p.market_price_cursor !== null)) {
+			const latest = movements.filter(m => m.printing_id === p.id).at(-1);
+			expect(latest, p.id).toMatchObject({ cursor: p.market_price_cursor, market_price: p.market_price });
+		}
+		expect(movements.some(m => m.market_price === null)).toBe(true);
 	});
 });
 

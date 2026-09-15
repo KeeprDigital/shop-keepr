@@ -216,11 +216,8 @@
 			"collector_number": "15",
 			"rarity": "rare",
 			"withdrawn": false,
-			"market_price": {
-				"amount": 120,
-				"currency": "USD"
-			},
-			"market_price_cursor": "magic-price-0007",
+			"market_price": null,
+			"market_price_cursor": "magic-price-0017",
 			"attributes": {
 				"colour_identity": [
 					"W"
