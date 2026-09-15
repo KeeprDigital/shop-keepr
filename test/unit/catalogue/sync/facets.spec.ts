@@ -1,6 +1,7 @@
 import type { PrintingRecord } from '../../../../server/catalogue/generated/types.gen';
 import { describe, expect, it } from 'vitest';
-import { displayFinish, judgeFacets } from '../../../../server/catalogue/sync/facets';
+import { displayFinish } from '../../../../server/catalogue/sync/facets';
+import { judgeFacets } from '../../../../server/search/mirror';
 import { fixturePrintings } from '../../../support/catalogue-fixture';
 
 const bolt = fixturePrintings().find(p => p.id === 'prt-magic-m10-146')!;
@@ -10,7 +11,7 @@ function withAttributes(record: PrintingRecord, attributes: PrintingRecord['attr
 	return { ...record, attributes: { ...record.attributes, ...attributes } };
 }
 
-describe('facet judgement (spec §4.2: a value that needs a column of its own is quarantined)', () => {
+describe('facet judgement (spec §4.2: a value that needs a column of its own is quarantined; judged by the Game System module)', () => {
 	it('accepts every fixture Printing', () => {
 		for (const printing of fixturePrintings()) {
 			expect(judgeFacets(printing), printing.id).toEqual({ ok: true });
@@ -30,6 +31,10 @@ describe('facet judgement (spec §4.2: a value that needs a column of its own is
 		expect(judgeFacets({ ...bolt, rarity: 'special' })).toEqual({ ok: true });
 		expect(judgeFacets(withAttributes(bolt, { card_type: 'kindred' }))).toEqual({ ok: true });
 		expect(judgeFacets(withAttributes(pikachu, { energy_type: 'dragon' }))).toEqual({ ok: true });
+	});
+
+	it('has nothing to judge for a game with no module', () => {
+		expect(judgeFacets({ ...bolt, game: 'lorcana', attributes: { colour_identity: 'not even a list' } })).toEqual({ ok: true });
 	});
 
 	it('treats an absent multi-valued Facet as normal', () => {

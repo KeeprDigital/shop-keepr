@@ -18,11 +18,12 @@ import type { SyncKind, SyncRunStatus } from '../../../shared/domain/sync-run';
 import type { CatalogueClient } from '../client';
 import type { Cursor } from '../generated/types.gen';
 import type { Existing, ExistingRow, PageCounts } from './plan';
+import { literal, packRows } from '../../db/sql';
+import { heldInSearch, SEARCH_INDEXES } from '../../search/mirror';
 import { newId } from '../../utils/ids';
 import { FIRST_CURSOR } from '../client';
 import { MIRROR_INDEXES } from './indexes';
 import { emptyExisting, planPage, vocabularyKey } from './plan';
-import { literal, packRows } from './sql';
 import { pageStatements } from './statements';
 
 /** What the sync needs of D1; a Session provides both. */
@@ -163,13 +164,18 @@ async function assertRunning(db: D1Client, runId: string): Promise<void> {
 	}
 }
 
-/** Hash and cursor of every row the page could touch, read in one `batch()`. */
+/**
+ * Hash and cursor of every row the page could touch, read in one
+ * `batch()`. A Printing is held only when its search row is too (ADR
+ * 0008: the search read model is derived, and a missing or outdated row
+ * is a write the next full walk owes).
+ */
 async function readExisting(db: D1Client, game: string, printingIds: string[]): Promise<Existing> {
 	const existing = emptyExisting();
 	const selects = [
 		`SELECT code AS key, content_hash AS hash, cursor FROM catalogue_set WHERE game_system = ${literal(game)}`,
 		`SELECT facet, code, content_hash AS hash, cursor FROM catalogue_vocabulary WHERE game_system = ${literal(game)}`,
-		...packRows('SELECT printing_id AS key, content_hash AS hash, cursor FROM printing_detail WHERE printing_id IN (', printingIds.map(literal), ')'),
+		...packRows('SELECT printing_id AS key, content_hash AS hash, cursor FROM printing_detail WHERE printing_id IN (', printingIds.map(literal), `) AND ${heldInSearch(game)}`),
 	];
 	const [sets, vocabularies, ...printings] = await db.batch<{ key: string; facet: string; code: string; hash: string; cursor: Cursor }>(selects.map(sql => db.prepare(sql)));
 	const held = (row: { hash: string; cursor: Cursor }): ExistingRow => ({ hash: row.hash, cursor: row.cursor });
@@ -195,7 +201,7 @@ export interface FinishOptions extends RunRef {
  * Settles the run. A full walk counts the Printings the Mirror holds that
  * the walk did not return as drift, rows untouched (absence is not
  * withdrawal, ADR 0009), and clears the quarantine earlier runs left. The
- * status follows the counts. The Mirror indexes are built here unless the
+ * status follows the counts. The Mirror and search indexes are built here unless the
  * run was a seed, when they wait for the next run so every Game System
  * seeds bare (spec §4.5).
  */
@@ -212,7 +218,7 @@ export async function finishRun(db: D1Client, { runId, kind, game, fullWalk, see
 			? db.prepare(`DELETE FROM catalogue_quarantine WHERE kind = ?1 AND game_system = ?2 AND sync_run_id <> ?3`).bind(kind, game, runId)
 			: db.prepare(`SELECT 1`),
 		db.prepare(`UPDATE sync_run SET status = ?1, records_drifted = ?2, finished_at = ?3, updated_at = ?3 WHERE id = ?4 AND status = 'running'`).bind(status, drifted, now, runId),
-		...(seed ? [] : MIRROR_INDEXES.map(sql => db.prepare(sql))),
+		...(seed ? [] : [...MIRROR_INDEXES, ...SEARCH_INDEXES].map(sql => db.prepare(sql))),
 	]);
 	if (finished!.meta.changes === 0) {
 		await assertRunning(db, runId);
@@ -229,7 +235,7 @@ async function absentPrintings(db: D1Client, game: string, printingsSeen: number
 
 /** Builds the Mirror indexes; a no-op once they exist. The seed script calls it after every Game System is in. */
 export async function buildMirrorIndexes(db: D1Client): Promise<void> {
-	await db.batch(MIRROR_INDEXES.map(sql => db.prepare(sql)));
+	await db.batch([...MIRROR_INDEXES, ...SEARCH_INDEXES].map(sql => db.prepare(sql)));
 }
 
 export async function failRun(db: D1Client, { runId, now, error }: { runId: string; now: number; error: string }): Promise<void> {

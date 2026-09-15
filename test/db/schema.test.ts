@@ -8,7 +8,10 @@ describe('schema', () => {
 			.all<{ name: string; sql: string }>();
 
 		expect(results.map(row => row.name)).toContain('store');
-		for (const row of results) {
+		expect(results.map(row => row.name)).toContain('mtg_printing');
+		// An FTS5 index is a virtual table with shadow tables of its own; neither can be STRICT.
+		const ownTables = results.filter(row => !/_fts(?:_\w+)?$/.test(row.name));
+		for (const row of ownTables) {
 			expect(row.sql, row.name).toMatch(/\)\s*STRICT\s*$/);
 		}
 	});

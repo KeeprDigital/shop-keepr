@@ -115,6 +115,9 @@ importers:
       better-auth:
         specifier: 1.7.4
         version: 1.7.4(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(kysely@0.29.5))(vitest@4.1.11)(vue@3.5.42(typescript@6.0.3))
+      double-metaphone:
+        specifier: 2.0.1
+        version: 2.0.1
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(kysely@0.29.5)
@@ -4117,6 +4120,10 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
+
+  double-metaphone@2.0.1:
+    resolution: {integrity: sha512-oHqGfNo2bG/VTZSGFz98TWpyv3WD+d9TDOxwAY8L+zqwm4sGawNvEynegjPU+4HowE4HnIXSYAq0lst2YJgfzA==}
+    hasBin: true
 
   drizzle-kit@0.31.10:
     resolution: {integrity: sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==}
@@ -11131,6 +11138,8 @@ snapshots:
       type-fest: 5.9.0
 
   dotenv@17.4.2: {}
+
+  double-metaphone@2.0.1: {}
 
   drizzle-kit@0.31.10:
     dependencies:

@@ -96,6 +96,21 @@ pnpm catalogue:seed --resume                         # a delta from the stored c
 
 The seed drives the same sync module inline against the D1 under `.wrangler/state` that `pnpm dev` uses. The module's hash-compare, cursor ordering and quarantine rules are unit-tested against the fixture (`test/unit/catalogue/sync/`); the whole run is tested inside workerd against a real D1 (`test/db/catalogue-sync.test.ts`).
 
+## Search
+
+Card-name search is the five-tier cascade of spec §4.3 and ADR 0012, run inside D1 as one `batch()` per search and stopped at the first tier with rows: the folded name exactly, the folded name with its spaces stripped, FTS5 token-AND over the folded name (any order, a subset of the tokens, the last as a prefix), Double Metaphone token-AND for respellings and romanisations, and a per-token trigram resolve of the tokens the vocabulary does not know, AND-ed with the rest, for keyboard slips. Every tier is game-scoped, and every tier takes the same in-stock filter and Facet predicates.
+
+The name keys ship as one small versioned library, `shared/search/name-keys.ts` (`fold`, `foldNoSpace`, `metaphoneKey`, `tokenTrigrams`, `NAME_KEYS_VERSION`), applied to every stored name at sync time and to every query. One module per Game System under `server/search/games/` owns its search table (`mtg_printing`, `pokemon_printing`, `onepiece_printing`, `riftbound_printing`), its typed Facet columns (a multi-valued Facet is one boolean column per value), its index set and its Pricing Attribute registry; nothing outside `server/search/` imports a module, and the sync writes the tables through `server/search/mirror.ts`, which also writes each table's FTS5 index explicitly (an external-content index does not follow its base table) and the shared `token_trigram` vocabulary, all in the same page batch. A Printing counts as held by the sync only when its search row exists at the current `NAME_KEYS_VERSION`, so a search table added to a Mirror that already holds the game, or a bump of the version, is filled or rewritten by the next full walk (`pnpm catalogue:seed`).
+
+The staff route is `GET /api/staff/search?game=magic&q=bolt&inStock=false&facet.rarity=common`; `GET /api/staff/search/options?game=magic` is what the Lookup filter controls are built from, read from `catalogue_set` and `catalogue_vocabulary`, never hardcoded.
+
+```bash
+node scripts/search-recall.mjs                # recall per error class on the 38,001 real card names, 300 sampled per class
+node scripts/search-recall.mjs --sample 1000
+```
+
+Never measure search on a generated corpus (spec §9): the script loads `spike/typo-search/data/all-card-names.json` into an in-memory D1 through the same write side the sync uses and applies the spike's thirteen error classes.
+
 ## Checks
 
 ```bash

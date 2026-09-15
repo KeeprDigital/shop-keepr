@@ -15,7 +15,7 @@
 import type { QuarantineReason } from '../../../shared/domain/sync-run';
 import type { ParsedRecord } from '../client';
 import type { CatalogueRecord, Cursor, PrintingRecord, SetRecord, VocabularyRecord } from '../generated/types.gen';
-import { judgeFacets } from './facets';
+import { judgeFacets } from '../../search/mirror';
 import { contentHash } from './hash';
 
 export interface ExistingRow {

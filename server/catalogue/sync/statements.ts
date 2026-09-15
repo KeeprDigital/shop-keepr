@@ -12,12 +12,16 @@
  * - the quarantine rows and the run's counters apply only while the run is
  *   still on the cursor the page started from, so a replayed page cannot
  *   double-count or double-quarantine.
+ *
+ * The game's search table, its FTS5 index and the trigram vocabulary are
+ * written in the same batch by the search module's write side (ADR 0008).
  */
 import type { Cursor, PrintingRecord, SetRecord, VocabularyRecord } from '../generated/types.gen';
 import type { PagePlan, Quarantined, Write } from './plan';
 import type { RunRef } from './run';
+import { literal, packRows, tuple } from '../../db/sql';
+import { searchStatements } from '../../search/mirror';
 import { displayFinish } from './facets';
-import { literal, packRows, tuple } from './sql';
 
 export interface PageWriteContext extends RunRef {
 	/** The cursor the page started from: the run's `cursor_to` while this page is unapplied. */
@@ -34,6 +38,7 @@ export function pageStatements(plan: PagePlan, ctx: PageWriteContext): string[] 
 		...vocabularyStatements(plan.vocabularies, ctx),
 		...printingStatements(plan.printings, ctx),
 		...printingDetailStatements(plan.printings, ctx),
+		...searchStatements(ctx.game, plan.printings.map(w => w.record), ctx),
 		...quarantineStatements(plan.quarantined, ctx),
 		runProgressStatement(plan, ctx),
 	];
