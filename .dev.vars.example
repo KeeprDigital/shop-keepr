@@ -1,0 +1,5 @@
+# Local values for the Catalogue seam (ADR 0013), read by `wrangler dev`,
+# `pnpm dev` and `pnpm catalogue:seed --from staging`. Copy to `.dev.vars`.
+# In every other environment they are Worker secrets (`wrangler secret put`).
+CATALOGUE_BASE_URL=
+CATALOGUE_CREDENTIAL=

@@ -27,5 +27,14 @@
 			"database_id": "00000000-0000-4000-8000-000000000001",
 			"migrations_dir": "server/db/migrations"
 		}
+	],
+	// The Catalogue sync (spec §5, ADR 0009): one Workflow, one instance per
+	// (kind, Game System) run. The class is exported by server/entry.cloudflare.ts.
+	"workflows": [
+		{
+			"binding": "CATALOGUE_SYNC",
+			"name": "catalogue-sync",
+			"class_name": "CatalogueSyncWorkflow"
+		}
 	]
 }
