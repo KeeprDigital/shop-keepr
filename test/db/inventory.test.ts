@@ -1,18 +1,23 @@
 import { env } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDb } from '../../server/db/client';
+import { sku } from '../../server/db/schema';
+import { setExchangeRateManually } from '../../server/fx/exchange-rate';
 import { recordAdjustment } from '../../server/ledger/adjustment';
 import { listInventory } from '../../server/ledger/inventory';
+import { memoryQueue } from '../support/reprice';
 import { seedPrinting, STAFF_ACTOR } from '../support/stock';
 
 const db = createDb(env.DB);
 
 describe('inventory (spec §8.2, `/inventory`)', () => {
 	beforeEach(async () => {
-		await seedPrinting(db);
-		await seedPrinting(db, { id: 'prt-pokemon-base1-4', cardId: 'card-pokemon-charizard', name: 'Charizard', collectorNumber: '4', rarity: 'rare_holo', finish: 'holo' });
-		await seedPrinting(db, { id: 'prt-magic-lea-232', cardId: 'card-magic-black-lotus', gameSystem: 'magic', name: 'Black Lotus', setCode: 'lea', collectorNumber: '232', rarity: 'rare', withdrawn: true });
+		await seedPrinting(db, { marketPrice: 240, marketPriceCurrency: 'USD', marketPriceUpdatedAt: 1_789_084_800_000 });
+		await seedPrinting(db, { id: 'prt-pokemon-base1-4', cardId: 'card-pokemon-charizard', name: 'Charizard', collectorNumber: '4', rarity: 'rare_holo', finish: 'holo', marketPrice: 41_000, marketPriceCurrency: 'USD', marketPriceUpdatedAt: 1_789_084_800_000 });
+		await seedPrinting(db, { id: 'prt-magic-lea-232', cardId: 'card-magic-black-lotus', gameSystem: 'magic', name: 'Black Lotus', setCode: 'lea', collectorNumber: '232', rarity: 'rare', withdrawn: true, marketPrice: 1_000_000, marketPriceCurrency: 'USD', marketPriceUpdatedAt: 1_789_084_800_000 });
 		await seedPrinting(db, { id: 'prt-magic-unf-100', cardId: 'card-magic-hundred', gameSystem: 'magic', name: '100% Chance of Rain', setCode: 'unf', collectorNumber: '100_a', rarity: 'common' });
+		await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.79, sessionId: 'sess_counter_1', queue: memoryQueue(), now: 1_900_000_000_000 });
 		await recordAdjustment(db, { printingId: 'prt-pokemon-base1-58', condition: 'NM', language: 'en', change: { delta: 4 }, reason: 'found' }, STAFF_ACTOR);
 		await recordAdjustment(db, { printingId: 'prt-pokemon-base1-58', condition: 'LP', language: 'ja', change: { delta: 1 }, reason: 'found' }, STAFF_ACTOR);
 		await recordAdjustment(db, { printingId: 'prt-pokemon-base1-4', condition: 'NM', language: 'en', change: { delta: 2 }, reason: 'found' }, STAFF_ACTOR);
@@ -36,6 +41,29 @@ describe('inventory (spec §8.2, `/inventory`)', () => {
 		]);
 		expect(rows[2]).toMatchObject({ printingId: 'prt-pokemon-base1-4', gameSystem: 'pokemon', setCode: 'base1', collectorNumber: '4', finish: 'holo' });
 		expect(rows[2]!.skuId).toBeTypeOf('string');
+	});
+
+	it('carries each row\'s stored Sell and Buy Price, its Market Price and when it was priced, in the Store\'s currency', async () => {
+		const { rows, currency } = await listInventory(db, {});
+		expect(currency).toBe('GBP');
+		// $410 at 0.79 is £323.90: Sell 110 %, rounded up to 10p; Buy 65 %, rounded down to 5p.
+		expect(rows[2]).toMatchObject({ name: 'Charizard', marketPrice: 41_000, marketPriceCurrency: 'USD', sellPrice: 35_630, buyPrice: 21_050, sellPriceSource: 'rule', buyPriceSource: 'rule' });
+		expect(rows[2]!.pricedAt).toBeGreaterThan(0);
+		// No Market Price: evaluated, nothing to say.
+		expect(rows[0]).toMatchObject({ name: '100% Chance of Rain', marketPrice: null, sellPrice: null, buyPrice: null });
+	});
+
+	it('sorts by Sell Price and Buy Price from the stored columns, nulls last', async () => {
+		expect((await listInventory(db, { sort: 'sellPrice', direction: 'asc' })).rows.map(row => row.sellPrice)).toEqual([150, 190, 35_630, 608_300, null]);
+		expect((await listInventory(db, { sort: 'buyPrice', direction: 'desc' })).rows.map(row => row.buyPrice)).toEqual([308_100, 21_050, 95, 60, null]);
+		expect((await listInventory(db, { sort: 'marketPrice', direction: 'desc' })).rows.map(row => row.name)).toEqual(['Black Lotus', 'Charizard', 'Pikachu', 'Pikachu', '100% Chance of Rain']);
+	});
+
+	it('lists a pinned SKU at on-hand 0 beside the stock on hand', async () => {
+		const [sold] = await db.select({ id: sku.id }).from(sku).where(eq(sku.condition, 'HP'));
+		await db.update(sku).set({ sellPrice: 12_345 as never, sellPriceSource: 'pinned', sellPinnedSessionId: 'sess_counter_1', sellPinnedAt: 1_900_000_000_000 }).where(eq(sku.id, sold!.id));
+		const { rows } = await listInventory(db, { q: 'chariz' });
+		expect(rows.map(row => [row.condition, row.onHand, row.sellPrice, row.sellPriceSource])).toEqual([['NM', 2, 35_630, 'rule'], ['HP', 0, 12_345, 'pinned']]);
 	});
 
 	it('filters by Game System and by name', async () => {

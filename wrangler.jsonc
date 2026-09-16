@@ -44,5 +44,26 @@
 			"name": "catalogue-sync",
 			"class_name": "CatalogueSyncWorkflow"
 		}
-	]
+	],
+	// The reprice sweep (spec §6, _The sweep_; ADR 0004): the producer is
+	// every path that asks for a sweep (a rule edit, an FX step, a Market
+	// Price run); the consumer in server/entry.cloudflare.ts runs one chunk
+	// per message and sends the next. One message at a time: the job is
+	// serial by design, and the D1 row is where its state lives.
+	"queues": {
+		"producers": [
+			{
+				"binding": "REPRICE",
+				"queue": "shop-keepr-reprice"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "shop-keepr-reprice",
+				"max_batch_size": 1,
+				"max_retries": 5,
+				"retry_delay": 30
+			}
+		]
+	}
 }

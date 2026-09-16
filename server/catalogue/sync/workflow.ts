@@ -14,6 +14,7 @@ import type { SyncKind } from '../../../shared/domain/sync-run';
 import type { Cursor } from '../generated/types.gen';
 import type { StepRunner, SyncOutcome } from './run';
 import { WorkflowEntrypoint } from 'cloudflare:workers';
+import { repriceQueue } from '../../pricing/queue';
 import { createCatalogueClient } from '../client';
 import { catalogueCredentials } from '../credentials';
 import { runSync } from './run';
@@ -48,6 +49,7 @@ export class CatalogueSyncWorkflow extends WorkflowEntrypoint<Env, CatalogueSync
 			fromCursor,
 			steps: workflowSteps(step),
 			workflowInstanceId: event.instanceId,
+			reprice: repriceQueue(this.env),
 		});
 	}
 }

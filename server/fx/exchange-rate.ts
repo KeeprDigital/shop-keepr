@@ -16,15 +16,20 @@
  * Every dependent write carries its own guard in SQL (spec §4.1; ADR
  * 0011): the step lands only while the rate in force is still the one it
  * was judged against, and the rate moves only once its step exists.
+ *
+ * A step is the event a full reprice sweep hangs off (spec §6, _When
+ * prices are recomputed_): every step, fetched or manual, asks for one.
  */
 import type { ExchangeRateView } from '../../shared/contracts/staff/exchange-rate';
 import type { ExchangeRateStepSource } from '../../shared/domain/exchange-rate';
 import type { Db } from '../db/client';
+import type { RepriceQueue } from '../pricing/sweep';
 import type { RateSource } from './frankfurter';
 import type { StepJudgement } from './step';
 import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import { exchangeRate, exchangeRateStep, printing, store } from '../db/schema';
 import { prepared } from '../ledger/statement';
+import { requestSweep } from '../pricing/sweep';
 import { apiError } from '../utils/api-error';
 import { newId } from '../utils/ids';
 import { STORE_ID } from '../utils/store';
@@ -46,7 +51,7 @@ export interface RefreshOutcome extends Pair {
 }
 
 /** The scheduled fetch: every pair the Mirror needs, judged, recorded, stepped where the threshold says. */
-export async function refreshExchangeRates(db: Db, { source, now = Date.now() }: { source: RateSource; now?: number }): Promise<RefreshOutcome[]> {
+export async function refreshExchangeRates(db: Db, { source, queue, now = Date.now() }: { source: RateSource; queue: RepriceQueue; now?: number }): Promise<RefreshOutcome[]> {
 	const { currency: quoteCurrency, fxStepThresholdPct } = await readFxSettings(db);
 	const outcomes: RefreshOutcome[] = [];
 	for (const baseCurrency of await pricedCurrencies(db, quoteCurrency)) {
@@ -64,6 +69,7 @@ export async function refreshExchangeRates(db: Db, { source, now = Date.now() }:
 		const stepped = await recordStep(db, { ...pair, from: judgement.from, to: judgement.to, fetched, source: 'fetched', sessionId: null, now });
 		if (stepped) {
 			console.warn(`[fx] ${baseCurrency}/${quoteCurrency} stepped ${judgement.from ?? 'nothing'} -> ${judgement.to} (fetched ${fetched}, threshold ${fxStepThresholdPct}%)`);
+			await requestSweep(db, queue, { reason: 'fx', games: null, watermark: false, now });
 		}
 		outcomes.push({ ...pair, fetched, rate: stepped ? judgement.to : held?.rate ?? null, stepped });
 	}
@@ -75,7 +81,7 @@ export async function refreshExchangeRates(db: Db, { source, now = Date.now() }:
  * recorded with the session that made it. Only for a currency the Mirror
  * prices in, or one already held; the Store's own needs no rate.
  */
-export async function setExchangeRateManually(db: Db, { baseCurrency, rate, sessionId, now = Date.now() }: { baseCurrency: string; rate: number; sessionId: string; now?: number }): Promise<ExchangeRateView> {
+export async function setExchangeRateManually(db: Db, { baseCurrency, rate, sessionId, queue, now = Date.now() }: { baseCurrency: string; rate: number; sessionId: string; queue: RepriceQueue; now?: number }): Promise<ExchangeRateView> {
 	const { currency: quoteCurrency } = await readFxSettings(db);
 	const held = await readPair(db, baseCurrency);
 	if (!held && !(await pricedCurrencies(db, quoteCurrency)).includes(baseCurrency)) {
@@ -86,6 +92,7 @@ export async function setExchangeRateManually(db: Db, { baseCurrency, rate, sess
 		throw apiError('CONFLICT', { message: `The ${baseCurrency}/${quoteCurrency} rate moved while it was being set; read it again` });
 	}
 	console.warn(`[fx] ${baseCurrency}/${quoteCurrency} set manually ${held?.rate ?? 'nothing'} -> ${rate} by session ${sessionId}`);
+	await requestSweep(db, queue, { reason: 'fx', games: null, watermark: false, now });
 	const [view] = await readExchangeRates(db, baseCurrency);
 	if (!view) {
 		throw apiError('INTERNAL', { message: `The ${baseCurrency}/${quoteCurrency} rate was set but cannot be read back` });

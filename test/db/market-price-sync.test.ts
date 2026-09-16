@@ -8,8 +8,10 @@ import { createCatalogueClient, FIRST_CURSOR } from '../../server/catalogue/clie
 import { claimRun, failRun, runMarketPriceSync, storedCursor } from '../../server/catalogue/sync/run';
 import { createDb } from '../../server/db/client';
 import { catalogueQuarantine, printing, printingDetail, syncRun } from '../../server/db/schema';
+import { readRepriceProgress } from '../../server/pricing/sweep';
 import { fixtureFetchFrom } from '../support/fixture-fetch';
 import { committedPages, fixturePrinting, syncFixture } from '../support/fixture-mirror';
+import { memoryQueue } from '../support/reprice';
 
 const baseURL = 'https://catalogue.test/api';
 const credential = 'shop-keepr-test-key';
@@ -33,9 +35,9 @@ function movement(printingId: string, amount: number | null, cursor: Cursor = 'm
 let tick = 1_900_000_000_000;
 
 /** One Market Price run; a full walk unless told to resume from the stored cursor. */
-function walkPrices(pages: FixturePages = committedPages, { game = 'magic', from = 'zero' }: { game?: string; from?: 'zero' | 'stored' } = {}) {
+function walkPrices(pages: FixturePages = committedPages, { game = 'magic', from = 'zero', reprice }: { game?: string; from?: 'zero' | 'stored'; reprice?: ReturnType<typeof memoryQueue> } = {}) {
 	const client = createCatalogueClient({ fetch: fixtureFetchFrom(pages, { baseURL, credential }), baseURL, credential });
-	return runMarketPriceSync({ db: env.DB, client, game, fromCursor: from === 'zero' ? FIRST_CURSOR : undefined, now: () => (tick += 1_000) });
+	return runMarketPriceSync({ db: env.DB, client, game, fromCursor: from === 'zero' ? FIRST_CURSOR : undefined, now: () => (tick += 1_000), reprice });
 }
 
 function completed(outcome: SyncOutcome) {
@@ -119,6 +121,21 @@ describe('the Market Price walk (ADR 0009: the run only ever carries movements)'
 		expect(run.status).toBe('completed');
 		expect(run.counts).toEqual({ seen: 1, written: 0, quarantined: 0, drifted: 0, skipped: 1 });
 		expect(await db().query.printing.findMany()).toEqual(before);
+	});
+
+	it('asks for a watermark-driven reprice sweep of the game when it moved a price, and none when it did not (spec §5)', async () => {
+		await syncFixture('magic');
+		await walkPrices();
+		const reprice = memoryQueue();
+
+		completed(await walkPrices(priceDelta([movement(bolt, 999, 'magic-price-0001')]), { from: 'stored', reprice }));
+		expect(reprice.sent).toEqual([]);
+		expect(await readRepriceProgress(db())).toBeNull();
+
+		// The stored cursor now stands at that movement's; the next delta walks on from it.
+		completed(await walkPrices(priceDelta([movement(bolt, 260)], 'magic-price-0001'), { from: 'stored', reprice }));
+		expect(reprice.sent).toHaveLength(1);
+		expect(await readRepriceProgress(db())).toMatchObject({ id: reprice.sent[0]!.sweepId, status: 'queued', reason: 'market_price', games: ['magic'], watermark: true });
 	});
 
 	it('leaves a rate alone when the movement is behind the price cursor held', async () => {

@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../../server/db/client';
 import { exchangeRateStep } from '../../server/db/schema';
 import { readExchangeRates, refreshExchangeRates, setExchangeRateManually } from '../../server/fx/exchange-rate';
+import { readRepriceProgress } from '../../server/pricing/sweep';
+import { memoryQueue } from '../support/reprice';
 import { seedPrinting } from '../support/stock';
 
 const db = createDb(env.DB);
@@ -22,13 +24,30 @@ function sourceOf(answer: number | Error, asked: string[] = []): RateSource {
 }
 
 let tick = 1_900_000_000_000;
-const refresh = (answer: number | Error, asked?: string[]) => refreshExchangeRates(db, { source: sourceOf(answer, asked), now: (tick += 60_000) });
+let queue = memoryQueue();
+const refresh = (answer: number | Error, asked?: string[]) => refreshExchangeRates(db, { source: sourceOf(answer, asked), queue, now: (tick += 60_000) });
 const steps = () => db.select().from(exchangeRateStep).orderBy(exchangeRateStep.steppedAt);
 
 describe('the stepped exchange rate (ADR 0003: fetched on a schedule, held as a discrete versioned value)', () => {
 	beforeEach(async () => {
+		queue = memoryQueue();
 		// The Store trades in GBP (the seed migration); the Catalogue prices this Printing in USD.
 		await seedPrinting(db, { marketPrice: 240, marketPriceCurrency: 'USD', marketPriceCursor: 'pokemon-price-0001', marketPriceUpdatedAt: 1_789_084_800_000 });
+	});
+
+	it('asks for a full reprice sweep on every step, fetched or set by hand, and never between steps (spec §6: a step is a logged event a sweep hangs off)', async () => {
+		await refresh(0.79);
+		expect(await readRepriceProgress(db)).toMatchObject({ status: 'queued', reason: 'fx', games: null, watermark: false });
+		expect(queue.sent).toHaveLength(1);
+
+		await refresh(0.795);
+		await refresh(new Error('upstream is down'));
+		expect(queue.sent).toHaveLength(1);
+
+		await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.85, sessionId: 'sess_counter_1', queue, now: (tick += 60_000) });
+		// One job per Store: the manual step folds into the sweep still queued.
+		expect(queue.sent).toHaveLength(1);
+		expect(await readRepriceProgress(db)).toMatchObject({ status: 'queued', reason: 'fx' });
 	});
 
 	it('puts the first fetched rate in force and records it as a step', async () => {
@@ -87,7 +106,7 @@ describe('the stepped exchange rate (ADR 0003: fetched on a schedule, held as a 
 
 	it('takes a manual set as a step of its own, recorded with who set it, and judges the next fetch against it', async () => {
 		await refresh(0.79);
-		const view = await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.85, sessionId: 'sess_counter_1', now: (tick += 60_000) });
+		const view = await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.85, sessionId: 'sess_counter_1', queue, now: (tick += 60_000) });
 		expect(view).toMatchObject({ baseCurrency: 'USD', quoteCurrency: 'GBP', rate: 0.85, fetchedRate: 0.79 });
 		expect(view.step).toMatchObject({ source: 'manual', rateFrom: 0.79, rateTo: 0.85, fetchedRate: null, sessionId: 'sess_counter_1', steppedAt: tick });
 
@@ -97,7 +116,7 @@ describe('the stepped exchange rate (ADR 0003: fetched on a schedule, held as a 
 	});
 
 	it('can be set by hand before anything was ever fetched', async () => {
-		const view = await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.8, sessionId: 'sess_counter_1', now: tick });
+		const view = await setExchangeRateManually(db, { baseCurrency: 'USD', rate: 0.8, sessionId: 'sess_counter_1', queue, now: tick });
 		expect(view).toMatchObject({ rate: 0.8, fetchedRate: null, fetchedAt: null });
 		expect(view.step).toMatchObject({ source: 'manual', rateFrom: null, rateTo: 0.8 });
 	});
@@ -115,8 +134,8 @@ describe('the stepped exchange rate (ADR 0003: fetched on a schedule, held as a 
 	});
 
 	it('refuses a manual set for a currency nothing is priced in', async () => {
-		await expect(setExchangeRateManually(db, { baseCurrency: 'JPY', rate: 0.005, sessionId: 'sess_counter_1', now: tick })).rejects.toMatchObject({ statusCode: 400 });
-		await expect(setExchangeRateManually(db, { baseCurrency: 'GBP', rate: 1, sessionId: 'sess_counter_1', now: tick })).rejects.toMatchObject({ statusCode: 400 });
+		await expect(setExchangeRateManually(db, { baseCurrency: 'JPY', rate: 0.005, sessionId: 'sess_counter_1', queue, now: tick })).rejects.toMatchObject({ statusCode: 400 });
+		await expect(setExchangeRateManually(db, { baseCurrency: 'GBP', rate: 1, sessionId: 'sess_counter_1', queue, now: tick })).rejects.toMatchObject({ statusCode: 400 });
 		expect(await readExchangeRates(db)).toEqual([]);
 	});
 

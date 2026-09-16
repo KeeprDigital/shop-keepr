@@ -29,6 +29,8 @@ import type { Money } from '../../shared/domain/money';
 import type { Db } from '../db/client';
 import type { Actor } from './actor';
 import { sql } from 'drizzle-orm';
+import { loadPricingContext } from '../pricing/context';
+import { repriceAfterLedger } from '../pricing/reprice';
 import { apiError } from '../utils/api-error';
 import { STORE_ID } from '../utils/store';
 import { prepared } from './statement';
@@ -128,7 +130,9 @@ export type CommitOutcome
  * Runs the commit batch and reports whether the entry landed. A header
  * that landed without every line and on-hand update behind it is a
  * broken chain the guards were meant to make impossible; it is reported
- * loudly rather than returned as success.
+ * loudly rather than returned as success. An entry that landed moved
+ * `on_hand`, so each SKU it touched has its Buy Price recomputed here, in
+ * the request (spec §6, _When prices are recomputed_; ADR 0004).
  */
 export async function commitEntry(db: Db, plan: CommitPlan): Promise<CommitOutcome> {
 	const { skuUpserts, headerInsert, lineInserts, onHandUpdates } = commitStatements(db, plan);
@@ -140,6 +144,13 @@ export async function commitEntry(db: Db, plan: CommitPlan): Promise<CommitOutco
 	const dependents = changes.slice(skuUpserts.length + 1);
 	if (dependents.some(count => count !== 1)) {
 		throw apiError('INTERNAL', { message: `Ledger entry ${plan.header.id} landed with a dependent statement missed: ${dependents.join(',')}` });
+	}
+	// The entry has landed; a recompute that fails leaves the previous price, and the next sweep catches up.
+	try {
+		await repriceAfterLedger(db, await loadPricingContext(db), [...new Set(plan.lines.map(line => line.skuId))]);
+	}
+	catch (error) {
+		console.error(`[reprice] ledger entry ${plan.header.id} landed but its SKUs could not be repriced inline`, error);
 	}
 	return { landed: true };
 }

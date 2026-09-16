@@ -10,7 +10,11 @@ export type D1Client = Pick<D1Database, 'prepare' | 'batch'>;
  * same request made even if read replication is ever switched on.
  */
 export function createDb(binding: D1Database) {
-	const session: D1Client = binding.withSession('first-primary');
+	return createDbOn(binding.withSession('first-primary'));
+}
+
+/** Drizzle over a Session already open, so code that writes its own SQL and code that uses Drizzle share one. */
+export function createDbOn(session: D1Client) {
 	return drizzle(session as D1Database, { schema, casing: 'snake_case' });
 }
 
